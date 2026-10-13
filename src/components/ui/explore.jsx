@@ -1,0 +1,169 @@
+import { Link } from 'react-router-dom';
+import { cx } from '../../utils/helpers.js';
+import { SmartImage } from './media.jsx';
+import { ArrowRightIcon } from './icons.jsx';
+
+// ---------------------------------------------------------------------------
+// Photo-led browsing primitives shared by the landing page (/) and the section
+// landing pages. Everything here is deliberately static: hover feedback is a
+// colour / border change only (150ms) and filters swap content instantly.
+//
+// Every photo, srcset and alt text still comes from /src/config/images.js —
+// these components only position it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal paths render as a router link, anything else as a plain anchor, so
+ * a service booking URL from /config/redirects.js can be swapped for an
+ * off-site link later without touching any page.
+ */
+export function ExploreLink({ to, className, children, ...props }) {
+  const internal = typeof to === 'string' && to.startsWith('/');
+  if (internal) {
+    return (
+      <Link to={to} className={className} {...props}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <a href={to} className={className} {...props}>
+      {children}
+    </a>
+  );
+}
+
+const chipBase =
+  'group block overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-navy-900/40 focus-visible:border-navy-900/40';
+const tileBase =
+  'group relative block overflow-hidden rounded-2xl border border-navy-900/10 transition-colors duration-150 hover:border-navy-900/40 focus-visible:border-navy-900/40';
+const cardBase =
+  'group flex h-full flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-navy-900/40 focus-visible:border-navy-900/40';
+
+/** Small photo chip (photo + 1–3 word label) — the "Explore bar" row. */
+export function PhotoChip({ to, image, label, sizes = '(min-width: 1024px) 15vw, 44vw', className }) {
+  return (
+    <ExploreLink to={to} className={cx(chipBase, className)}>
+      <SmartImage image={image} aspect="4 / 3" sizes={sizes} />
+      <span className="block px-3 py-2.5 text-center font-display text-base text-navy-900 transition-colors duration-150 group-hover:text-gold-600 sm:text-lg">
+        {label}
+      </span>
+    </ExploreLink>
+  );
+}
+
+/**
+ * Photo tile with the label sitting over the photo (campus mosaic, games).
+ * The whole tile is one link, so the label is read as the link name.
+ */
+export function PhotoTile({ to, image, label, detail, aspect = '4 / 3', sizes, className, children }) {
+  return (
+    <ExploreLink to={to} className={cx(tileBase, className)}>
+      <SmartImage image={image} aspect={aspect} sizes={sizes} overlay>
+        <span className="absolute inset-x-0 bottom-0 block p-4">
+          <span className="block font-display text-lg text-white transition-colors duration-150 group-hover:text-gold-400 sm:text-xl">
+            {label}
+          </span>
+          {detail && <span className="mt-0.5 block text-xs text-white/80">{detail}</span>}
+        </span>
+      </SmartImage>
+      {children}
+    </ExploreLink>
+  );
+}
+
+/**
+ * Section card: photo, name, one short detail (price / capacity that already
+ * exists in the site data) and a "View" line. Whole card is one link.
+ */
+export function PhotoCard({ to, image, label, detail, aspect = '4 / 3', sizes, className, ...props }) {
+  return (
+    <ExploreLink to={to} className={cx(cardBase, className)} {...props}>
+      <SmartImage image={image} aspect={aspect} sizes={sizes} />
+      <span className="flex flex-1 flex-col p-4 sm:p-5">
+        <span className="block font-display text-lg text-navy-900">{label}</span>
+        {detail && <span className="mt-1 block text-sm text-slate-600">{detail}</span>}
+        <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-navy-900 transition-colors duration-150 group-hover:text-gold-600">
+          View <ArrowRightIcon className="h-4 w-4" />
+        </span>
+      </span>
+    </ExploreLink>
+  );
+}
+
+/**
+ * Instant filter row. Switching tabs swaps the grid with no transition, so the
+ * content changes the moment it is pressed.
+ *
+ * @param {{ options: Array<{ value: string, label: string }>, value: string,
+ *   onChange: (value: string) => void, label: string, className?: string }} props
+ */
+export function FilterRow({ options = [], value, onChange, label, className }) {
+  return (
+    // Scrolls sideways on phones and wraps once there is room for the row.
+    <div
+      className={cx('flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0', className)}
+      role="group"
+      aria-label={label}
+    >
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            aria-pressed={active}
+            className={cx(
+              'shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-colors duration-150',
+              active
+                ? 'border-navy-900 bg-navy-900 text-white'
+                : 'border-slate-300 bg-white text-slate-600 hover:border-navy-900/40 hover:text-navy-900',
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Trailing "Explore" / "View all" link that closes a landing-page section.
+ * `light` is for the navy bands.
+ */
+export function SectionLink({ to, children = 'Explore', light = false, className }) {
+  return (
+    <ExploreLink
+      to={to}
+      className={cx(
+        'mt-6 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors duration-150',
+        light ? 'text-white hover:text-gold-400' : 'text-navy-900 hover:text-gold-600',
+        className,
+      )}
+    >
+      {children} <ArrowRightIcon className="h-4 w-4" />
+    </ExploreLink>
+  );
+}
+
+/** "More to explore" — three photo cards pointing at the other sections. */
+export function MoreToExplore({ items = [], className }) {
+  if (!items.length) return null;
+  return (
+    <div className={cx('grid gap-4 sm:grid-cols-2 lg:grid-cols-3', className)}>
+      {items.map((it) => (
+        <PhotoCard
+          key={it.to + it.label}
+          to={it.to}
+          image={it.image}
+          label={it.label}
+          detail={it.detail}
+          aspect="16 / 10"
+          sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+        />
+      ))}
+    </div>
+  );
+}

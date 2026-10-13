@@ -1,0 +1,98 @@
+/* FRCC design tokens — mirrors tailwind.tokens.js + src/index.css.
+   The other team can ship this file standalone (no Tailwind required for
+   the variables; component classes assume the utilities exist). */
+
+:root {
+  /* Brand — reuse exactly. Only tints/shadows derive from these. */
+  --frcc-navy-950: #0a1730;
+  --frcc-navy-900: #0b1d3a;
+  --frcc-navy-800: #13294d;
+  --frcc-navy-700: #1b3a6b;
+  --frcc-navy-100: #dce4f2;
+  --frcc-navy-50: #eff3fa;
+  --frcc-gold-600: #a9861d;
+  --frcc-gold-500: #c9a227;
+  --frcc-gold-400: #d9bc55;
+  --frcc-gold-100: #f5eac6;
+  --frcc-gold-50: #fbf6e3;
+  --frcc-cream: #faf7f0;
+
+  /* Fonts */
+  --frcc-font-display: "Fraunces", Georgia, serif;
+  --frcc-font-sans: Inter, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Shape + elevation */
+  --frcc-radius-card: 1rem;
+  --frcc-radius-field: 0.75rem;
+  --frcc-shadow-card: 0 10px 30px -12px rgba(11, 29, 58, 0.25);
+  --frcc-shadow-lift: 0 18px 40px -18px rgba(11, 29, 58, 0.35);
+
+  /* Type scale */
+  --frcc-h-display: clamp(2.25rem, 5vw, 3.75rem);
+  --frcc-h-hero: clamp(1.875rem, 4vw, 3rem);
+  --frcc-h-section: clamp(1.5rem, 3vw, 1.875rem);
+}
+
+body {
+  background: var(--frcc-cream);
+  color: #1e293b;
+  font-family: var(--frcc-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Component classes — identical names/roles to the main site. */
+.frcc-container { margin-inline: auto; width: 100%; max-width: 80rem; padding-inline: 1rem; }
+@media (min-width: 640px) { .frcc-container { padding-inline: 1.5rem; } }
+@media (min-width: 1024px) { .frcc-container { padding-inline: 2rem; } }
+
+.frcc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  font-weight: 600; border-radius: var(--frcc-radius-field);
+  padding: 0.625rem 1.25rem; font-size: 0.95rem; line-height: 1.4;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer; border: 1px solid transparent; text-decoration: none;
+}
+.frcc-btn:focus-visible { outline: 2px solid var(--frcc-navy-800); outline-offset: 2px; }
+.frcc-btn-primary { background: var(--frcc-navy-900); color: #fff; }
+.frcc-btn-primary:hover { background: var(--frcc-navy-800); transform: translateY(-2px); box-shadow: var(--frcc-shadow-lift); }
+.frcc-btn-gold { background: var(--frcc-gold-500); color: var(--frcc-navy-950); }
+.frcc-btn-gold:hover { background: var(--frcc-gold-400); transform: translateY(-2px); box-shadow: var(--frcc-shadow-lift); }
+.frcc-btn-outline { background: #fff; color: var(--frcc-navy-900); border-color: rgba(11, 29, 58, 0.2); }
+.frcc-btn-outline:hover { border-color: rgba(11, 29, 58, 0.5); background: var(--frcc-navy-50); }
+.frcc-btn-ghost { color: var(--frcc-navy-900); }
+.frcc-btn-ghost:hover { background: rgba(11, 29, 58, 0.05); }
+
+.frcc-card {
+  background: #fff; border-radius: var(--frcc-radius-card);
+  border: 1px solid rgba(148, 163, 184, 0.35); box-shadow: var(--frcc-shadow-card);
+  padding: 1.25rem;
+}
+.frcc-card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.frcc-card-hover:hover { transform: translateY(-4px); box-shadow: var(--frcc-shadow-lift); }
+
+.frcc-field {
+  width: 100%; border-radius: var(--frcc-radius-field); border: 1px solid #cbd5e1;
+  background: #fff; padding: 0.625rem 0.875rem; color: #0f172a;
+}
+.frcc-field:focus { border-color: var(--frcc-navy-800); outline: 2px solid rgba(11, 29, 58, 0.2); }
+.frcc-label { display: block; font-size: 0.875rem; font-weight: 500; color: #334155; margin-bottom: 0.375rem; }
+.frcc-error { font-size: 0.875rem; color: #dc2626; margin-top: 0.25rem; }
+
+.frcc-tag {
+  display: inline-flex; align-items: center; gap: 0.375rem; border-radius: 999px;
+  border: 1px solid; padding: 0.25rem 0.625rem;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.frcc-tag-gold { border-color: rgba(201, 162, 39, 0.4); background: var(--frcc-gold-50); color: var(--frcc-gold-600); }
+.frcc-tag-navy { border-color: rgba(11, 29, 58, 0.15); background: var(--frcc-navy-50); color: var(--frcc-navy-800); }
+.frcc-tag-green { border-color: rgba(22, 163, 74, 0.3); background: #f0fdf4; color: #15803d; }
+.frcc-tag-slate { border-color: #cbd5e1; background: #f1f5f9; color: #64748b; }
+.frcc-tag-on-dark { border-color: rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+.frcc-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: var(--frcc-gold-600); }
+.frcc-eyebrow-on-dark { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: var(--frcc-gold-400); }
+
+@media (prefers-reduced-motion: reduce) {
+  .frcc-btn, .frcc-card-hover { transition: none; }
+  .frcc-btn-primary:hover, .frcc-btn-gold:hover { transform: none; }
+}
