@@ -13,8 +13,9 @@ import {
   StatusTag,
 } from '../components/ui/feedback.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
-import { BookingBar } from '../components/BookingPanel.jsx';
+import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage, ImageCaption } from '../components/ui/media.jsx';
+import { ExperienceSection } from '../components/ui/explore.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
 import { IMAGES } from '../config/images.js';
 import { SITE_INFO } from '../config/siteInfo.js';
@@ -154,15 +155,20 @@ export function HomeHubPage() {
 
   return (
     <div>
-      {/* 1 · WELCOME HERO — full-bleed photo only */}
-      <HeroImage slot="hero-home" size="large" />
+      {/* 1 · WELCOME HERO — photo only, booking card docked on the right */}
+      <div className="hero-wrap">
+        <HeroImage slot="hero-home" size="large" />
 
-      {/* 2 · BOOKING BAR — half on the hero photo, half on the section below */}
-      <div id="booking" className="container-x relative z-20 -mt-16 scroll-mt-32 lg:-mt-20">
-        <Reveal>
-          <BookingBar />
-        </Reveal>
+        {/* 2 · BOOKING CARD — inside the hero, right side */}
+        <div id="booking" className="hero-card-wrap scroll-mt-32">
+          <Reveal>
+            <BookingCard />
+          </Reveal>
+        </div>
       </div>
+
+      {/* 2a · BOOK YOUR EXPERIENCE — five portrait service tiles */}
+      <ExperienceSection />
 
       {/* 2b · WELCOME — plain heading below the hero */}
       <section className="band-white" aria-label="Welcome home">

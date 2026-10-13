@@ -127,6 +127,16 @@ export function Navbar() {
     setAvatar(false);
   }, [location.pathname]);
 
+  // "Book now" scrolls to the booking card on the landing page and opens
+  // the booking hub everywhere else.
+  function onBookNow(e) {
+    closeAll();
+    if (location.pathname === '/') {
+      e.preventDefault();
+      document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   // Esc closes whatever is open.
   useEffect(() => {
     function onKey(e) {
@@ -365,7 +375,7 @@ export function Navbar() {
           <div className="flex items-center justify-end gap-2">
             <div className="hidden items-center gap-2 lg:flex">
               {!user && <NavLink to="/signin" state={signinState} className={navLink}>Sign in</NavLink>}
-              <GoldCta to="/book" onClick={closeAll}>Book now</GoldCta>
+              <GoldCta to="/book" onClick={onBookNow}>Book now</GoldCta>
               {!user && <OutlineCta to="/signup" onClick={closeAll}>Join now</OutlineCta>}
               {user && <AccountMenu />}
             </div>
@@ -540,7 +550,7 @@ export function Navbar() {
                     <OutlineCta to="/signup" size="md" className="mt-2 w-full" onClick={closeAll}>Join now</OutlineCta>
                   </>
                 )}
-                <GoldCta to="/book" size="md" className="mt-2 w-full" onClick={closeAll}>Book now</GoldCta>
+                <GoldCta to="/book" size="md" className="mt-2 w-full" onClick={onBookNow}>Book now</GoldCta>
                 {MEMBER_PROMO_NOTE && (
                   <p className="mt-3 rounded-xl border border-gold-500/40 bg-gold-50 px-3 py-2 text-xs font-semibold text-navy-900">
                     {MEMBER_PROMO_NOTE}

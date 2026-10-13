@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { BookingBar } from '../components/BookingPanel.jsx';
-import { PageHeader } from '../components/ui/sections.jsx';
+import { HeroImage } from '../components/HeroImage.jsx';
+import { Breadcrumbs } from '../components/ui/sections.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { PhotoTile, SectionLink } from '../components/ui/explore.jsx';
 import { IMAGES } from '../config/images.js';
@@ -43,21 +44,20 @@ const CARDS = [
 export function BookPage() {
   return (
     <div>
-      {/* 1 · Photo header — title over image, navy overlay, one short line */}
-      <PageHeader
-        title="Book anything on campus"
-        description="Pick a service and start your booking — your choices carry through to the booking page."
-        image={IMAGES.bannerHotel}
-        breadcrumbs={[{ label: 'Home', to: '/home' }, { label: 'Book' }]}
-        reserveBottom
-      />
+      {/* 1 · HERO + BOOKING BAR — bar overlaps the hero bottom edge */}
+      <div className="hero-wrap">
+        <HeroImage slot="hero-stay" size="large" />
 
-      {/* 2 · Booking bar — half on photo, half on section below */}
-      <div id="booking" className="container-x relative z-20 -mt-16 scroll-mt-32 sm:-mt-20">
-        <BookingBar />
+        {/* 2 · Booking bar — half on photo, half on section below */}
+        <div id="booking" className="container-x hero-bar scroll-mt-32">
+          <BookingBar />
+        </div>
       </div>
 
-      <div className="container-x section-top">
+      <div className="container-x section-top hero-after">
+        <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Book' }]} />
+        <h1 className="h-section mt-3">Book anything on campus</h1>
+        <p className="mt-3 max-w-2xl text-slate-600">Pick a service and start your booking — your choices carry through to the booking page.</p>
         {/* 3 · Five large photo cards — one per service */}
         <section aria-label="Booking options" className="mt-12">
           <h2 className="h-section">Five ways to spend the day</h2>

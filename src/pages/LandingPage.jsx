@@ -1,28 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookingBar } from '../components/BookingPanel.jsx';
+import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
-import { PhotoTile, FilterRow, SectionLink } from '../components/ui/explore.jsx';
+import { PhotoTile, FilterRow, SectionLink, ExperienceSection } from '../components/ui/explore.jsx';
 import { Lightbox } from '../components/ui/lightbox.jsx';
 import { IMAGES } from '../config/images.js';
 import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
 import { ArrowRightIcon, MapPinIcon, ClockIcon, PhoneIcon } from '../components/ui/icons.jsx';
-
-// 1 · Hero data
-const HERO_HEADLINE = 'Your campus, one membership'; // 6 words
-const HERO_TAGLINE = 'Hotel, halls, parking, games and membership in one place.';
-
-// 2 · Explore row — five large photo cards
-const EXPLORE_CARDS = [
-  { to: '/book/hotel', label: 'Stay', image: IMAGES.exploreHotel },
-  { to: '/book/hall', label: 'Halls', image: IMAGES.exploreHall },
-  { to: '/book/parking', label: 'Parking', image: IMAGES.exploreCourts },
-  { to: '/book/activities', label: 'Activities', image: IMAGES.explorePool },
-  { to: '/membership', label: 'Membership', image: IMAGES.exploreRestaurant },
-];
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
@@ -106,37 +93,18 @@ export function LandingPage() {
 
   return (
     <div>
-      {/* 1 · HERO — full-bleed photo only */}
-      <HeroImage slot="hero-home" size="large" />
+      {/* 1 · HERO — photo only, booking card docked on the right */}
+      <div className="hero-wrap">
+        <HeroImage slot="hero-home" size="large" />
 
-      {/* 1b · BOOKING BAR — overlaps hero bottom edge, half over photo, half over next section */}
-      <div id="booking" className="container-x relative z-20 -mt-16 scroll-mt-32 lg:-mt-20">
-        <BookingBar />
+        {/* 1b · BOOKING CARD — inside the hero, right side */}
+        <div id="booking" className="hero-card-wrap scroll-mt-32">
+          <BookingCard />
+        </div>
       </div>
 
-      {/* 2 · EXPLORE ROW — five large photo cards */}
-      <section
-        id="explore"
-        className="band-white scroll-mt-28"
-        aria-label="Explore the campus sections"
-      >
-        <div className="container-x section">
-          <h1 className="h-section">{HERO_HEADLINE}</h1>
-          <p className="mt-3 max-w-2xl text-slate-600">{HERO_TAGLINE}</p>
-          <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-4">
-            {EXPLORE_CARDS.map((c) => (
-              <PhotoTile
-                key={c.label}
-                to={c.to}
-                image={c.image}
-                label={c.label}
-                aspect="4 / 3"
-                sizes="(min-width: 1024px) 19vw, (min-width: 640px) 46vw, 92vw"
-              />
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* 2 · BOOK YOUR EXPERIENCE — five portrait service tiles */}
+      <ExperienceSection id="explore" />
 
       {/* 3 · FEATURE SECTIONS — cream · white · navy */}
       {/* 3a · Stay — cream */}

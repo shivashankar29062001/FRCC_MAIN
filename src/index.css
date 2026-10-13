@@ -150,3 +150,242 @@ a:not(.btn-base):not(.tag):not([class*="tag-"]):hover {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* ======================================================================== */
+/* Hero + booking bar overlap (landing, home hub, section pages, /book).    */
+/* The hero is tall and full-bleed; the booking bar sits absolutely at the  */
+/* hero's bottom edge, half overlapping the photo and half the section     */
+/* below. On mobile the bar stacks in normal flow below the photo.          */
+/* ======================================================================== */
+.hero {
+  position: relative;
+  width: 100%;
+  height: 60vh;
+  min-height: 420px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0b1a33, #12305a);
+}
+@media (min-width: 900px) {
+  .hero {
+    height: 88vh;
+    min-height: 560px;
+  }
+}
+/* Compact heroes (pages without a booking bar) stay short. */
+.hero--compact {
+  height: 40vh;
+  min-height: 260px;
+}
+@media (min-width: 1024px) {
+  .hero--compact {
+    height: 40vh;
+    min-height: 260px;
+  }
+}
+.hero__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+.hero__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(11, 26, 51, 0.45), rgba(11, 26, 51, 0) 28%, rgba(11, 26, 51, 0) 70%, rgba(11, 26, 51, 0.45));
+}
+.hero-wrap {
+  position: relative;
+}
+.hero-bar {
+  z-index: 20;
+}
+/* Desktop: bar overlaps the hero bottom edge (half on photo, half below). */
+@media (min-width: 1024px) {
+  .hero-bar {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 50%);
+  }
+  /* Clearance for the overlapping half of the bar plus breathing room. */
+  .hero-after {
+    padding-top: 120px;
+  }
+}
+/* Mobile: bar sits fully below the photo in normal flow. */
+@media (max-width: 1023.98px) {
+  .hero-bar {
+    position: static;
+    padding-top: 1rem;
+  }
+}
+
+/* In-hero booking card (landing + home hub): right side, vertically
+   centered on desktop; full width below the photo on mobile. */
+.hero-card-wrap {
+  z-index: 20;
+}
+@media (min-width: 900px) {
+  .hero-card-wrap {
+    position: absolute;
+    top: 50%;
+    right: max(1rem, calc((100% - 80rem) / 2 + 2rem));
+    transform: translateY(-50%);
+    width: 420px;
+    max-width: calc(100% - 2rem);
+  }
+}
+@media (max-width: 899.98px) {
+  .hero-card-wrap {
+    position: static;
+    margin: 1rem 1rem 0;
+  }
+}
+/* Dark navy glass booking card (hero on / and home hub). */
+.booking-card {
+  position: relative;
+  width: 100%;
+  background: rgba(11, 26, 51, 0.78);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 32px 80px -16px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+.booking-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 20px 20px 0 0;
+  background: #c9a227;
+}
+.booking-eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: #c9a227;
+}
+.booking-title {
+  color: #fff;
+  font-size: 28px;
+  line-height: 1.2;
+  margin-top: 6px;
+}
+/* Segmented 5-tab control: icon above label, gold active. */
+.booking-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 18px;
+}
+.booking-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 8px 2px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+.booking-tab:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.booking-tab[aria-selected="true"] {
+  background: #c9a227;
+  border-color: #c9a227;
+  color: #0b1d3a;
+}
+.booking-tab:focus-visible {
+  outline: 2px solid #c9a227;
+  outline-offset: 2px;
+}
+/* Dark fields: 52px, translucent, white text, gold focus. */
+.booking-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 6px;
+}
+.booking-field {
+  height: 52px;
+  width: 100%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 15px;
+  padding-left: 2.5rem;
+  padding-right: 0.875rem;
+  outline: none;
+  transition: border-color 150ms, background-color 150ms;
+}
+select.booking-field {
+  padding-right: 2rem;
+}
+.booking-field::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+.booking-field:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.booking-field:focus {
+  border-color: #c9a227;
+  background: rgba(255, 255, 255, 0.12);
+}
+.booking-field option {
+  color: #0b1d3a;
+  background: #fff;
+}
+.booking-field-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+}
+.booking-card .field-error {
+  color: #fca5a5;
+}
+/* Gold member offer line under the fields. */
+.booking-offer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c9a227;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+/* Tiny help footer. */
+.booking-help {
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+.booking-help a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

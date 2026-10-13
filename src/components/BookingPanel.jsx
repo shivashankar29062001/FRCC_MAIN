@@ -18,7 +18,11 @@ import {
   CarIcon,
   MailIcon,
   ChevronDownIcon,
+  StarIcon,
+  ArrowRightIcon,
 } from './ui/icons.jsx';
+import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
+import { SITE_INFO } from '../config/siteInfo.js';
 
 // ---------------------------------------------------------------------------
 // THE booking bar — the one booking widget in the site. It is used
@@ -130,11 +134,11 @@ function Field({ id, label, icon: Icon, error, children }) {
 
 const inputCls = 'field h-12 !pl-10 w-full';
 
-function TextInput({ id, error, ...props }) {
+function TextInput({ id, error, inputClass = inputCls, ...props }) {
   return (
     <input
       id={id}
-      className={inputCls}
+      className={inputClass}
       aria-invalid={!!error}
       aria-describedby={error ? `${id}-error` : undefined}
       {...props}
@@ -142,12 +146,12 @@ function TextInput({ id, error, ...props }) {
   );
 }
 
-function SelectInput({ id, error, options, placeholder = 'Select…', ...props }) {
+function SelectInput({ id, error, inputClass = inputCls, nativeArrow = false, options, placeholder = 'Select…', ...props }) {
   return (
     <>
       <select
         id={id}
-        className={cx(inputCls, 'appearance-none pr-9')}
+        className={nativeArrow ? inputClass : cx(inputClass, 'appearance-none pr-9')}
         aria-invalid={!!error}
         aria-describedby={error ? `${id}-error` : undefined}
         {...props}
@@ -157,7 +161,9 @@ function SelectInput({ id, error, options, placeholder = 'Select…', ...props }
           ? <option key={o} value={o}>{o}</option>
           : <option key={o.value} value={o.value}>{o.label}</option>))}
       </select>
-      <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      {!nativeArrow && (
+        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      )}
     </>
   );
 }
@@ -167,11 +173,12 @@ function SelectInput({ id, error, options, placeholder = 'Select…', ...props }
  * typed (the site's own format); parseDMY() turns it into the ISO date the
  * booking flow takes.
  */
-function DateInput({ id, error, value, onChange, ...props }) {
+function DateInput({ id, error, value, onChange, inputClass, ...props }) {
   return (
     <TextInput
       id={id}
       error={error}
+      inputClass={inputClass}
       type="text"
       inputMode="numeric"
       autoComplete="off"
@@ -515,6 +522,205 @@ function ServiceTabs({ tab, onTabKey, tabRefs, selectTab }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The booking card shown inside the hero on the landing page and the home
+ * hub. Same tabs, fields, validation and hand-off as the bar — only the
+ * presentation differs: compact tab row, vertically stacked fields (stay
+ * pairs check-in/check-out and guests/rooms side by side), full-width gold
+ * button. Dates stay DD/MM/YYYY.
+ */
+/** Dark field for the hero card: small white label above, icon left. */
+function CardField({ id, label, icon: Icon, error, children }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <label htmlFor={id} className="booking-label">{label}</label>
+      <div className="relative">
+        <span aria-hidden className="booking-field-icon">
+          <Icon className="h-4 w-4" />
+        </span>
+        {children}
+      </div>
+      {error && <p role="alert" id={`${id}-error`} className="field-error">{error}</p>}
+    </div>
+  );
+}
+
+/** Segmented 5-tab control for the hero card — same tab keys as the bar. */
+function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
+  const items = [
+    { id: 'stay', label: 'Stay', icon: HotelIcon },
+    { id: 'hall', label: 'Hall', icon: HallIcon },
+    { id: 'parking', label: 'Parking', icon: ParkingIcon },
+    { id: 'activities', label: 'Play', icon: GamepadIcon },
+    { id: 'membership', label: 'Member', icon: MembershipIcon },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Booking services"
+      onKeyDown={onTabKey}
+      className="booking-tabs"
+    >
+      {items.map((t) => {
+        const selected = t.id === tab;
+        return (
+          <button
+            key={t.id}
+            ref={(el) => { tabRefs.current[t.id] = el; }}
+            type="button"
+            role="tab"
+            id={`booking-card-tab-${t.id}`}
+            aria-selected={selected}
+            aria-controls={`booking-card-panel-${t.id}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => selectTab(t.id)}
+            className="booking-tab"
+          >
+            <t.icon className="h-4 w-4" />
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CardFields({ tab, v, errors, patch, busy }) {
+  const active = TABS.find((t) => t.id === tab) || TABS[0];
+
+  return (
+    <div className="flex flex-col gap-3">
+      {tab === 'stay' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <CardField id="card-stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
+              <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
+            </CardField>
+            <CardField id="card-stay-checkout" label="Check-out" icon={CalendarIcon} error={errors.checkout}>
+              <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
+            </CardField>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <CardField id="card-stay-guests" label="Guests" icon={UsersIcon} error={errors.adults}>
+              <SelectInput inputClass="booking-field" nativeArrow id="card-stay-guests" error={errors.adults} value={v.adults || ''} onChange={(e) => patch({ adults: e.target.value })} options={GUEST_OPTIONS} placeholder="Guests…" />
+            </CardField>
+            <CardField id="card-stay-rooms" label="Rooms" icon={HotelIcon} error={errors.rooms}>
+              <SelectInput inputClass="booking-field" nativeArrow id="card-stay-rooms" error={errors.rooms} value={v.rooms || ''} onChange={(e) => patch({ rooms: e.target.value })} options={ROOM_OPTIONS} placeholder="Rooms…" />
+            </CardField>
+          </div>
+        </>
+      )}
+
+      {tab === 'hall' && (
+        <>
+          <CardField id="card-hall-date" label="Event date" icon={CalendarIcon} error={errors.date}>
+            <DateInput inputClass="booking-field" id="card-hall-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
+          </CardField>
+          <div className="grid grid-cols-2 gap-3">
+            <CardField id="card-hall-event" label="Event type" icon={HallIcon} error={errors.event}>
+              <SelectInput inputClass="booking-field" nativeArrow id="card-hall-event" error={errors.event} value={v.event || ''} onChange={(e) => patch({ event: e.target.value })} options={EVENT_OPTIONS} placeholder="Choose…" />
+            </CardField>
+            <CardField id="card-hall-guests" label="Guests" icon={UsersIcon} error={errors.guests}>
+              <TextInput inputClass="booking-field" id="card-hall-guests" error={errors.guests} type="number" min="1" placeholder="e.g. 200" value={v.guests || ''} onChange={(e) => patch({ guests: e.target.value })} />
+            </CardField>
+          </div>
+        </>
+      )}
+
+      {tab === 'parking' && (
+        <>
+          <CardField id="card-parking-date" label="Date" icon={CalendarIcon} error={errors.date}>
+            <DateInput inputClass="booking-field" id="card-parking-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
+          </CardField>
+          <div className="grid grid-cols-2 gap-3">
+            <CardField id="card-parking-vehicle" label="Vehicle type" icon={CarIcon} error={errors.vehicle}>
+              <SelectInput inputClass="booking-field" nativeArrow id="card-parking-vehicle" error={errors.vehicle} value={v.vehicle || ''} onChange={(e) => patch({ vehicle: e.target.value })} options={VEHICLE_OPTIONS} placeholder="Choose…" />
+            </CardField>
+            <CardField id="card-parking-duration" label="Duration" icon={ClockIcon} error={errors.duration}>
+              <SelectInput inputClass="booking-field" nativeArrow id="card-parking-duration" error={errors.duration} value={v.duration || ''} onChange={(e) => patch({ duration: e.target.value })} options={DURATION_OPTIONS} placeholder="Choose…" />
+            </CardField>
+          </div>
+        </>
+      )}
+
+      {tab === 'activities' && (
+        <>
+          <CardField id="card-activities-game" label="Game" icon={GamepadIcon} error={errors.game}>
+            <SelectInput inputClass="booking-field" nativeArrow id="card-activities-game" error={errors.game} value={v.game || ''} onChange={(e) => patch({ game: e.target.value })} options={GAME_OPTIONS} placeholder="Choose a game…" />
+          </CardField>
+          <div className="grid grid-cols-2 gap-3">
+            <CardField id="card-activities-date" label="Date" icon={CalendarIcon} error={errors.date}>
+              <DateInput inputClass="booking-field" id="card-activities-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
+            </CardField>
+            <CardField id="card-activities-players" label="Players" icon={UsersIcon} error={errors.players}>
+              <TextInput inputClass="booking-field" id="card-activities-players" error={errors.players} type="number" min="1" placeholder="e.g. 4" value={v.players || ''} onChange={(e) => patch({ players: e.target.value })} />
+            </CardField>
+          </div>
+        </>
+      )}
+
+      {tab === 'membership' && (
+        <>
+          <CardField id="card-membership-plan" label="Plan type" icon={MembershipIcon} error={errors.plan}>
+            <SelectInput inputClass="booking-field" nativeArrow id="card-membership-plan" error={errors.plan} value={v.plan || ''} onChange={(e) => patch({ plan: e.target.value })} options={PLAN_OPTIONS} placeholder="Choose a plan…" />
+          </CardField>
+          <CardField id="card-membership-contact" label="Contact" icon={MailIcon} error={errors.contact}>
+            <TextInput inputClass="booking-field" id="card-membership-contact" error={errors.contact} type="text" autoComplete="email" placeholder="Email or mobile" value={v.contact || ''} onChange={(e) => patch({ contact: e.target.value })} />
+          </CardField>
+        </>
+      )}
+
+      {MEMBER_PROMO_NOTE && (
+        <p className="booking-offer">
+          <StarIcon className="h-3.5 w-3.5 shrink-0" /> {MEMBER_PROMO_NOTE}
+        </p>
+      )}
+
+      <LoadingButton
+        type="submit"
+        variant="gold"
+        loading={busy}
+        loadingLabel={active.busyLabel}
+        className="h-[54px] w-full text-base font-semibold"
+      >
+        Check availability <ArrowRightIcon className="h-4 w-4" />
+      </LoadingButton>
+    </div>
+  );
+}
+
+export function BookingCard({ defaultTab = 'stay', preselect = false, className }) {
+  const { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit } = useBookingForm(defaultTab, preselect);
+  const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
+
+  return (
+    <section
+      aria-label="Booking"
+      className={cx('booking-card', className)}
+    >
+      <p className="booking-eyebrow">Book direct</p>
+      <h2 className="booking-title font-display">Plan your visit</h2>
+      <CardTabs tab={tab} onTabKey={onTabKey} tabRefs={tabRefs} selectTab={selectTab} />
+      <div
+        key={tab}
+        role="tabpanel"
+        id={`booking-card-panel-${tab}`}
+        aria-labelledby={`booking-card-tab-${tab}`}
+        className="pt-4"
+      >
+        <form onSubmit={submit} noValidate>
+          <CardFields tab={tab} v={v} errors={errors} patch={patch} busy={busy} />
+        </form>
+      </div>
+      {SITE_INFO.phone && phoneHref && (
+        <p className="booking-help">
+          Need help? Call <a href={phoneHref}>{SITE_INFO.phone}</a>
+        </p>
+      )}
+    </section>
   );
 }
 

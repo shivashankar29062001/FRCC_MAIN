@@ -4,7 +4,8 @@ import { useApp, newId } from '../../app/store/AppContext.jsx';
 import { useMockQuery } from '../../app/hooks/useMockQuery.js';
 import { Button, Input, Select, LoadingButton } from '../../components/ui/controls.jsx';
 import { Card, EmptyState, SectionHeading } from '../../components/ui/feedback.jsx';
-import { PageHeader } from '../../components/ui/sections.jsx';
+import { Breadcrumbs } from '../../components/ui/sections.jsx';
+import { HeroImage } from '../../components/HeroImage.jsx';
 import { Reveal } from '../../components/ui/motion.jsx';
 import { IMAGES } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
@@ -371,19 +372,22 @@ export function ActivitiesProcessPage() {
 
   return (
     <div>
-      <PageHeader
-        title={game ? `Book ${game.name}` : 'Book your game'}
-        description="Six quick steps — game, date, slot, details, payment and confirmation. Your booking ID and QR are issued instantly."
-        image={IMAGES.bannerActivities}
-        breadcrumbs={[
-          { label: 'Home', to: '/home' },
-          { label: 'Activities / Games', to: '/book/activities' },
-          { label: 'Booking' },
-        ]}
-      />
+      <HeroImage slot="hero-activities" size="compact" />
 
       <div className="container-x section-top">
-        <BookingStepper steps={STEPS} current={step} onStepClick={(i) => { if (i < step && step < 5) { setErrors({}); setStep(i); } }} />
+        <Breadcrumbs
+          items={[
+            { label: 'Home', to: '/home' },
+            { label: 'Activities / Games', to: '/book/activities' },
+            { label: 'Booking' },
+          ]}
+        />
+        <h1 className="h-section mt-3">{game ? `Book ${game.name}` : 'Book your game'}</h1>
+        <p className="mt-3 max-w-2xl text-slate-600">Six quick steps — game, date, slot, details, payment and confirmation. Your booking ID and QR are issued instantly.</p>
+
+        <div className="mt-6">
+          <BookingStepper steps={STEPS} current={step} onStepClick={(i) => { if (i < step && step < 5) { setErrors({}); setStep(i); } }} />
+        </div>
 
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
           <div className="min-w-0">

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
-import { BookingBar } from './BookingPanel.jsx';
 import { HeroImage } from './HeroImage.jsx';
 import { FilterRow, MoreToExplore, PhotoCard, PhotoTile } from './ui/explore.jsx';
 import { IMAGES, roomSlot } from '../config/images.js';
@@ -237,18 +236,10 @@ export function RedirectIntro({ redirectKey, bannerImage }) {
 
   const more = ALL_SECTIONS.filter((s) => s.key !== redirectKey).slice(0, 3);
 
-  const tabMap = { hotel: 'stay', hall: 'hall', parking: 'parking', activities: 'activities', membership: 'membership' };
-  const defaultTab = tabMap[redirectKey] || 'stay';
-
   return (
     <div>
-      {/* 1 · HERO — full-bleed photo only */}
+      {/* 1 · HERO — full-bleed photo only, no booking card */}
       <HeroImage slot={bannerImage?.slot} size="compact" />
-
-      {/* 2 · Booking bar — half on photo header, half on section below, preselected tab */}
-      <div id="booking" className="container-x relative z-20 -mt-16 scroll-mt-32 sm:-mt-20">
-        <BookingBar defaultTab={defaultTab} preselect />
-      </div>
 
       <div className="container-x section-top">
         {/* Page title as a plain heading below the hero */}

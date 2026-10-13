@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { cx } from '../../utils/helpers.js';
 import { SmartImage } from './media.jsx';
 import { ArrowRightIcon } from './icons.jsx';
+import { IMAGES } from '../../config/images.js';
+import { getRedirect, isPlaceholder } from '../../config/redirects.js';
 
 // ---------------------------------------------------------------------------
 // Photo-led browsing primitives shared by the landing page (/) and the section
@@ -165,5 +167,71 @@ export function MoreToExplore({ items = [], className }) {
         />
       ))}
     </div>
+  );
+}
+
+// Five services, same destinations as the booking tabs (external booking URL
+// when configured, otherwise the in-app showcase page).
+const EXPERIENCE = [
+  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', showcase: '/book/hotel' },
+  { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', showcase: '/book/hall' },
+  { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', showcase: '/book/parking' },
+  { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', showcase: '/book/activities' },
+  { key: 'membership', label: 'Membership', line: 'One fee, lifetime access', imageKey: 'serviceMembership', showcase: '/membership' },
+];
+
+function experienceHref(key, showcase) {
+  const url = getRedirect(key);
+  return isPlaceholder(url) ? showcase : url;
+}
+
+/**
+ * Five large portrait photo tiles in one row (3:4, radius 16, 20px gap),
+ * 2 columns on tablet, 1 on mobile. Whole tile links to that service's
+ * booking page. Hover is a gold border colour change only.
+ */
+export function ExperienceTiles({ className }) {
+  return (
+    <div className={cx('grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5', className)}>
+      {EXPERIENCE.map((t) => (
+        <ExploreLink
+          key={t.key}
+          to={experienceHref(t.key, t.showcase)}
+          aria-label={`${t.label} — Book now`}
+          className="group relative block overflow-hidden rounded-2xl border border-navy-900/10 transition-colors duration-150 hover:border-gold-500 focus-visible:border-gold-500"
+        >
+          <SmartImage
+            image={IMAGES[t.imageKey]}
+            aspect="3 / 4"
+            sizes="(min-width: 1024px) 18vw, (min-width: 640px) 44vw, 92vw"
+            overlay
+          >
+            <span className="absolute inset-x-0 bottom-0 block p-5">
+              <span className="block font-display text-[22px] leading-snug text-white">{t.label}</span>
+              <span className="mt-1 block text-sm text-white/80">{t.line}</span>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950">
+                Book now <ArrowRightIcon className="h-4 w-4" />
+              </span>
+            </span>
+          </SmartImage>
+        </ExploreLink>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Image-led section directly below the hero on / and the home hub:
+ * "Book your experience" on cream with 80px vertical padding.
+ */
+export function ExperienceSection({ id }) {
+  return (
+    <section id={id} className="bg-cream py-20" aria-label="Book your experience">
+      <div className="container-x">
+        <h2 className="h-section">Book your experience</h2>
+        <p className="mt-3 max-w-2xl text-slate-600">Rooms, halls, parking, games and membership.</p>
+        <ExperienceTiles className="mt-8" />
+      </div>
+    </section>
   );
 }

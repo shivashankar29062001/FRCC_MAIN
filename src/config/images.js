@@ -181,6 +181,10 @@ export const REMOTE = {
   bannerMembershipSection: 'https://images.unsplash.com/photo-1772208392422-bb2f2609097a?w=1600&q=80&auto=format&fit=crop',
   bannerProfile: 'https://images.unsplash.com/photo-1756069596380-ea364729737c?w=1600&q=80&auto=format&fit=crop',
   facilityGarden: 'https://images.unsplash.com/photo-1672791222207-9765d66c7d93?w=1600&q=80&auto=format&fit=crop',
+  parkingEntry: 'https://images.unsplash.com/photo-1710140985320-bd660135863c?w=1600&q=80&auto=format&fit=crop',
+  parkingEV: 'https://images.unsplash.com/photo-1761401429082-cec0cb4080b9?w=1600&q=80&auto=format&fit=crop',
+  parkingSecurity: 'https://images.unsplash.com/photo-1772982059839-41f2747cce20?w=1600&q=80&auto=format&fit=crop',
+  parkingValet: 'https://images.unsplash.com/photo-1739239130013-f8d430e8a147?w=1600&q=80&auto=format&fit=crop',
 };
 
 /**
@@ -216,6 +220,13 @@ export const IMAGES = {
   // =========================================================================
 
   hero: S('hero-home', 'FRCC Campus', 'FRCC campus aerial view'),
+  'hero-home': S('hero-home', 'FRCC Campus', 'FRCC campus aerial view'),
+  'hero-stay': S('hero-stay', 'Stay', 'Wide view of the FRCC hotel entrance and grand lobby'),
+  'hero-halls': S('hero-halls', 'Halls', 'Wide shot of the FRCC grand convention hall dressed for an event'),
+  'hero-activities': S('hero-activities', 'Activities', 'Wide action shot of a badminton match inside the FRCC sports hall'),
+  'hero-parking': S('hero-parking', 'Parking', 'Wide view of the FRCC covered parking deck'),
+  'hero-facilities': S('hero-facilities', 'Support', 'FRCC reception desk with the lobby behind'),
+  'hero-membership': S('hero-membership', 'Membership', 'FRCC members lounge with velvet armchairs and warm, upscale lighting'),
   bannerHotel: S('hero-stay', 'Stay', 'Wide view of the FRCC hotel entrance and grand lobby'),
   bannerHall: S('hero-halls', 'Halls', 'Wide shot of the FRCC grand convention hall dressed for an event'),
   bannerParking: S('hero-parking', 'Parking', 'Wide view of the FRCC covered parking deck'),
