@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { useApp } from '../app/store/AppContext.jsx';
 import { useMockQuery } from '../app/hooks/useMockQuery.js';
 import { Card, EmptyState, LoadingState, SkeletonGrid, ErrorState } from '../components/ui/feedback.jsx';
-import { PageHeader } from '../components/ui/sections.jsx';
+import { Breadcrumbs } from '../components/ui/sections.jsx';
+import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { IMAGES } from '../config/images.js';
@@ -133,13 +134,12 @@ export function MembershipDashboardPage() {
   if (!isMember) {
     return (
       <div>
-        <PageHeader
-          title="You don't have a membership yet"
-          description="Join once, belong for life — Member ID and QR issued on signup."
-          image={IMAGES.bannerMembership}
-          breadcrumbs={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]}
-        />
-        <div className="container-x section-top grid gap-6 lg:grid-cols-2">
+        <HeroImage slot="hero-membership-dashboard" />
+        <div className="container-x section-top">
+          <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
+          <h1 className="h-section mt-3">You don&apos;t have a membership yet</h1>
+          <p className="mt-1 text-slate-600">Join once, belong for life — Member ID and QR issued on signup.</p>
+          <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <Reveal>
             <Card className="h-full">
               <p className="eyebrow">Why become a member</p>
@@ -168,20 +168,18 @@ export function MembershipDashboardPage() {
           </Reveal>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div>
-      <PageHeader
-        title={`${membership?.planName || 'Member'} · ${membership?.memberId || ''}`}
-        description={`Member since ${membership?.since || '2026'} · ${membership?.validity || 'Lifetime · Active'}`}
-        image={IMAGES.bannerMembership}
-        breadcrumbs={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]}
-      />
-
+      <HeroImage slot="hero-membership-dashboard" />
       <div className="container-x section-top">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
+        <h1 className="h-section mt-3">{`${membership?.planName || 'Member'} · ${membership?.memberId || ''}`}</h1>
+        <p className="mt-1 text-slate-600">{`Member since ${membership?.since || '2026'} · ${membership?.validity || 'Lifetime · Active'}`}</p>
+        <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
           <Reveal>
             <MemberIdCard user={user} membership={membership} />
             <a href={MEMBERSHIP_URL} className="btn-base mt-4 w-full border border-navy-900/20 bg-white px-5 py-3 text-navy-900 hover:border-navy-900/50 hover:bg-navy-50/60">

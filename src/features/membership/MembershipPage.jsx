@@ -24,7 +24,7 @@ export function MembershipPage() {
   return (
     <div>
       {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-membership" size="compact" />
+      <HeroImage slot="hero-membership" />
 
       <section className="band-white" aria-label="Membership">
         <div className="container-x section">

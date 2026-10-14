@@ -372,7 +372,7 @@ export function ActivitiesProcessPage() {
 
   return (
     <div>
-      <HeroImage slot="hero-activities" size="compact" />
+      <HeroImage slot="hero-activities" />
 
       <div className="container-x section-top">
         <Breadcrumbs

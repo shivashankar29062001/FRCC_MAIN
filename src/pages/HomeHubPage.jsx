@@ -155,16 +155,14 @@ export function HomeHubPage() {
 
   return (
     <div>
-      {/* 1 · WELCOME HERO — photo only, booking card docked on the right */}
-      <div className="hero-wrap">
-        <HeroImage slot="hero-home" size="large" />
+      {/* 1 · WELCOME HERO — photo only */}
+      <HeroImage slot="hero-hub" />
 
-        {/* 2 · BOOKING CARD — inside the hero, right side */}
-        <div id="booking" className="hero-card-wrap scroll-mt-32">
-          <Reveal>
-            <BookingCard />
-          </Reveal>
-        </div>
+      {/* 2 · BOOKING CARD — starts below the hero */}
+      <div id="booking" className="hero-card-wrap scroll-mt-24">
+        <Reveal>
+          <BookingCard />
+        </Reveal>
       </div>
 
       {/* 2a · BOOK YOUR EXPERIENCE — five portrait service tiles */}

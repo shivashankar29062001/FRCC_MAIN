@@ -16,7 +16,8 @@ import {
   StatusTag,
 } from '../components/ui/feedback.jsx';
 import { Input, LoadingButton, SearchInput } from '../components/ui/controls.jsx';
-import { PageHeader } from '../components/ui/sections.jsx';
+import { Breadcrumbs } from '../components/ui/sections.jsx';
+import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
 import {
   UserIcon,
@@ -227,17 +228,19 @@ export function ProfilePage({ initialTab = 'details' }) {
     t.id === 'bookings' ? { ...t, count: bookings.length } : t.id === 'payments' ? { ...t, count: payments.length } : t,
   );
 
+  const isBookingsTab = tab === 'bookings';
+  const heroSlot = isBookingsTab ? 'hero-bookings' : 'hero-profile';
+
   return (
     <div>
-      <PageHeader
-        title={`Hi, ${(user?.name || 'Member').split(' ')[0]}`}
-        description={`${user?.emailOrPhone || ''} · ${user?.userId || ''}`}
-        image={IMAGES.bannerProfile}
-        breadcrumbs={[{ label: 'Home', to: '/home' }, { label: 'Profile' }]}
-      />
+      <HeroImage slot={heroSlot} />
 
       <div className="container-x section-top">
-        <div role="tablist" aria-label="Profile sections" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: isBookingsTab ? 'My bookings' : 'Profile' }]} />
+        <h1 className="h-section mt-3">{isBookingsTab ? 'My bookings' : `Hi, ${(user?.name || 'Member').split(' ')[0]}`}</h1>
+        <p className="mt-1 text-slate-600">{isBookingsTab ? 'Your activity and sports bookings, time slots and QR codes.' : `${user?.emailOrPhone || ''} · ${user?.userId || ''}`}</p>
+
+        <div role="tablist" aria-label="Profile sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           {tabs.map((t) => {
             const selected = tab === t.id;
             return (

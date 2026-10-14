@@ -24,7 +24,7 @@ export function ParkingPage() {
   return (
     <div>
       {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-parking" size="compact" />
+      <HeroImage slot="hero-parking" />
 
       <section className="band-white" aria-label="Parking">
         <div className="container-x section">

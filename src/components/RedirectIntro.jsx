@@ -239,7 +239,7 @@ export function RedirectIntro({ redirectKey, bannerImage }) {
   return (
     <div>
       {/* 1 · HERO — full-bleed photo only, no booking card */}
-      <HeroImage slot={bannerImage?.slot} size="compact" />
+      <HeroImage slot={bannerImage?.slot} />
 
       <div className="container-x section-top">
         {/* Page title as a plain heading below the hero */}

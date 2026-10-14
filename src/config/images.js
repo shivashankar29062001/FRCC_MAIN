@@ -57,6 +57,17 @@ export function localFor(slot) {
 // no Unsplash+ mark). Every URL appears ONCE in the whole file.
 // ---------------------------------------------------------------------------
 
+export const OBJECT_POSITIONS = {
+  'hero-home': 'center 45%',
+  'hero-halls': 'center 40%',
+  'hero-stay': 'center 55%',
+  'hero-parking': 'center 55%',
+};
+
+export function getObjectPosition(slot) {
+  return OBJECT_POSITIONS[slot] || 'center 50%';
+}
+
 export const REMOTE = {
   'hero-home': 'https://images.unsplash.com/photo-1728051104503-e1a4a19d638c?w=2400&q=80&auto=format&fit=crop',
   'hero-stay': 'https://images.unsplash.com/photo-1762245308715-b721cf3267b6?w=2400&q=80&auto=format&fit=crop',
@@ -145,7 +156,7 @@ export const REMOTE = {
   serviceMembership: 'https://images.unsplash.com/photo-1779144639642-5e159954120e?w=1600&q=80&auto=format&fit=crop',
   hallFunction: 'https://images.unsplash.com/photo-1780337092772-d85ad9dc562c?w=1600&q=80&auto=format&fit=crop',
   membershipWide: 'https://images.unsplash.com/photo-1759038086701-234d7c43c227?w=1600&q=80&auto=format&fit=crop',
-  visitEntrance: 'https://images.unsplash.com/photo-1761295909753-93a4e9e48695?w=1600&q=80&auto=format&fit=crop',
+  visitEntrance: 'https://images.unsplash.com/photo-1761295909753-93a4e9e48695?w=2400&q=80&auto=format&fit=crop',
   hotelBathroom: 'https://images.unsplash.com/photo-1771929662486-f793e08f0f16?w=1600&q=80&auto=format&fit=crop',
   hotelBreakfast: 'https://images.unsplash.com/photo-1776267074168-9bf2f21ec4fa?w=1600&q=80&auto=format&fit=crop',
   hotelView: 'https://images.unsplash.com/photo-1718046254692-543196d7cba6?w=1600&q=80&auto=format&fit=crop',
@@ -156,7 +167,7 @@ export const REMOTE = {
   galleryLounge: 'https://images.unsplash.com/photo-1790611180279-fe5a0c942797?w=1600&q=80&auto=format&fit=crop',
   eventFestival: 'https://images.unsplash.com/photo-1790595379794-beb5e8374425?w=1600&q=80&auto=format&fit=crop',
   eventSports: 'https://images.unsplash.com/photo-1723074832950-9fb031b0f4ec?w=1600&q=80&auto=format&fit=crop',
-  membershipLounge: 'https://images.unsplash.com/photo-1781512579593-2dad26fbe861?w=1600&q=80&auto=format&fit=crop',
+  membershipLounge: 'https://images.unsplash.com/photo-1781512579593-2dad26fbe861?w=2400&q=80&auto=format&fit=crop',
   membershipCard: 'https://images.unsplash.com/photo-1768396747960-ae6ba3c855bc?w=1600&q=80&auto=format&fit=crop',
   membershipEvents: 'https://images.unsplash.com/photo-1780680493115-5a0fea585450?w=1600&q=80&auto=format&fit=crop',
   membershipFitness: 'https://images.unsplash.com/photo-1721394747060-7cfc57104f88?w=1600&q=80&auto=format&fit=crop',
@@ -164,7 +175,7 @@ export const REMOTE = {
   authSignin: 'https://images.unsplash.com/photo-1760276148666-1fd62b875fa6?w=1600&q=80&auto=format&fit=crop',
   memberCardBg: 'https://images.unsplash.com/photo-1771226281112-b7119ef4112e?w=1600&q=80&auto=format&fit=crop',
   galleryPool: 'https://images.unsplash.com/photo-1623718649591-311775a30c43?w=1600&q=80&auto=format&fit=crop',
-  galleryLobby: 'https://images.unsplash.com/photo-1746549858455-2d8799c01d4b?w=1600&q=80&auto=format&fit=crop',
+  galleryLobby: 'https://images.unsplash.com/photo-1746549858455-2d8799c01d4b?w=2400&q=80&auto=format&fit=crop',
   galleryRoom: 'https://images.unsplash.com/photo-1595327023008-bce2898309c0?w=1600&q=80&auto=format&fit=crop',
   galleryHall: 'https://images.unsplash.com/photo-1687213280116-234f93b15b44?w=1600&q=80&auto=format&fit=crop',
   galleryRestaurant: 'https://images.unsplash.com/photo-1774509627260-4f97e8cd1af1?w=1600&q=80&auto=format&fit=crop',
@@ -178,14 +189,34 @@ export const REMOTE = {
   exploreMoreParking: 'https://images.unsplash.com/photo-1749269532497-6aa8c01eb880?w=1600&q=80&auto=format&fit=crop',
   exploreMoreActivities: 'https://images.unsplash.com/photo-1518620025093-fbca064bdd9a?w=1600&q=80&auto=format&fit=crop',
   exploreMoreMembership: 'https://images.unsplash.com/photo-1790152370989-a9fdabb03c0e?w=1600&q=80&auto=format&fit=crop',
-  bannerMembershipSection: 'https://images.unsplash.com/photo-1772208392422-bb2f2609097a?w=1600&q=80&auto=format&fit=crop',
-  bannerProfile: 'https://images.unsplash.com/photo-1756069596380-ea364729737c?w=1600&q=80&auto=format&fit=crop',
-  facilityGarden: 'https://images.unsplash.com/photo-1672791222207-9765d66c7d93?w=1600&q=80&auto=format&fit=crop',
+  bannerMembershipSection: 'https://images.unsplash.com/photo-1772208392422-bb2f2609097a?w=2400&q=80&auto=format&fit=crop',
+  'banner-membership-section': 'https://images.unsplash.com/photo-1772208392422-bb2f2609097a?w=2400&q=80&auto=format&fit=crop',
+  bannerProfile: 'https://images.unsplash.com/photo-1756069596380-ea364729737c?w=2400&q=80&auto=format&fit=crop',
+  'banner-profile': 'https://images.unsplash.com/photo-1756069596380-ea364729737c?w=2400&q=80&auto=format&fit=crop',
+  facilityGarden: 'https://images.unsplash.com/photo-1672791222207-9765d66c7d93?w=2400&q=80&auto=format&fit=crop',
   parkingEntry: 'https://images.unsplash.com/photo-1710140985320-bd660135863c?w=1600&q=80&auto=format&fit=crop',
   parkingEV: 'https://images.unsplash.com/photo-1761401429082-cec0cb4080b9?w=1600&q=80&auto=format&fit=crop',
   parkingSecurity: 'https://images.unsplash.com/photo-1772982059839-41f2747cce20?w=1600&q=80&auto=format&fit=crop',
   parkingValet: 'https://images.unsplash.com/photo-1739239130013-f8d430e8a147?w=1600&q=80&auto=format&fit=crop',
 };
+
+export const FALLBACK = {
+  'hero-hub': REMOTE.galleryLobby,
+  'hero-facilities': REMOTE['hero-facilities'] || REMOTE.facilityGarden,
+  'hero-profile': REMOTE.bannerProfile,
+  'hero-membership-dashboard': REMOTE.bannerMembershipSection,
+  'hero-bookings': REMOTE.membershipLounge,
+  'hero-stay': REMOTE['hero-stay'],
+  'hero-halls': REMOTE['hero-halls'],
+  'hero-parking': REMOTE['hero-parking'],
+  'hero-activities': REMOTE['hero-activities'],
+  'hero-membership': REMOTE['hero-membership'],
+  'hero-book': REMOTE.visitEntrance,
+};
+
+export function heroSrc(slot) {
+  return localFor(slot) || REMOTE[slot] || FALLBACK[slot] || REMOTE['hero-home'];
+}
 
 /**
  * Create an image slot: local file wins, else the REMOTE fallback, else null.
@@ -197,7 +228,7 @@ export const REMOTE = {
 const S = (slot, name, alt, extra = {}) => ({
   slot,
   name,
-  src: localFor(slot) || REMOTE[slot] || null,
+  src: localFor(slot) || REMOTE[slot] || FALLBACK[slot] || REMOTE['hero-home'],
   srcSet: '',
   alt,
   ...extra,
@@ -221,12 +252,17 @@ export const IMAGES = {
 
   hero: S('hero-home', 'FRCC Campus', 'FRCC campus aerial view'),
   'hero-home': S('hero-home', 'FRCC Campus', 'FRCC campus aerial view'),
+  'hero-hub': S('hero-hub', 'Member Home', 'FRCC campus view'),
   'hero-stay': S('hero-stay', 'Stay', 'Wide view of the FRCC hotel entrance and grand lobby'),
   'hero-halls': S('hero-halls', 'Halls', 'Wide shot of the FRCC grand convention hall dressed for an event'),
   'hero-activities': S('hero-activities', 'Activities', 'Wide action shot of a badminton match inside the FRCC sports hall'),
   'hero-parking': S('hero-parking', 'Parking', 'Wide view of the FRCC covered parking deck'),
   'hero-facilities': S('hero-facilities', 'Support', 'FRCC reception desk with the lobby behind'),
   'hero-membership': S('hero-membership', 'Membership', 'FRCC members lounge with velvet armchairs and warm, upscale lighting'),
+  'hero-profile': S('hero-profile', 'Profile', 'FRCC members lounge with warm lighting and comfortable seating'),
+  'hero-membership-dashboard': S('hero-membership-dashboard', 'Membership Dashboard', 'FRCC members lounge with velvet armchairs and warm, upscale lighting'),
+  'hero-bookings': S('hero-bookings', 'My Bookings', 'FRCC members lounge with sofas, flowers and soft candlelight'),
+  'hero-book': S('hero-book', 'Book', 'FRCC campus view'),
   bannerHotel: S('hero-stay', 'Stay', 'Wide view of the FRCC hotel entrance and grand lobby'),
   bannerHall: S('hero-halls', 'Halls', 'Wide shot of the FRCC grand convention hall dressed for an event'),
   bannerParking: S('hero-parking', 'Parking', 'Wide view of the FRCC covered parking deck'),

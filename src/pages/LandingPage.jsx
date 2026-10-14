@@ -10,6 +10,8 @@ import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
 import { ArrowRightIcon, MapPinIcon, ClockIcon, PhoneIcon } from '../components/ui/icons.jsx';
+import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
+import { TypeWriter } from '../components/TypeWriter.jsx';
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
@@ -69,6 +71,7 @@ export function LandingPage() {
   const { hash, state } = useLocation();
   const [activityCategory, setActivityCategory] = useState('all');
   const [photoIndex, setPhotoIndex] = useState(null);
+  const [headlineDone, setHeadlineDone] = useState(false);
 
   // ProtectedRoute lands logged-out visitors here with state.from
   const pendingFrom = typeof state?.from === 'string' ? state.from : null;
@@ -93,12 +96,91 @@ export function LandingPage() {
 
   return (
     <div>
-      {/* 1 · HERO — photo only, booking card docked on the right */}
-      <div className="hero-wrap">
-        <HeroImage slot="hero-home" size="large" />
+      {/* 1 · HERO */}
+      <div className="landing-hero-wrap">
+        <HeroImage slot="hero-home">
+          <div className="landing-hero-overlay" aria-hidden="true" />
+          <div className="container-x relative z-10 h-full flex items-center">
+            <div className="landing-hero-text max-w-[560px] text-white">
+              {/* 2a · Small gold label */}
+              <p className="landing-hero-eyebrow">FRCC</p>
 
-        {/* 1b · BOOKING CARD — inside the hero, right side */}
-        <div id="booking" className="hero-card-wrap scroll-mt-32">
+              {/* 2b · Serif headline */}
+              <h1 className="landing-hero-headline">
+                <TypeWriter
+                  text="Film Recreation Cultural Club"
+                  speed={55}
+                  caretFadeDelay={1500}
+                  onComplete={() => setHeadlineDone(true)}
+                />
+              </h1>
+
+              {/* 2c · Second line typing loop */}
+              <p className="landing-hero-subline">
+                <TypeWriter
+                  phrases={[
+                    'Stay in comfort.',
+                    'Play every game.',
+                    'Celebrate every occasion.',
+                    'Belong for life.',
+                  ]}
+                  speed={55}
+                  holdTime={1600}
+                  loop
+                />
+              </p>
+
+              {/* 3 · Discount badge */}
+              <div className="mt-6">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm ${
+                    headlineDone ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                  }`}
+                  style={{
+                    backgroundColor: '#c9a227',
+                    color: '#0b1a33',
+                    transition: 'opacity 400ms ease-out',
+                  }}
+                >
+                  <svg
+                    className="h-3.5 w-3.5 shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="19" y1="5" x2="5" y2="19" />
+                    <circle cx="6.5" cy="6.5" r="2.5" />
+                    <circle cx="17.5" cy="17.5" r="2.5" />
+                  </svg>
+                  <span>{MEMBER_PROMO_NOTE}</span>
+                </div>
+              </div>
+
+              {/* 4 · Buttons under the badge */}
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  to="/book"
+                  className="btn-base bg-[#c9a227] text-[#0b1a33] font-semibold px-7 py-3.5 text-base rounded-xl hover:bg-[#b89220] transition-colors duration-150 inline-flex items-center justify-center"
+                >
+                  Book now
+                </Link>
+                <Link
+                  to="/signup"
+                  className="btn-base border border-white text-white bg-transparent font-semibold px-7 py-3.5 text-base rounded-xl hover:bg-white/10 transition-colors duration-150 inline-flex items-center justify-center"
+                >
+                  Join now
+                </Link>
+              </div>
+            </div>
+          </div>
+        </HeroImage>
+
+        {/* 1b · BOOKING CARD */}
+        <div id="booking" className="landing-hero-card-wrap scroll-mt-24">
           <BookingCard />
         </div>
       </div>

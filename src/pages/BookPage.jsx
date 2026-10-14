@@ -44,17 +44,15 @@ const CARDS = [
 export function BookPage() {
   return (
     <div>
-      {/* 1 · HERO + BOOKING BAR — bar overlaps the hero bottom edge */}
-      <div className="hero-wrap">
-        <HeroImage slot="hero-stay" size="large" />
+      {/* 1 · HERO — photo only */}
+      <HeroImage slot="hero-book" />
 
-        {/* 2 · Booking bar — half on photo, half on section below */}
-        <div id="booking" className="container-x hero-bar scroll-mt-32">
-          <BookingBar />
-        </div>
+      {/* 2 · Booking bar — starts below the hero */}
+      <div id="booking" className="container-x py-8 scroll-mt-24">
+        <BookingBar />
       </div>
 
-      <div className="container-x section-top hero-after">
+      <div className="container-x pb-14 sm:pb-16 lg:pb-20">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Book' }]} />
         <h1 className="h-section mt-3">Book anything on campus</h1>
         <p className="mt-3 max-w-2xl text-slate-600">Pick a service and start your booking — your choices carry through to the booking page.</p>

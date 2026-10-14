@@ -82,7 +82,7 @@ export function SupportPage() {
   return (
     <div>
       {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-facilities" size="compact" />
+      <HeroImage slot="hero-facilities" />
 
       <div className="container-x section-top">
         <h1 className="h-section">How can we help?</h1>
