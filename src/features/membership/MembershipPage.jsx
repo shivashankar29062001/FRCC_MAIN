@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { IMAGES } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
-import { HeroImage } from '../../components/HeroImage.jsx';
+import { ServiceHero } from '../../components/ServiceHero.jsx';
 
 // ---------------------------------------------------------------------------
 // /membership — Membership section landing page: photo header + plan cards + explore
@@ -23,10 +23,9 @@ const MORE_EXPLORE = [
 export function MembershipPage() {
   return (
     <div>
-      {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-membership" />
+      <ServiceHero service="membership" />
 
-      <section className="band-white" aria-label="Membership">
+      <section id="content" className="band-white scroll-mt-24" aria-label="Membership">
         <div className="container-x section">
           <h1 className="h-display max-w-2xl">Lifetime membership</h1>
           <p className="lead mt-3 max-w-lg">One fee, member rates across hotel, halls, parking & games</p>

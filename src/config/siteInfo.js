@@ -7,11 +7,13 @@
 // Social entries left as '' are hidden automatically.
 // ---------------------------------------------------------------------------
 
+import { name, shortName, tagline } from './site.js';
+
 export const SITE_INFO = {
   // Brand
-  name: 'FRCC',
-  tagline: 'Club · Resort · Society',
-  fullName: 'FRCC Club, Resort & Society',
+  name: shortName,
+  tagline,
+  fullName: name,
 
   // Contact (fictional — replace with real info before launch)
   address: {
@@ -34,8 +36,8 @@ export const SITE_INFO = {
 
   // SEO / meta
   meta: {
-    title: 'FRCC - Club · Resort · Society',
-    description: 'FRCC is a premium club, resort and society campus offering hotel stays, convention halls, parking, sports facilities and lifetime membership. Book your experience today.',
+    title: `${shortName} | ${name}`,
+    description: name,
     ogImage: '/og-image.jpg',
   },
 

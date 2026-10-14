@@ -206,7 +206,7 @@ function getDescription(redirectKey) {
  *   redirectKey: 'hotel' | 'hall' | 'parking' | 'activities' | 'membership'
  *   bannerImage: image slot from IMAGES
  */
-export function RedirectIntro({ redirectKey, bannerImage }) {
+export function RedirectIntro({ redirectKey, bannerImage, hero }) {
   const [filter, setFilter] = useState('all');
   const { hash } = useLocation();
 
@@ -238,10 +238,10 @@ export function RedirectIntro({ redirectKey, bannerImage }) {
 
   return (
     <div>
-      {/* 1 · HERO — full-bleed photo only, no booking card */}
-      <HeroImage slot={bannerImage?.slot} />
+      {/* 1 · HERO */}
+      {hero || <HeroImage slot={bannerImage?.slot} />}
 
-      <div className="container-x section-top">
+      <div id="content" className="container-x section-top scroll-mt-24">
         {/* Page title as a plain heading below the hero */}
         <h1 className="h-section">{sectionTitle}</h1>
         <p className="mt-3 max-w-2xl text-slate-600">{description}</p>

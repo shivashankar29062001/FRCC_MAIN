@@ -1,4 +1,5 @@
 import { RedirectIntro } from '../../components/RedirectIntro.jsx';
+import { ServiceHero } from '../../components/ServiceHero.jsx';
 import { IMAGES } from '../../config/images.js';
 
 export function HallPage() {
@@ -6,6 +7,7 @@ export function HallPage() {
     <RedirectIntro
       redirectKey="hall"
       bannerImage={IMAGES.bannerHall}
+      hero={<ServiceHero service="hall" />}
     />
   );
 }

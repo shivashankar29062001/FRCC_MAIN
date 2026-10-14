@@ -1,4 +1,5 @@
 import { RedirectIntro } from '../../components/RedirectIntro.jsx';
+import { ServiceHero } from '../../components/ServiceHero.jsx';
 import { IMAGES } from '../../config/images.js';
 
 export function HotelPage() {
@@ -6,6 +7,7 @@ export function HotelPage() {
     <RedirectIntro
       redirectKey="hotel"
       bannerImage={IMAGES.bannerHotel}
+      hero={<ServiceHero service="stay" />}
     />
   );
 }

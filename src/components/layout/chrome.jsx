@@ -22,6 +22,7 @@ import {
   LinkedinIcon,
   YoutubeIcon,
 } from '../ui/icons.jsx';
+import { Logo } from '../Logo.jsx';
 
 // ---------------------------------------------------------------------------
 // Site chrome: the two-level navigation (utility strip + main bar), the mobile
@@ -40,15 +41,13 @@ import {
 //                    an accordion list. Same content, no animation.
 // ---------------------------------------------------------------------------
 
-function Logo({ to = '/' }) {
+function BrandLogo({ to = '/' }) {
   return (
     <Link to={to} className="flex items-center gap-2.5" aria-label="FRCC home">
-      <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl bg-navy-900 font-display text-lg font-bold text-gold-500">
-        F
-      </span>
+      <Logo variant="emblem" size={52} />
       <span className="leading-tight">
         <span className="block font-display font-bold text-lg text-navy-900">FRCC</span>
-        <span className="block text-[11px] uppercase tracking-[0.18em] text-slate-500">Club · Resort · Society</span>
+        <span className="block text-[11px] tracking-[0.08em] text-slate-500">Film Recreation &amp; Cultural Centre</span>
       </span>
     </Link>
   );
@@ -331,7 +330,7 @@ export function Navbar() {
       {/* 2 · Main bar — white, sticky, one hairline */}
       <div className="border-b border-slate-200 bg-white">
         <div className="container-x grid h-16 grid-cols-[auto_1fr_auto] items-center gap-3">
-          <Logo to={user ? '/home' : '/'} />
+          <BrandLogo to={user ? '/home' : '/'} />
 
           {/* Centre · the six primary links */}
           <nav className="hidden items-center justify-center gap-1 text-sm font-medium lg:flex" aria-label="Primary">
@@ -582,11 +581,9 @@ export function Footer() {
       <div className="container-x grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         {/* Brand */}
         <div className="sm:col-span-2 lg:col-span-1">
-          <p className="font-display text-2xl text-white">FRCC</p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-gold-400">Club · Resort · Society</p>
+          <Logo variant="lockup" size={120} />
           <p className="mt-4 text-sm leading-relaxed text-slate-400">
-            Premium club, resort &amp; society campus — hotel, halls, parking, games and lifetime membership behind a
-            single login.
+            Film Recreation &amp; Cultural Centre
           </p>
           {socialLinks.length > 0 && (
             <div className="mt-5 flex gap-2">

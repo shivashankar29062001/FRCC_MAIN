@@ -17,6 +17,7 @@ import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage, ImageCaption } from '../components/ui/media.jsx';
 import { ExperienceSection } from '../components/ui/explore.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
+import { ServiceHero } from '../components/ServiceHero.jsx';
 import { IMAGES } from '../config/images.js';
 import { SITE_INFO } from '../config/siteInfo.js';
 import { firstNameOf, greetingFor } from '../utils/helpers.js';
@@ -155,18 +156,11 @@ export function HomeHubPage() {
 
   return (
     <div>
-      {/* 1 · WELCOME HERO — photo only */}
-      <HeroImage slot="hero-hub" />
-
-      {/* 2 · BOOKING CARD — starts below the hero */}
-      <div id="booking" className="hero-card-wrap scroll-mt-24">
-        <Reveal>
-          <BookingCard />
-        </Reveal>
-      </div>
+      {/* 1 · HERO — landing-style hero with slot hero-hub, full tabbed booking card, stat row */}
+      <ServiceHero service="hub" />
 
       {/* 2a · BOOK YOUR EXPERIENCE — five portrait service tiles */}
-      <ExperienceSection />
+      <ExperienceSection id="explore" />
 
       {/* 2b · WELCOME — plain heading below the hero */}
       <section className="band-white" aria-label="Welcome home">

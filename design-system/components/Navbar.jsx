@@ -1,3 +1,5 @@
+import { Logo } from '../../src/components/Logo.jsx';
+
 // Standalone Navbar — same links, logo and logged-in states as the main site.
 // Props: user (null = logged out, { name } = logged in), isMember (bool).
 // Plain anchors so the other team can use it without react-router.
@@ -14,10 +16,10 @@ export function Navbar({ user = null, isMember = false }) {
     <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/90 backdrop-blur">
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 h-16">
         <a href="/" className="flex items-center gap-2.5" aria-label="FRCC home">
-          <span aria-hidden className="grid place-items-center rounded-xl bg-navy-900 text-gold-500 font-bold h-10 w-10 text-lg">F</span>
+          <Logo variant="emblem" size={52} />
           <span className="leading-tight">
-            <span className="block font-bold text-navy-900 text-lg">FRCC</span>
-            <span className="block text-[11px] uppercase tracking-[0.18em] text-slate-500">Club · Resort · Society</span>
+            <span className="block font-display font-bold text-navy-900 text-lg">FRCC</span>
+            <span className="block text-[11px] tracking-[0.08em] text-slate-500">Film Recreation &amp; Cultural Centre</span>
           </span>
         </a>
         <nav className="hidden lg:flex items-center gap-1 text-sm font-medium" aria-label="Primary">

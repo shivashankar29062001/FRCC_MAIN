@@ -4,6 +4,8 @@
 
 :root {
   /* Brand — reuse exactly. Only tints/shadows derive from these. */
+  --color-accent: #d4af55;
+  --color-navy: #0b1a33;
   --frcc-navy-950: #0a1730;
   --frcc-navy-900: #0b1d3a;
   --frcc-navy-800: #13294d;
@@ -12,7 +14,7 @@
   --frcc-navy-50: #eff3fa;
   --frcc-gold-600: #a9861d;
   --frcc-gold-500: #c9a227;
-  --frcc-gold-400: #d9bc55;
+  --frcc-gold-400: #d4af55;
   --frcc-gold-100: #f5eac6;
   --frcc-gold-50: #fbf6e3;
   --frcc-cream: #faf7f0;

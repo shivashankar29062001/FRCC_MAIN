@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { IMAGES } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
-import { HeroImage } from '../../components/HeroImage.jsx';
+import { ServiceHero } from '../../components/ServiceHero.jsx';
 
 // ---------------------------------------------------------------------------
 // /book/parking — Parking section landing page: photo header + zone cards + explore
@@ -23,10 +23,9 @@ const MORE_EXPLORE = [
 export function ParkingPage() {
   return (
     <div>
-      {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-parking" />
+      <ServiceHero service="parking" />
 
-      <section className="band-white" aria-label="Parking">
+      <section id="content" className="band-white scroll-mt-24" aria-label="Parking">
         <div className="container-x section">
           <h1 className="h-display max-w-2xl">Parking zones</h1>
           <p className="lead mt-3 max-w-lg">Reserve a zoned slot by the hour before you arrive</p>

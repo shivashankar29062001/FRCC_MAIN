@@ -11,6 +11,7 @@ import {
   GamepadIcon,
   ArrowRightIcon,
 } from '../components/ui/icons.jsx';
+import { Logo } from '../components/Logo.jsx';
 
 // ---------------------------------------------------------------------------
 // Auth screens — split-screen: brand panel (left) + form (right) on desktop,
@@ -32,10 +33,10 @@ function BrandPanel({ eyebrow, title, body, points, footnote, image }) {
       <div aria-hidden className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl" />
       <div className="relative flex h-full flex-col">
         <Link to="/" className="inline-flex items-center gap-2.5" aria-label="FRCC home">
-          <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 font-display text-lg font-bold text-gold-400">F</span>
+          <Logo variant="emblem" size={40} />
           <span className="leading-tight">
             <span className="block font-display font-bold text-white text-lg">FRCC</span>
-            <span className="block text-[11px] uppercase tracking-[0.18em] text-slate-400">Club · Resort · Society</span>
+            <span className="block text-[11px] tracking-[0.08em] text-slate-400">Film Recreation &amp; Cultural Centre</span>
           </span>
         </Link>
 
@@ -133,6 +134,9 @@ export function SignupPage() {
       }}
     >
       <div className="card p-6 sm:p-8">
+        <div className="mb-5">
+          <Logo variant="emblem" size={72} />
+        </div>
         <p className="eyebrow">Sign up</p>
         <h2 className="h-sub mt-1.5">Create account</h2>
         <p className="p-muted mt-1.5 text-sm">One account for hotel, halls, parking, games &amp; membership.</p>
@@ -266,6 +270,9 @@ export function SigninPage() {
       }}
     >
       <div className="card p-6 sm:p-8">
+        <div className="mb-5">
+          <Logo variant="emblem" size={72} />
+        </div>
         <p className="eyebrow">Sign in</p>
         <h2 className="h-sub mt-1.5">Welcome back</h2>
         <p className="p-muted mt-1.5 text-sm">Sign in to book &amp; manage membership.</p>

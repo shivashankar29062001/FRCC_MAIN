@@ -10,8 +10,9 @@ import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
 import { ArrowRightIcon, MapPinIcon, ClockIcon, PhoneIcon } from '../components/ui/icons.jsx';
-import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
+import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { TypeWriter } from '../components/TypeWriter.jsx';
+import { name as siteName, shortName as siteShortName, tagline as siteTagline } from '../config/site.js';
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
@@ -101,14 +102,14 @@ export function LandingPage() {
         <HeroImage slot="hero-home">
           <div className="landing-hero-overlay" aria-hidden="true" />
           <div className="container-x relative z-10 h-full flex items-center">
-            <div className="landing-hero-text max-w-[560px] text-white">
+            <div className="landing-hero-text max-w-[520px] text-white">
               {/* 2a · Small gold label */}
-              <p className="landing-hero-eyebrow">FRCC</p>
+              <p className="landing-hero-eyebrow">{siteShortName}</p>
 
               {/* 2b · Serif headline */}
               <h1 className="landing-hero-headline">
                 <TypeWriter
-                  text="Film Recreation Cultural Club"
+                  text={siteName}
                   speed={55}
                   caretFadeDelay={1500}
                   onComplete={() => setHeadlineDone(true)}
@@ -119,6 +120,7 @@ export function LandingPage() {
               <p className="landing-hero-subline">
                 <TypeWriter
                   phrases={[
+                    siteTagline,
                     'Stay in comfort.',
                     'Play every game.',
                     'Celebrate every occasion.',
@@ -130,58 +132,42 @@ export function LandingPage() {
                 />
               </p>
 
-              {/* 3 · Discount badge */}
-              <div className="mt-6">
-                <div
-                  className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm ${
-                    headlineDone ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                  }`}
-                  style={{
-                    backgroundColor: '#c9a227',
-                    color: '#0b1a33',
-                    transition: 'opacity 400ms ease-out',
-                  }}
-                >
-                  <svg
-                    className="h-3.5 w-3.5 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+              {/* 5, 6, 7 · Stat row and link with fade-in after headline */}
+              <div
+                className={`landing-hero-fade-group ${
+                  headlineDone ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
+              >
+                {/* 5 · Stat row */}
+                <div className="landing-hero-stat-row">
+                  <span className="landing-hero-stat-number">{MEMBER_DISCOUNT_PERCENT}%</span>
+                  <div className="landing-hero-stat-divider" aria-hidden="true" />
+                  <div className="flex flex-col justify-center">
+                    <span className="landing-hero-stat-title">Member savings</span>
+                    <span className="landing-hero-stat-subtitle">on every booking</span>
+                  </div>
+                </div>
+
+                {/* 6 · Plain text link */}
+                <div className="mt-[18px]">
+                  <Link
+                    to="/signup"
+                    className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
-                    <line x1="19" y1="5" x2="5" y2="19" />
-                    <circle cx="6.5" cy="6.5" r="2.5" />
-                    <circle cx="17.5" cy="17.5" r="2.5" />
-                  </svg>
-                  <span>{MEMBER_PROMO_NOTE}</span>
+                    <span>Become a member</span>
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
                 </div>
               </div>
 
-              {/* 4 · Buttons under the badge */}
-              <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Link
-                  to="/book"
-                  className="btn-base bg-[#c9a227] text-[#0b1a33] font-semibold px-7 py-3.5 text-base rounded-xl hover:bg-[#b89220] transition-colors duration-150 inline-flex items-center justify-center"
-                >
-                  Book now
-                </Link>
-                <Link
-                  to="/signup"
-                  className="btn-base border border-white text-white bg-transparent font-semibold px-7 py-3.5 text-base rounded-xl hover:bg-white/10 transition-colors duration-150 inline-flex items-center justify-center"
-                >
-                  Join now
-                </Link>
-              </div>
+
             </div>
           </div>
         </HeroImage>
 
         {/* 1b · BOOKING CARD */}
         <div id="booking" className="landing-hero-card-wrap scroll-mt-24">
-          <BookingCard />
+          <BookingCard compact />
         </div>
       </div>
 

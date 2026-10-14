@@ -32,11 +32,19 @@ export default function App() {
               <Route path="/signin" element={<SigninPage />} />
               <Route path="/home" element={<ProtectedRoute><HomeHubPage /></ProtectedRoute>} />
               <Route path="/book/hotel" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
+              <Route path="/book/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
+              <Route path="/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
               <Route path="/book/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
+              <Route path="/book/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
+              <Route path="/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
+              <Route path="/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
               <Route path="/book/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
+              <Route path="/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
               <Route path="/book/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
+              <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
               <Route path="/book/activities/process" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />
               <Route path="/membership" element={<ProtectedRoute><MembershipPage /></ProtectedRoute>} />
+              <Route path="/book/membership" element={<ProtectedRoute><MembershipPage /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
               <Route path="/profile/bookings" element={<ProtectedRoute><ProfilePage initialTab="bookings" /></ProtectedRoute>} />
               <Route path="/membership/dashboard" element={<ProtectedRoute><MembershipDashboardPage /></ProtectedRoute>} />

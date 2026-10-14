@@ -57,8 +57,9 @@ const TABS = [
 const GAME_OPTIONS = (GAMES || []).map((g) => ({ value: g.id, label: g.name }));
 
 const PLAN_OPTIONS = [
-  { value: 'individual', label: 'Individual' },
-  { value: 'family', label: 'Family' },
+  { value: 'silver', label: 'Silver' },
+  { value: 'gold', label: 'Gold' },
+  { value: 'platinum', label: 'Platinum' },
   { value: 'corporate', label: 'Corporate' },
 ];
 
@@ -78,6 +79,42 @@ const DURATION_OPTIONS = [
 // a party size and a room count).
 const DEFAULTS = { stay: { adults: '2', rooms: '1' } };
 const EMPTY = { stay: {}, hall: {}, parking: {}, activities: {}, membership: {} };
+
+const SERVICE_HEADERS = {
+  stay: 'Book your stay',
+  hall: 'Book a hall',
+  parking: 'Reserve parking',
+  activities: 'Book a game',
+  membership: 'Join FRCC',
+};
+
+function readParams() {
+  if (typeof window === 'undefined') return {};
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const result = {};
+    const checkin = sp.get('checkin');
+    const checkout = sp.get('checkout');
+    const adults = sp.get('adults');
+    const rooms = sp.get('rooms');
+    if (checkin || checkout || adults || rooms) {
+      result.stay = {};
+      if (checkin) {
+        const parts = checkin.split('-');
+        result.stay.checkin = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : checkin;
+      }
+      if (checkout) {
+        const parts = checkout.split('-');
+        result.stay.checkout = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : checkout;
+      }
+      if (adults) result.stay.adults = adults;
+      if (rooms) result.stay.rooms = rooms;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
 
 function readStored() {
   try {
@@ -321,11 +358,23 @@ function useBookingForm(defaultTab, preselect) {
   });
   const [values, setValues] = useState(() => {
     try {
-      return { ...EMPTY, ...(readStored()?.values || {}) };
+      const stored = readStored()?.values || {};
+      const fromUrl = readParams();
+      return {
+        ...EMPTY,
+        ...stored,
+        ...(fromUrl.stay ? { stay: { ...(stored.stay || {}), ...(fromUrl.stay || {}) } } : {}),
+      };
     } catch {
-      return { ...EMPTY };
+      return { ...EMPTY, ...readParams() };
     }
   });
+
+  useEffect(() => {
+    if (preselect && defaultTab) {
+      setTab(defaultTab);
+    }
+  }, [defaultTab, preselect]);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const tabRefs = useRef({});
@@ -588,14 +637,14 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
   );
 }
 
-function CardFields({ tab, v, errors, patch, busy }) {
+function CardFields({ tab, v, errors, patch, busy, compact = false }) {
   const active = TABS.find((t) => t.id === tab) || TABS[0];
 
   return (
     <div className="flex flex-col gap-3">
       {tab === 'stay' && (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
               <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
             </CardField>
@@ -603,7 +652,7 @@ function CardFields({ tab, v, errors, patch, busy }) {
               <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
             </CardField>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-stay-guests" label="Guests" icon={UsersIcon} error={errors.adults}>
               <SelectInput inputClass="booking-field" nativeArrow id="card-stay-guests" error={errors.adults} value={v.adults || ''} onChange={(e) => patch({ adults: e.target.value })} options={GUEST_OPTIONS} placeholder="Guests…" />
             </CardField>
@@ -619,7 +668,7 @@ function CardFields({ tab, v, errors, patch, busy }) {
           <CardField id="card-hall-date" label="Event date" icon={CalendarIcon} error={errors.date}>
             <DateInput inputClass="booking-field" id="card-hall-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
           </CardField>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-hall-event" label="Event type" icon={HallIcon} error={errors.event}>
               <SelectInput inputClass="booking-field" nativeArrow id="card-hall-event" error={errors.event} value={v.event || ''} onChange={(e) => patch({ event: e.target.value })} options={EVENT_OPTIONS} placeholder="Choose…" />
             </CardField>
@@ -635,7 +684,7 @@ function CardFields({ tab, v, errors, patch, busy }) {
           <CardField id="card-parking-date" label="Date" icon={CalendarIcon} error={errors.date}>
             <DateInput inputClass="booking-field" id="card-parking-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
           </CardField>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-parking-vehicle" label="Vehicle type" icon={CarIcon} error={errors.vehicle}>
               <SelectInput inputClass="booking-field" nativeArrow id="card-parking-vehicle" error={errors.vehicle} value={v.vehicle || ''} onChange={(e) => patch({ vehicle: e.target.value })} options={VEHICLE_OPTIONS} placeholder="Choose…" />
             </CardField>
@@ -651,7 +700,7 @@ function CardFields({ tab, v, errors, patch, busy }) {
           <CardField id="card-activities-game" label="Game" icon={GamepadIcon} error={errors.game}>
             <SelectInput inputClass="booking-field" nativeArrow id="card-activities-game" error={errors.game} value={v.game || ''} onChange={(e) => patch({ game: e.target.value })} options={GAME_OPTIONS} placeholder="Choose a game…" />
           </CardField>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-activities-date" label="Date" icon={CalendarIcon} error={errors.date}>
               <DateInput inputClass="booking-field" id="card-activities-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
             </CardField>
@@ -667,13 +716,13 @@ function CardFields({ tab, v, errors, patch, busy }) {
           <CardField id="card-membership-plan" label="Plan type" icon={MembershipIcon} error={errors.plan}>
             <SelectInput inputClass="booking-field" nativeArrow id="card-membership-plan" error={errors.plan} value={v.plan || ''} onChange={(e) => patch({ plan: e.target.value })} options={PLAN_OPTIONS} placeholder="Choose a plan…" />
           </CardField>
-          <CardField id="card-membership-contact" label="Contact" icon={MailIcon} error={errors.contact}>
+          <CardField id="card-membership-contact" label="Preferred contact" icon={MailIcon} error={errors.contact}>
             <TextInput inputClass="booking-field" id="card-membership-contact" error={errors.contact} type="text" autoComplete="email" placeholder="Email or mobile" value={v.contact || ''} onChange={(e) => patch({ contact: e.target.value })} />
           </CardField>
         </>
       )}
 
-      {MEMBER_PROMO_NOTE && (
+      {!compact && MEMBER_PROMO_NOTE && (
         <p className="booking-offer">
           <StarIcon className="h-3.5 w-3.5 shrink-0" /> {MEMBER_PROMO_NOTE}
         </p>
@@ -684,38 +733,43 @@ function CardFields({ tab, v, errors, patch, busy }) {
         variant="gold"
         loading={busy}
         loadingLabel={active.busyLabel}
-        className="h-[54px] w-full text-base font-semibold"
+        className={compact ? "h-[46px] w-full text-sm font-semibold" : "h-[54px] w-full text-base font-semibold"}
       >
-        Check availability <ArrowRightIcon className="h-4 w-4" />
+        {active.button || 'Check availability'} {!compact && <ArrowRightIcon className="h-4 w-4" />}
       </LoadingButton>
     </div>
   );
 }
 
-export function BookingCard({ defaultTab = 'stay', preselect = false, className }) {
-  const { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit } = useBookingForm(defaultTab, preselect);
+export function BookingCard({ defaultTab = 'stay', preselect = false, className, compact = false, service = null }) {
+  const activeTab = service || defaultTab;
+  const isServiceMode = Boolean(service);
+  const isCompact = compact || isServiceMode;
+  const { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit } = useBookingForm(activeTab, Boolean(service || preselect));
+  const currentTab = service || tab;
   const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
+  const title = (service && SERVICE_HEADERS[service]) || 'Plan your visit';
 
   return (
     <section
       aria-label="Booking"
-      className={cx('booking-card', className)}
+      className={cx('booking-card', isCompact && 'booking-card--compact', className)}
     >
-      <p className="booking-eyebrow">Book direct</p>
-      <h2 className="booking-title font-display">Plan your visit</h2>
-      <CardTabs tab={tab} onTabKey={onTabKey} tabRefs={tabRefs} selectTab={selectTab} />
+      {!isCompact && <p className="booking-eyebrow">Book direct</p>}
+      <h2 className="booking-title font-display">{title}</h2>
+      {!service && <CardTabs tab={currentTab} onTabKey={onTabKey} tabRefs={tabRefs} selectTab={selectTab} />}
       <div
-        key={tab}
+        key={currentTab}
         role="tabpanel"
-        id={`booking-card-panel-${tab}`}
-        aria-labelledby={`booking-card-tab-${tab}`}
-        className="pt-4"
+        id={`booking-card-panel-${currentTab}`}
+        aria-labelledby={!service ? `booking-card-tab-${currentTab}` : undefined}
+        className={isCompact ? "pt-3" : "pt-4"}
       >
         <form onSubmit={submit} noValidate>
-          <CardFields tab={tab} v={v} errors={errors} patch={patch} busy={busy} />
+          <CardFields tab={currentTab} v={v} errors={errors} patch={patch} busy={busy} compact={isCompact} />
         </form>
       </div>
-      {SITE_INFO.phone && phoneHref && (
+      {!isCompact && SITE_INFO.phone && phoneHref && (
         <p className="booking-help">
           Need help? Call <a href={phoneHref}>{SITE_INFO.phone}</a>
         </p>

@@ -2,7 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
+:root {
+  color-scheme: light;
+  --color-accent: #d4af55;
+  --color-navy: #0b1a33;
+}
 
 body {
   @apply bg-cream text-slate-800 font-sans antialiased;
@@ -394,7 +398,7 @@ select.booking-field {
 }
 
 /* ======================================================================== */
-/* Landing Page (/) Hero: Navy gradient overlay + responsive card layout   */
+/* Landing Page (/) Hero: Overlays + Typography + Compact Booking Card      */
 /* ======================================================================== */
 .landing-hero-wrap {
   position: relative;
@@ -406,75 +410,155 @@ select.booking-field {
   overflow: hidden;
 }
 
+.landing-hero-wrap .hero__shade {
+  display: none !important;
+}
+
 @media (min-width: 900px) {
   .landing-hero-wrap .hero {
     height: min(56.25vw, 88vh);
-    min-height: 600px;
+    min-height: 560px;
   }
 }
 
 @media (max-width: 899.98px) {
   .landing-hero-wrap .hero {
     height: auto;
-    min-height: 520px;
+    min-height: 480px;
     padding-top: 3.5rem;
     padding-bottom: 3.5rem;
   }
 }
 
-/* 1. Navy gradient overlay stronger on the left + soft top gradient for navbar */
+/* 1. Overlays: left gradient (0.50 fading to transparent at 50% width) + top gradient (0.35 over top 120px) */
 .landing-hero-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 1;
   background:
-    linear-gradient(to bottom, rgba(11, 26, 51, 0.65) 0%, rgba(11, 26, 51, 0.2) 20%, transparent 40%),
-    linear-gradient(to right, rgba(11, 26, 51, 0.78) 0%, rgba(11, 26, 51, 0.78) 25%, rgba(11, 26, 51, 0.05) 65%, transparent 100%);
+    linear-gradient(to bottom, rgba(11, 26, 51, 0.35) 0px, transparent 120px),
+    linear-gradient(to right, rgba(11, 26, 51, 0.50) 0%, transparent 50%);
 }
 
 @media (max-width: 899.98px) {
   .landing-hero-overlay {
     background:
-      linear-gradient(to bottom, rgba(11, 26, 51, 0.85) 0%, rgba(11, 26, 51, 0.72) 100%);
+      linear-gradient(to bottom, rgba(11, 26, 51, 0.35) 0px, transparent 120px),
+      linear-gradient(to right, rgba(11, 26, 51, 0.60) 0%, rgba(11, 26, 51, 0.60) 40%, transparent 100%);
   }
 }
 
-/* 2. Text block styling */
+/* No text-shadow or box-shadow on hero text */
+.landing-hero-text,
+.landing-hero-text * {
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* 3. Text block styling */
 .landing-hero-eyebrow {
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0.14em;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   color: #c9a227;
 }
 
 .landing-hero-headline {
   font-family: Fraunces, Georgia, serif;
-  font-size: clamp(40px, 5.2vw, 68px);
-  line-height: 1.08;
+  font-size: clamp(30px, 3.8vw, 48px);
+  font-weight: 500;
+  line-height: 1.15;
   color: #ffffff;
-  letter-spacing: -0.02em;
-  margin-top: 0.75rem;
-  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 0.5rem;
+  max-width: 520px;
 }
 
 .landing-hero-subline {
-  font-size: 24px;
-  line-height: 1.35;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.9);
-  margin-top: 1rem;
-  min-height: 2rem;
+  margin-top: 0.75rem;
+  min-height: 1.75rem;
 }
 
-/* 6. Landing hero booking card: right side on desktop, below photo on mobile (<900px) */
+/* 5 & 6 & 7. Stat row + Become a member link (opacity only, 400ms fade-in) */
+.landing-hero-fade-group {
+  transition: opacity 400ms ease-out;
+}
+
+.landing-hero-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.landing-hero-stat-number {
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 1;
+  color: #c9a227;
+}
+
+.landing-hero-stat-divider {
+  width: 1px;
+  height: 56px;
+  background-color: #c9a227;
+}
+
+.landing-hero-stat-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.25;
+}
+
+.landing-hero-stat-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.landing-hero-member-link {
+  font-size: 15px;
+  font-weight: 500;
+  color: #ffffff;
+  text-decoration: underline;
+  text-decoration-color: #c9a227;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  transition: color 150ms ease-out, text-decoration-color 150ms ease-out;
+}
+
+.landing-hero-member-link:hover {
+  color: #c9a227;
+  text-decoration-color: #c9a227;
+}
+
+@media (max-width: 899.98px) {
+  .landing-hero-stat-number {
+    font-size: 44px;
+  }
+  .landing-hero-stat-divider {
+    height: 44px;
+  }
+}
+
+/* 2. Compact booking card */
 .landing-hero-card-wrap {
   position: static;
   z-index: 20;
-  width: 100%;
-  max-width: 44rem;
+  width: 340px;
+  max-width: 92vw;
   margin: 1.5rem auto 0;
-  padding: 0 1rem;
+  padding: 0;
 }
 
 @media (min-width: 900px) {
@@ -482,18 +566,93 @@ select.booking-field {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    right: 2rem;
-    width: 100%;
-    max-width: 460px;
+    right: max(24px, calc((100% - 80rem) / 2 + 24px));
+    width: 340px;
+    max-width: 92vw;
     margin: 0;
-    padding: 0;
   }
 }
 
-@media (min-width: 1280px) {
-  .landing-hero-card-wrap {
-    right: calc((100% - 80rem) / 2 + 2rem);
-  }
+.landing-hero-card-wrap .booking-card,
+.booking-card--compact {
+  width: 340px !important;
+  max-width: 92vw !important;
+  padding: 18px !important;
+  border-radius: 16px !important;
+  background: rgba(11, 26, 51, 0.58) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+.landing-hero-card-wrap .booking-card::before,
+.booking-card--compact::before {
+  display: none !important;
+}
+
+.landing-hero-card-wrap .booking-title,
+.booking-card--compact .booking-title {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 20px !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  margin-top: 0 !important;
+}
+
+.landing-hero-card-wrap .booking-tabs,
+.booking-card--compact .booking-tabs {
+  margin-top: 12px !important;
+  gap: 4px !important;
+}
+
+.landing-hero-card-wrap .booking-tab,
+.booking-card--compact .booking-tab {
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 4px 2px !important;
+  font-size: 11px !important;
+  border-radius: 10px !important;
+}
+
+.landing-hero-card-wrap .booking-tab svg,
+.booking-card--compact .booking-tab svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.landing-hero-card-wrap .booking-label,
+.booking-card--compact .booking-label {
+  font-size: 11px !important;
+  margin-bottom: 4px !important;
+}
+
+.landing-hero-card-wrap .booking-field,
+.booking-card--compact .booking-field {
+  height: 42px !important;
+  font-size: 14px !important;
+  padding-left: 2.25rem !important;
+  border-radius: 10px !important;
+}
+
+.landing-hero-card-wrap .booking-field-icon,
+.booking-card--compact .booking-field-icon {
+  left: 0.65rem !important;
+}
+
+.landing-hero-card-wrap .booking-card button[type="submit"],
+.booking-card--compact button[type="submit"] {
+  height: 46px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+}
+
+.landing-hero-card-wrap .booking-offer,
+.landing-hero-card-wrap .booking-help,
+.booking-card--compact .booking-offer,
+.booking-card--compact .booking-help {
+  display: none !important;
 }
 
 /* Typewriter blinking caret */
@@ -523,6 +682,66 @@ select.booking-field {
 @media (prefers-reduced-motion: reduce) {
   .typewriter-caret {
     display: none !important;
+  }
+}
+
+/* ======================================================================== */
+/* Service Hero: Reusable hero with Service Booking Card                    */
+/* ======================================================================== */
+.service-hero-wrap {
+  position: relative;
+}
+
+.service-hero-wrap .hero {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.service-hero-wrap .hero__shade {
+  display: none !important;
+}
+
+@media (min-width: 900px) {
+  .service-hero-wrap .hero {
+    height: min(56.25vw, 88vh);
+    min-height: 520px;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .service-hero-wrap .hero {
+    height: 60vh;
+    min-height: 360px;
+  }
+}
+
+.service-hero-card-wrap {
+  position: static;
+  z-index: 20;
+  width: 100%;
+  max-width: 100%;
+  margin: 1.5rem auto 0;
+  padding: 0 1rem;
+}
+
+@media (min-width: 900px) {
+  .service-hero-card-wrap {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    right: max(24px, calc((100% - 80rem) / 2 + 24px));
+    width: 340px;
+    max-width: 92vw;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .service-hero-card-wrap .booking-card {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }
 
