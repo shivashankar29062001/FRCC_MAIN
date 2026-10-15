@@ -51,11 +51,19 @@ export function Footer() {
         <div>
           <p className="text-sm font-semibold text-white">Contact</p>
           <ul className="mt-4 space-y-3 text-sm text-slate-400">
-            <li>Lakeview Road, FRCC Campus</li>
-            <li><a href="tel:+919000000000" className="hover:text-gold-400">+91 90000 00000</a></li>
-            <li><a href="mailto:hello@frcc.club" className="hover:text-gold-400">hello@frcc.club</a></li>
+            <li className="space-y-0.5">
+              <span className="block font-medium text-slate-300">Vijayawada (Registered Office):</span>
+              <span className="block text-xs leading-relaxed text-slate-400">D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003</span>
+            </li>
+            <li className="space-y-0.5">
+              <span className="block font-medium text-slate-300">Hyderabad Office:</span>
+              <span className="block text-xs leading-relaxed text-slate-400">Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081</span>
+            </li>
+            <li><a href="tel:+917893616262" className="hover:text-gold-400">+91 78936 16262</a></li>
+            <li><a href="https://wa.me/917893616262" target="_blank" rel="noopener noreferrer" className="hover:text-gold-400">WhatsApp: +91 78936 16262</a></li>
+            <li><a href="mailto:hello@frcc.example" className="hover:text-gold-400">hello@frcc.example (SAMPLE)</a></li>
           </ul>
-          <p className="mt-4 text-xs text-slate-500">Front desk open 6 AM – 11 PM daily</p>
+          <p className="mt-4 text-xs text-slate-500">Front desk open 6 AM – 11 PM daily (SAMPLE)</p>
         </div>
       </div>
       <div className="border-t border-white/10">

@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
 import { useApp } from '../app/store/AppContext.jsx';
 import { useMockQuery } from '../app/hooks/useMockQuery.js';
 import { Card, EmptyState, LoadingState, SkeletonGrid, ErrorState } from '../components/ui/feedback.jsx';
 import { Breadcrumbs } from '../components/ui/sections.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
-import { SmartImage } from '../components/ui/media.jsx';
-import { IMAGES } from '../config/images.js';
 import { MEMBERSHIP_URL } from '../config/redirects.js';
+import {
+  MembershipIdCard,
+  HealthCard,
+  downloadBothCards,
+} from '../features/membership/MembershipCards.jsx';
 import {
   AwardIcon,
   MembershipIcon,
@@ -17,100 +19,25 @@ import {
 } from '../components/ui/icons.jsx';
 
 // ---------------------------------------------------------------------------
-// /membership/dashboard — ONLY for users with an active membership.
-// Data comes from the membership team later. No membership → locked state with
-// benefit highlights + "Get Membership" (redirects via MEMBERSHIP_URL).
+// /membership/dashboard — Shows both membership cards for a stored membership.
+// Safely falls back to a locked benefits view if no membership exists (no crash).
 // ---------------------------------------------------------------------------
 
-/** Deterministic QR-looking placeholder (no new dependency). */
-function QrPlaceholder({ seed = 'frcc' }) {
-  const SIZE = 9;
-  const cells = useMemo(() => {
-    let h = 2166136261;
-    for (let i = 0; i < seed.length; i += 1) {
-      h ^= seed.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    const out = [];
-    for (let i = 0; i < SIZE * SIZE; i += 1) {
-      h = Math.imul(h ^ (h >>> 15), 2246822507);
-      out.push(((h >>> (i % 24)) & 3) !== 0);
-    }
-    return out;
-  }, [seed]);
-
-  const finders = [[0, 0], [0, SIZE - 3], [SIZE - 3, 0]];
-  const inFinder = (r, c) => finders.some(([r0, c0]) => r >= r0 && r < r0 + 3 && c >= c0 && c < c0 + 3);
-
-  return (
-    <div
-      role="img"
-      aria-label="Member QR code placeholder"
-      className="grid h-24 w-24 shrink-0 gap-[2px] rounded-lg bg-white p-2 shadow-card"
-      style={{ gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))` }}
-    >
-      {cells.map((on, i) => {
-        const r = Math.floor(i / SIZE);
-        const c = i % SIZE;
-        const dark = inFinder(r, c) ? !(r % 3 === 1 && c % 3 === 1) : on;
-        return <span key={i} className={dark ? 'rounded-[1px] bg-navy-950' : 'rounded-[1px] bg-navy-50'} />;
-      })}
-    </div>
-  );
-}
-
-/** Hyatt-style member ID card: plan name, member since, validity/status, QR. */
-function MemberIdCard({ user, membership }) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-navy-900/10 bg-navy-950 p-6 text-white shadow-lift">
-      <SmartImage fill image={IMAGES.memberCardBg} zoom={false} sizes="(min-width: 1024px) 45vw, 100vw" />
-      <span aria-hidden className="absolute inset-0 bg-gradient-to-br from-navy-950/95 via-navy-950/90 to-navy-900/80" />
-      <span aria-hidden className="absolute inset-0 bg-grid-gold bg-[size:28px_28px] opacity-40" />
-      <span aria-hidden className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gold-500/15 blur-3xl" />
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="eyebrow-on-dark">FRCC Member ID</p>
-          <p className="mt-2 truncate font-display text-2xl text-white">{membership?.name || user?.name || 'Member'}</p>
-          <p className="mt-1 font-mono text-sm text-gold-400">{membership?.memberId || 'Not issued yet'}</p>
-        </div>
-        <QrPlaceholder seed={membership?.memberId || user?.userId || 'frcc'} />
-      </div>
-      <dl className="relative mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-4 text-xs">
-        <div>
-          <dt className="text-slate-400">Plan</dt>
-          <dd className="mt-1 font-semibold text-white">{membership?.planName || '—'}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-400">Member since</dt>
-          <dd className="mt-1 font-semibold text-white">{membership?.since || '2026'}</dd>
-        </div>
-        <div>
-          <dt className="text-slate-400">Validity</dt>
-          <dd className="mt-1 font-semibold text-white">{membership?.validity || 'Lifetime'}</dd>
-        </div>
-      </dl>
-      <p className="relative mt-4">
-        <span className="tag tag-green">Active</span>
-      </p>
-    </div>
-  );
-}
-
 const BENEFITS = [
-  'Club, pool, gym and courts access',
-  'Guest passes every month',
-  'Discounted hall and hotel rates',
-  'Priority booking on peak days',
+  '30% discount on every booking (stay, halls, games, gym, pool)',
+  'FRCC Health Card: 20% discount at collaborating diagnostic centres',
+  'Complimentary parking privilege across all club visits',
+  'Priority sports slots & pool access reserved for members',
 ];
 
 const OFFERS = [
-  { title: '20% off North Wing weekends', desc: 'Gold & Platinum · till month-end', tag: 'Rooms' },
-  { title: 'Free guest pass this month', desc: 'Bring two guests to the pool', tag: 'Guests' },
-  { title: 'Priority badminton slots', desc: '6–9 PM courts held for members', tag: 'Sports' },
+  { title: '30% off every booking', desc: 'Member discount on luxury stay & event venues', tag: 'Rooms & Halls' },
+  { title: '20% off diagnostic centres', desc: 'Health card savings with authorized partner labs', tag: 'Health' },
+  { title: 'Priority sports slots', desc: 'Courts & swimming pool held exclusively for members', tag: 'Sports' },
 ];
 
 export function MembershipDashboardPage() {
-  const { user, isMember, membership } = useApp();
+  const { isMember, membership } = useApp();
   const { loading, error, retry } = useMockQuery(() => ({ ready: true }));
 
   if (loading) {
@@ -130,94 +57,152 @@ export function MembershipDashboardPage() {
     );
   }
 
-  // Locked state — no dashboard data, only benefit highlights + redirect.
-  if (!isMember) {
+  // Locked state — when no membership exists, safely render without crashing
+  if (!isMember || !membership) {
     return (
       <div>
-        <HeroImage slot="hero-membership-dashboard" />
+        <HeroImage slot="hero-profile" />
         <div className="container-x section-top">
           <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
           <h1 className="h-section mt-3">You don&apos;t have a membership yet</h1>
-          <p className="mt-1 text-slate-600">Join once, belong for life — Member ID and QR issued on signup.</p>
+          <p className="mt-1 text-slate-600">Join once, belong for life — Member ID card and Health Card issued instantly on enrollment.</p>
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <Reveal>
-            <Card className="h-full">
-              <p className="eyebrow">Why become a member</p>
-              <h2 className="h-sub mt-1">Every facility, one card</h2>
-              <ul className="mt-5 space-y-2.5">
-                {BENEFITS.map((b) => (
-                  <li key={b} className="flex items-start gap-3 text-sm text-slate-700">
-                    <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-50 text-[11px] font-bold text-gold-600">
-                      <CheckIcon className="h-3 w-3" />
-                    </span>
-                    {b}
-                  </li>
-                ))}
-              </ul>
-              <a href={MEMBERSHIP_URL} className="btn-base mt-6 w-full px-5 py-3 bg-gold-500 text-navy-950 hover:bg-gold-400">
-                Get Membership <ArrowRightIcon className="h-4 w-4" />
-              </a>
-            </Card>
-          </Reveal>
-          <Reveal delay={100}>
-            <EmptyState
-              title="No dashboard data"
-              body="Your plan name, member ID, QR, validity and offers will appear here once the membership team confirms your enrolment."
-              icon={AwardIcon}
-            />
-          </Reveal>
+            <Reveal>
+              <Card className="h-full">
+                <p className="eyebrow">Why become a member</p>
+                <h2 className="h-sub mt-1">Every facility, one card</h2>
+                <ul className="mt-5 space-y-2.5">
+                  {BENEFITS.map((b) => (
+                    <li key={b} className="flex items-start gap-3 text-sm text-slate-700">
+                      <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-50 text-[11px] font-bold text-gold-600">
+                        <CheckIcon className="h-3 w-3" />
+                      </span>
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+                <a href={MEMBERSHIP_URL} className="btn-base mt-6 w-full px-5 py-3 bg-gold-500 text-navy-950 hover:bg-gold-400">
+                  Get Membership <ArrowRightIcon className="h-4 w-4" />
+                </a>
+              </Card>
+            </Reveal>
+            <Reveal delay={100}>
+              <EmptyState
+                title="No active membership found"
+                body="Your Membership ID card, Health card, validity, and club privileges will appear here once you join FRCC."
+                icon={AwardIcon}
+              />
+            </Reveal>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+
+  // Active state — shows both cards for the stored membership
+  const memberId = membership?.memberId || 'FRCC-MEMBER';
 
   return (
     <div>
-      <HeroImage slot="hero-membership-dashboard" />
+      <HeroImage slot="hero-profile" />
       <div className="container-x section-top">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
-        <h1 className="h-section mt-3">{`${membership?.planName || 'Member'} · ${membership?.memberId || ''}`}</h1>
-        <p className="mt-1 text-slate-600">{`Member since ${membership?.since || '2026'} · ${membership?.validity || 'Lifetime · Active'}`}</p>
-        <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <Reveal>
-            <MemberIdCard user={user} membership={membership} />
-            <a href={MEMBERSHIP_URL} className="btn-base mt-4 w-full border border-navy-900/20 bg-white px-5 py-3 text-navy-900 hover:border-navy-900/50 hover:bg-navy-50/60">
-              Renew / Upgrade <ArrowRightIcon className="h-4 w-4" />
-            </a>
-          </Reveal>
+        <h1 className="h-section mt-3">{`${membership?.planName || 'FRCC Membership'} · ${memberId}`}</h1>
+        <p className="mt-1 text-slate-600">Lifetime Active Membership · Film Recreation &amp; Cultural Centre</p>
 
-          <Reveal delay={100}>
+        {/* Digital Privilege Cards Section: shows both cards */}
+        <section aria-label="Official FRCC Cards" className="mt-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <p className="eyebrow">Digital Privilege Cards</p>
+              <h2 className="h-sub">Your FRCC Membership &amp; Health Cards</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => downloadBothCards(memberId)}
+              className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-5 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm inline-flex items-center gap-2 self-start sm:self-auto"
+            >
+              Download cards
+            </button>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Reveal>
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-navy-900">
+                    Membership ID Card
+                  </span>
+                  <span className="tag tag-green !text-[11px]">Verified Active</span>
+                </div>
+                <MembershipIdCard id="frcc-membership-id-card" member={membership} />
+              </div>
+            </Reveal>
+
+            <Reveal delay={100}>
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-navy-900">
+                    FRCC Health Card
+                  </span>
+                  <span className="tag tag-gold !text-[11px]">20% Diagnostics Pass</span>
+                </div>
+                <HealthCard id="frcc-health-card" member={membership} />
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Benefits & Privileges */}
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          <Reveal>
             <Card className="h-full">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="eyebrow">Benefits</p>
-                  <h2 className="h-sub mt-1">Included in {membership?.planName || 'your plan'}</h2>
+                  <h2 className="h-sub mt-1">Included in your membership</h2>
                 </div>
                 <span aria-hidden className="grid h-11 w-11 place-items-center rounded-xl border border-navy-900/10 bg-navy-50 text-navy-800">
                   <QrIcon className="h-5 w-5" />
                 </span>
               </div>
-              <ul className="mt-5 grid gap-2.5 sm:grid-cols-2">
+              <ul className="mt-5 space-y-3">
                 {BENEFITS.map((b) => (
                   <li key={b} className="panel-tint flex items-start gap-2.5 p-3.5 text-sm text-slate-700">
                     <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
-                    {b}
+                    <span>{b}</span>
                   </li>
                 ))}
               </ul>
             </Card>
           </Reveal>
+
+          <Reveal delay={100}>
+            <Card className="h-full flex flex-col justify-between">
+              <div>
+                <p className="eyebrow">Member Support</p>
+                <h2 className="h-sub mt-1">Need help with your cards?</h2>
+                <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+                  Present your digital Membership ID Card or FRCC Health Card at the club reception or collaborating diagnostic centres. You can download crisp PNG copies anytime using the button above.
+                </p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Member ID: {memberId}</span>
+                <span className="font-medium text-emerald-600">Status: Active Lifetime</span>
+              </div>
+            </Card>
+          </Reveal>
         </div>
 
+        {/* Member-only Offers */}
         <section className="mt-12" aria-label="Member-only offers">
           <div className="flex items-center gap-3">
             <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl bg-gold-50 text-gold-600">
               <MembershipIcon className="h-5 w-5" />
             </span>
             <div>
-              <p className="eyebrow">Member-only offers</p>
-              <h2 className="h-sub">This month for you</h2>
+              <p className="eyebrow">Member-only privileges</p>
+              <h2 className="h-sub">Active privileges for you</h2>
             </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -236,3 +221,5 @@ export function MembershipDashboardPage() {
     </div>
   );
 }
+
+export default MembershipDashboardPage;

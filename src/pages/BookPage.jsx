@@ -10,25 +10,25 @@ import { ArrowRightIcon } from '../components/ui/icons.jsx';
 // Five showcase cards for the booking hub
 const CARDS = [
   {
-    to: '/book/hotel',
+    to: '/stay',
     label: 'Stay',
     desc: '36 rooms across two wings — member rates from tonight.',
     image: IMAGES.serviceHotel,
   },
   {
-    to: '/book/hall',
+    to: '/halls',
     label: 'Halls',
     desc: '4 venues seating 40 to 600 — weddings, conferences, celebrations.',
     image: IMAGES.serviceHall,
   },
   {
-    to: '/book/parking',
+    to: '/parking',
     label: 'Parking',
     desc: '3 zoned areas — reserve by the hour before you arrive.',
     image: IMAGES.serviceParking,
   },
   {
-    to: '/book/activities',
+    to: '/activities',
     label: 'Activities',
     desc: '11 games across courts, grounds, pool and play zones.',
     image: IMAGES.serviceActivities,

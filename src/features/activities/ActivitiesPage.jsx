@@ -1,15 +1,12 @@
-import { RedirectIntro } from '../../components/RedirectIntro.jsx';
+// ---------------------------------------------------------------------------
+// /src/features/activities/ActivitiesPage.jsx — Activities Landing Page
+// ---------------------------------------------------------------------------
+
+import { ServiceLanding } from '../../components/ServiceLanding.jsx';
 import { ServiceHero } from '../../components/ServiceHero.jsx';
-import { IMAGES } from '../../config/images.js';
 
 export function ActivitiesPage() {
-  return (
-    <RedirectIntro
-      redirectKey="activities"
-      bannerImage={IMAGES.bannerActivities}
-      hero={<ServiceHero service="activities" />}
-    />
-  );
+  return <ServiceLanding service="activities" hero={<ServiceHero service="activities" />} />;
 }
 
 export default ActivitiesPage;

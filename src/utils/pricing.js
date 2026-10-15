@@ -23,4 +23,28 @@ export function calculateTotal(subtotal = 0, isMember = false) {
   };
 }
 
-export default calculateTotal;
+/**
+ * Formats an amount into Indian Rupees with Indian grouping (e.g. ₹1,00,000).
+ *
+ * @param {number|string} amount - The amount to format.
+ * @returns {string} Formatted INR currency string.
+ */
+export function formatInr(amount) {
+  if (amount === null || amount === undefined || amount === '') return '';
+  if (typeof amount === 'string' && amount.startsWith('₹')) return amount;
+  const num = Number(amount);
+  if (Number.isNaN(num)) return String(amount);
+  const rounded = Math.round(num);
+  if (rounded < 0) {
+    return `-₹${Math.abs(rounded).toLocaleString('en-IN')}`;
+  }
+  return `₹${rounded.toLocaleString('en-IN')}`;
+}
+
+export const formatINR = formatInr;
+
+export default {
+  calculateTotal,
+  formatInr,
+  formatINR,
+};

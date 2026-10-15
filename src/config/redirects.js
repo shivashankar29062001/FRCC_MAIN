@@ -10,7 +10,7 @@ export const HOTEL_BOOKING_URL = '#';
 export const HALL_BOOKING_URL = '#';
 export const PARKING_BOOKING_URL = '#';
 export const ACTIVITIES_BOOKING_URL = '/book/activities/process';
-export const MEMBERSHIP_URL = '#';
+export const MEMBERSHIP_URL = '/membership';
 
 /**
  * false (default) → navigate in the SAME tab.

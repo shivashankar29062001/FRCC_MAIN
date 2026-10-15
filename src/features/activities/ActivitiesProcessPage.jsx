@@ -1,20 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useApp, newId } from '../../app/store/AppContext.jsx';
+import { QRCodeSVG } from 'qrcode.react';
+import { useApp } from '../../app/store/AppContext.jsx';
 import { useMockQuery } from '../../app/hooks/useMockQuery.js';
 import { Button, Input, Select, LoadingButton } from '../../components/ui/controls.jsx';
 import { Card, EmptyState, SectionHeading } from '../../components/ui/feedback.jsx';
-import { Breadcrumbs } from '../../components/ui/sections.jsx';
-import { HeroImage } from '../../components/HeroImage.jsx';
+import { FlowShell } from '../../components/FlowShell.jsx';
 import { Reveal } from '../../components/ui/motion.jsx';
 import { IMAGES } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
 import { getSlots } from './availability.service.js';
 import { saveActivityBooking } from './bookings.store.js';
-import { BookingStepper } from '../../components/booking/BookingStepper.jsx';
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
-import { BookingSummary } from '../../components/booking/BookingSummary.jsx';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
 import { MEMBER_DISCOUNT_LABEL, MEMBER_PROMO_NOTE } from '../../config/pricing.js';
@@ -28,6 +26,7 @@ import {
   CheckCircleIcon,
   ShieldIcon,
   DownloadIcon,
+  PrinterIcon,
   ChevronLeftIcon,
   ArrowRightIcon,
 } from '../../components/ui/icons.jsx';
@@ -115,6 +114,8 @@ function QrPlaceholder({ seed = 'frcc' }) {
 
 const MOBILE_RE = /^[+\d][\d\s-]{7,14}$/;
 
+const STORAGE_KEY = 'frcc_activities_booking_draft';
+
 function blankDraft(gameId, user) {
   const looksPhone = user?.emailOrPhone && !user.emailOrPhone.includes('@');
   return {
@@ -126,20 +127,70 @@ function blankDraft(gameId, user) {
     players: '',
     equipment: false,
     extras: {},
-    paymentMethod: '',
+    paymentMethod: 'upi',
   };
 }
 
 export function ActivitiesProcessPage() {
   const { user, isMember, pushToast } = useApp();
   const [params] = useSearchParams();
-  const paramGame = params.get('game') || '';
+  const paramGame = params.get('game') || params.get('item') || '';
   const paramValid = Boolean(paramGame && gameById(paramGame));
-  const [step, setStep] = useState(paramValid ? 1 : 0);
-  const [draft, setDraft] = useState(() => blankDraft(paramValid ? paramGame : '', user));
+
+  const [confirmed, setConfirmed] = useState(() => {
+    try {
+      const raw = window.sessionStorage.getItem('frcc_activities_confirmed');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [draft, setDraft] = useState(() => {
+    let saved = null;
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      if (raw) saved = JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    const initialGame = paramValid ? paramGame : (saved?.gameId || '');
+    const base = blankDraft(initialGame, user);
+    if (saved) {
+      return {
+        ...base,
+        ...saved,
+        gameId: initialGame || saved.gameId || '',
+      };
+    }
+    return base;
+  });
+
+  const [step, setStep] = useState(() => {
+    if (confirmed) return 5;
+    if (paramValid) return 1;
+    let saved = null;
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      if (raw) saved = JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    if (saved?.step !== undefined && saved.step < 5) return saved.step;
+    return 0;
+  });
+
   const [errors, setErrors] = useState({});
   const [paying, setPaying] = useState(false);
-  const [confirmed, setConfirmed] = useState(null);
+
+  // Sync draft and step to sessionStorage for refresh safety
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, step }));
+    } catch {
+      /* ignore */
+    }
+  }, [draft, step]);
 
   const game = gameById(draft.gameId);
   const patch = (p) => {
@@ -152,7 +203,6 @@ export function ActivitiesProcessPage() {
   };
 
   // Slots load per game + date (mock latency + error/retry states).
-  // TODO(Phase 2): GET /api/activities/slots?game=<id>&date=<iso>.
   const slotsQuery = useMockQuery(() => getSlots(draft.gameId, draft.date), {
     deps: [draft.gameId, draft.date],
     delay: 450,
@@ -174,6 +224,47 @@ export function ActivitiesProcessPage() {
       { label: game.playerLabel, value: draft.players || '—' },
     ];
   }, [game, draft.date, draft.slot, draft.players]);
+
+  // Inline step validation
+  const isStepValid = useMemo(() => {
+    if (step === 0) {
+      return Boolean(draft.gameId && gameById(draft.gameId));
+    }
+    if (step === 1) {
+      return Boolean(draft.date && draft.date >= todayISO());
+    }
+    if (step === 2) {
+      return Boolean(draft.slot && !slots.find((s) => s.time === draft.slot)?.booked);
+    }
+    if (step === 3) {
+      const g = gameById(draft.gameId);
+      const n = Number(draft.players);
+      const nameOk = draft.name.trim().length >= 2;
+      const cleanMobile = draft.mobile.replace(/\D/g, '');
+      const mobileOk = cleanMobile.length === 10 || MOBILE_RE.test(draft.mobile.trim());
+      const playersOk = Boolean(draft.players) && Number.isFinite(n) && n >= 1 && (!g || n <= g.maxPlayers);
+      if (!nameOk || !mobileOk || !playersOk) return false;
+      if (g?.extraFields) {
+        for (const f of g.extraFields) {
+          const v = draft.extras[f.id];
+          if (f.required && (v === undefined || v === '' || v === false)) return false;
+          if (f.type === 'number' && v !== undefined && v !== '') {
+            const nv = Number(v);
+            if (!Number.isFinite(nv)) return false;
+            if (f.min !== undefined && nv < f.min) return false;
+            if (f.max !== undefined && nv > f.max) return false;
+          }
+          if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) return false;
+          if (f.type === 'tel' && v && !MOBILE_RE.test(String(v).trim())) return false;
+        }
+      }
+      return true;
+    }
+    if (step === 4) {
+      return Boolean(draft.paymentMethod);
+    }
+    return true;
+  }, [step, draft, slots, game]);
 
   function fail(next) {
     setErrors(next);
@@ -201,7 +292,8 @@ export function ActivitiesProcessPage() {
       const g = gameById(draft.gameId);
       const next = {};
       if (draft.name.trim().length < 2) next.name = 'Enter the booker’s full name.';
-      if (!MOBILE_RE.test(draft.mobile.trim())) next.mobile = 'Enter a valid mobile number.';
+      const cleanMobile = draft.mobile.replace(/\D/g, '');
+      if (cleanMobile.length !== 10 && !MOBILE_RE.test(draft.mobile.trim())) next.mobile = 'Enter a valid 10-digit mobile number.';
       const n = Number(draft.players);
       if (!draft.players || !Number.isFinite(n) || n < 1) next.players = 'Enter how many are playing.';
       else if (g && n > g.maxPlayers) next.players = `Max ${g.maxPlayers} for ${g.name}.`;
@@ -243,7 +335,6 @@ export function ActivitiesProcessPage() {
   }
 
   function selectGame(id) {
-    // New game → reset downstream draft (date, slot, extras) but keep contact.
     setDraft((d) => ({ ...blankDraft(id, user), name: d.name, mobile: d.mobile }));
     setErrors({});
   }
@@ -255,16 +346,25 @@ export function ActivitiesProcessPage() {
       return;
     }
     setPaying(true);
-    // TODO(Phase 2): real gateway (Razorpay/Stripe) + server-side booking id.
+
+    // TODO(Razorpay): Real payment gateway integration
+    // 1. const order = await createRazorpayOrder({ amount: quote.total, currency: 'INR' });
+    // 2. Open Razorpay modal with order.id
+    // 3. await verifyRazorpayPayment(response);
+
     setTimeout(() => {
       setPaying(false);
       const atVenue = draft.paymentMethod === 'pay_at_venue';
       const pricing = calculateTotal(quote.subtotal, isMember);
+      const year = new Date().getFullYear();
+      const random6 = String(Math.floor(100000 + Math.random() * 900000));
+      const bookingId = `FRCC-ACT-${year}-${random6}`;
+
       const record = {
-        bookingId: newId('FRCC'),
+        bookingId,
         userId: user?.userId || 'guest',
         game: draft.gameId,
-        gameName: game.name,
+        gameName: game?.name || draft.gameId,
         date: draft.date,
         slot: draft.slot,
         players: draft.players,
@@ -274,6 +374,9 @@ export function ActivitiesProcessPage() {
         amount: pricing.total,
         isMember,
         status: atVenue ? 'Pending' : 'Confirmed',
+        paymentMethod: draft.paymentMethod,
+        userName: draft.name,
+        mobile: draft.mobile,
       };
       const { booking } = saveActivityBooking({
         booking: record,
@@ -283,10 +386,18 @@ export function ActivitiesProcessPage() {
           status: atVenue ? 'Pending' : 'Success',
         },
       });
+
+      try {
+        window.sessionStorage.setItem('frcc_activities_confirmed', JSON.stringify(booking));
+        window.sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+
       setConfirmed(booking);
       setStep(5);
       pushToast(atVenue ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
-    }, 1200);
+    }, 1500);
   }
 
   function downloadReceipt() {
@@ -320,6 +431,12 @@ export function ActivitiesProcessPage() {
   }
 
   function bookAnother() {
+    try {
+      window.sessionStorage.removeItem('frcc_activities_confirmed');
+      window.sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     const keepGame = draft.gameId;
     setDraft({ ...blankDraft(keepGame, user) });
     setConfirmed(null);
@@ -370,72 +487,96 @@ export function ActivitiesProcessPage() {
     return null;
   }
 
+  const processSummary = useMemo(() => {
+    let detailText = `${GAME_CATEGORIES[game?.category || 'indoor']} · ${game?.slotMinutes || 60} min`;
+    if (game?.id === 'luxury-gym') {
+      const tier = draft.extras.tier || 'standard';
+      detailText = tier === 'premium' ? 'Premium Tier (₹3,000 / month)' : 'Standard Tier (₹2,000 / month)';
+    } else if (game?.id === 'swimming-pool') {
+      const hrs = Number(draft.extras.hours || 1);
+      detailText = `${hrs} Hour${hrs > 1 ? 's' : ''} (₹1,000 / hr)`;
+    } else if (game) {
+      const sess = Number(draft.extras.sessions || 1);
+      detailText = `${sess} Session${sess > 1 ? 's' : ''} (₹1,500 / session)`;
+    }
+
+    return {
+      name: game?.name || 'Activity',
+      image: game ? IMAGES[game.imageKey] : undefined,
+      detail: detailText,
+      date: draft.date ? prettyDate(draft.date) : undefined,
+      slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
+      guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
+      price: quote.subtotal,
+      memberDiscount: quote.discount > 0 ? quote.discount : undefined,
+      total: quote.total,
+    };
+  }, [game, draft.date, draft.slot, draft.players, draft.extras, quote]);
+
   return (
-    <div>
-      <HeroImage slot="hero-activities" />
-
-      <div className="container-x section-top">
-        <Breadcrumbs
-          items={[
-            { label: 'Home', to: '/home' },
-            { label: 'Activities / Games', to: '/book/activities' },
-            { label: 'Booking' },
-          ]}
-        />
-        <h1 className="h-section mt-3">{game ? `Book ${game.name}` : 'Book your game'}</h1>
-        <p className="mt-3 max-w-2xl text-slate-600">Six quick steps — game, date, slot, details, payment and confirmation. Your booking ID and QR are issued instantly.</p>
-
-        <div className="mt-6">
-          <BookingStepper steps={STEPS} current={step} onStepClick={(i) => { if (i < step && step < 5) { setErrors({}); setStep(i); } }} />
-        </div>
-
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-          <div className="min-w-0">
-            {/* STEP 1 · Select Game -------------------------------------- */}
-            {step === 0 && (
-              <Reveal>
-                <Card>
-                  <p className="eyebrow">Step 1 · Select Game</p>
-                  <h2 className="h-sub mt-1">Which game are you booking?</h2>
-                  {paramGame && !paramValid && (
-                    <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
-                      “{paramGame}” isn’t a known game — pick one below to start.
-                    </p>
-                  )}
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2" role="group" aria-label="Choose a game">
-                    {GAMES.map((g) => {
-                      const selected = draft.gameId === g.id;
-                      const Icon = GAME_ICONS[g.category] || TrophyIcon;
-                      return (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => selectGame(g.id)}
-                          aria-pressed={selected}
-                          className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-800 ${
-                            selected ? 'border-navy-900 bg-navy-50/60 shadow-card' : 'border-slate-200 bg-white hover:border-navy-900/40 hover:shadow-card'
-                          }`}
-                        >
-                          <span aria-hidden className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
-                            <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="56px" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-1.5">
-                              <Icon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
-                              <strong className="truncate text-sm text-navy-900">{g.name}</strong>
-                            </span>
-                            <span className="mt-0.5 block text-xs text-slate-500">
-                              {GAME_CATEGORIES[g.category]} · {g.slotMinutes} min · from {formatINR(g.pricePerSlot)}
-                            </span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {errors.gameId && <p role="alert" className="field-error mt-3">{errors.gameId}</p>}
-                </Card>
-              </Reveal>
-            )}
+    <FlowShell
+      service="activities"
+      title={game ? `Book ${game.name}` : 'Book your game'}
+      steps={STEPS.map((s) => s.title)}
+      currentStep={step}
+      onStepClick={(i) => {
+        if (i < step && step < 5) {
+          setErrors({});
+          setStep(i);
+        }
+      }}
+      summary={processSummary}
+    >
+      <div>
+        {/* STEP 1 · Select Game -------------------------------------- */}
+        {step === 0 && (
+          <Reveal>
+            <Card>
+              <p className="eyebrow">Step 1 · Select Game</p>
+              <h2 className="h-sub mt-1">Which game are you booking?</h2>
+              {paramGame && !paramValid && (
+                <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
+                  “{paramGame}” isn’t a known game — pick one below to start.
+                </p>
+              )}
+              <div className="mt-5 grid gap-3 sm:grid-cols-2" role="group" aria-label="Choose a game">
+                {GAMES.map((g) => {
+                  const selected = draft.gameId === g.id;
+                  const Icon = GAME_ICONS[g.category] || TrophyIcon;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => selectGame(g.id)}
+                      aria-pressed={selected}
+                      className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-800 ${
+                        selected ? 'border-navy-900 bg-navy-50/60 shadow-card' : 'border-slate-200 bg-white hover:border-navy-900/40 hover:shadow-card'
+                      }`}
+                    >
+                      <span aria-hidden className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
+                        <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="56px" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
+                          <strong className="truncate text-sm text-navy-900">{g.name}</strong>
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {g.id === 'luxury-gym'
+                            ? '₹2,000 to ₹3,000 per month'
+                            : g.id === 'swimming-pool'
+                            ? `${formatINR(g.price || 1000)} per hour`
+                            : `${GAME_CATEGORIES[g.category]} · ${formatINR(g.price || 1500)} per session`}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {errors.gameId && <p role="alert" className="field-error mt-3">{errors.gameId}</p>}
+            </Card>
+          </Reveal>
+        )}
 
             {/* STEP 2 · Date & Time --------------------------------------- */}
             {step === 1 && game && (
@@ -525,6 +666,20 @@ export function ActivitiesProcessPage() {
                       onChange={(e) => patch({ players: e.target.value })}
                       error={errors.players}
                     />
+                    {game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
+                      <Select
+                        label="Number of Sessions (₹1,500 per session) *"
+                        name="sessions"
+                        value={draft.extras.sessions || '1'}
+                        onChange={(e) => patchExtra('sessions', e.target.value)}
+                        options={[
+                          { value: '1', label: '1 session (₹1,500)' },
+                          { value: '2', label: '2 sessions (₹3,000)' },
+                          { value: '3', label: '3 sessions (₹4,500)' },
+                          { value: '4', label: '4 sessions (₹6,000)' },
+                        ]}
+                      />
+                    )}
                     {game.rentalPrice > 0 && (
                       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-3 transition hover:border-navy-900/40 sm:mt-7">
                         <input type="checkbox" className="mt-1 h-4 w-4 accent-[#0B1D3A]" checked={draft.equipment} onChange={(e) => patch({ equipment: e.target.checked })} />
@@ -638,25 +793,56 @@ export function ActivitiesProcessPage() {
                     <p className="mx-auto mt-3 inline-flex items-center gap-2 rounded-full bg-navy-900 px-4 py-1.5 font-mono text-sm text-white">
                       <span className="text-gold-400">Booking ID</span> {confirmed.bookingId}
                     </p>
-                    <div className="mx-auto mt-5 flex max-w-md flex-col items-center gap-4 sm:flex-row sm:text-left">
-                      <QrPlaceholder seed={confirmed.bookingId} />
-                      <dl className="w-full space-y-1.5 text-sm">
-                        {[
-                          ['Date', prettyDate(confirmed.date)],
-                          ['Slot', confirmed.slot],
-                          [`${gameById(confirmed.game)?.playerLabel || 'Players'}`, confirmed.players],
-                          ['Subtotal', formatINR(confirmedPricing.subtotal)],
-                          ...(confirmedPricing.discount > 0 ? [[MEMBER_DISCOUNT_LABEL, formatINR(-confirmedPricing.discount)]] : []),
-                          ['Total', formatINR(confirmedPricing.total)],
-                          ['Status', confirmed.status],
-                        ].map(([k, v]) => (
-                          <div key={k} className="flex justify-between gap-3">
-                            <dt className="text-slate-500">{k}</dt>
-                            <dd className={`font-medium ${String(v).startsWith('−') ? 'text-green-700' : 'text-navy-900'}`}>{v}</dd>
-                          </div>
-                        ))}
-                      </dl>
+
+                    {/* Entry QR Code */}
+                    <div className="my-6 flex flex-col items-center justify-center">
+                      <div className="p-3 bg-white rounded-2xl border-2 border-slate-200 shadow-sm inline-block">
+                        <QRCodeSVG
+                          value={`FRCC:ACT:${confirmed.bookingId}`}
+                          size={160}
+                          fgColor="#0B1D3A"
+                          bgColor="#ffffff"
+                          level="M"
+                        />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2 font-medium">
+                        Scan this QR code at the sports reception desk.
+                      </p>
                     </div>
+
+                    <div className="mx-auto mt-4 max-w-md rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Date</span>
+                        <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Slot</span>
+                        <span className="font-semibold text-navy-900">{confirmed.slot}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">{gameById(confirmed.game)?.playerLabel || 'Players'}</span>
+                        <span className="font-semibold text-navy-900">{confirmed.players}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="font-semibold text-navy-900">{formatINR(confirmedPricing.subtotal)}</span>
+                      </div>
+                      {confirmedPricing.discount > 0 && (
+                        <div className="flex justify-between text-green-700 font-medium">
+                          <span>{MEMBER_DISCOUNT_LABEL}</span>
+                          <span>{formatINR(-confirmedPricing.discount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-slate-200 pt-2 font-bold text-navy-900">
+                        <span>Total Paid</span>
+                        <span>{formatINR(confirmedPricing.total)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-slate-500">
+                        <span>Status</span>
+                        <span className="font-medium text-emerald-700">{confirmed.status}</span>
+                      </div>
+                    </div>
+
                     {!isMember && (
                       <div className="mx-auto mt-4 max-w-md rounded-xl border border-gold-200 bg-gold-50/70 p-3 text-xs text-slate-700">
                         <span>{MEMBER_PROMO_NOTE}. </span>
@@ -672,12 +858,30 @@ export function ActivitiesProcessPage() {
                       </div>
                     )}
                     <p className="caption mt-4">Show this QR at the venue reception. {gameById(confirmed.game)?.cancellationNote}</p>
-                    <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+
+                    {/* Action Buttons - No WhatsApp button */}
+                    <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="btn-base border border-slate-300 bg-white text-navy-900 hover:bg-slate-50 font-semibold px-6 py-2.5 inline-flex items-center justify-center gap-2"
+                      >
+                        <PrinterIcon className="h-4 w-4" /> Print / Download
+                      </button>
                       <Button variant="outline" onClick={downloadReceipt}>
-                        <DownloadIcon className="h-4 w-4" /> Download Receipt
+                        <DownloadIcon className="h-4 w-4" /> Receipt
                       </Button>
-                      <Button variant="primary" onClick={bookAnother}>Book Another</Button>
-                      <Link to="/home" className="btn-base px-5 py-2.5 border border-navy-900/20 bg-white text-navy-900 hover:border-navy-900/50 hover:bg-navy-50/60">
+                      <Button variant="outline" onClick={bookAnother}>
+                        Book Another
+                      </Button>
+                    </div>
+
+                    <div className="mt-6 border-t border-slate-100 pt-5 flex justify-center gap-4 text-sm font-semibold">
+                      <Link to="/profile/bookings" className="text-navy-900 hover:text-gold-600 transition">
+                        View My Bookings →
+                      </Link>
+                      <span className="text-slate-300">·</span>
+                      <Link to="/home" className="text-slate-600 hover:text-navy-900 transition">
                         Back to Home
                       </Link>
                     </div>
@@ -692,7 +896,7 @@ export function ActivitiesProcessPage() {
                 <Button variant="outline" onClick={goBack} disabled={step === 0}>
                   <ChevronLeftIcon className="h-4 w-4" /> Back
                 </Button>
-                <Button variant="primary" onClick={goNext} className="px-7">
+                <Button variant="primary" onClick={goNext} className="px-7" disabled={!isStepValid}>
                   {step === 3 ? 'Review Booking' : 'Next'} <ArrowRightIcon className="h-4 w-4" />
                 </Button>
               </div>
@@ -704,54 +908,43 @@ export function ActivitiesProcessPage() {
                 </Button>
               </div>
             )}
-          </div>
 
-          {/* Sticky summary (desktop) / collapsible (mobile) ------------------- */}
-          <div className="min-w-0">
-            <BookingSummary
-              rows={summaryRows}
-              lines={quote.lines}
-              subtotal={quote.subtotal}
-              total={quote.total}
-              isMember={isMember}
-              footnote={game ? `${game.cancellationNote}${isMember ? ' Member discount applied.' : ''}` : 'Pick a game to see live pricing.'}
-            />
-            {game && (
-              <Card className="mt-4 hidden lg:block">
-                <p className="eyebrow">Rules & safety</p>
-                <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-600">
-                  {game.rules.map((r) => <li key={r}>· {r}</li>)}
-                </ul>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
+          {/* Rules & safety and Related games */}
+          {game && (
+            <Card className="mt-6">
+              <p className="eyebrow">Rules & safety</p>
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-slate-600">
+                {game.rules.map((r) => <li key={r}>· {r}</li>)}
+              </ul>
+            </Card>
+          )}
 
-      {/* Related games ------------------------------------------------------ */}
-      {game && step < 5 && (
-        <div className="container-x section-sm">
-          <SectionHeading eyebrow="Keep exploring" title="Other games" sub="Switch games any time from step 1 — the summary updates live." />
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {GAMES.filter((g) => g.id !== game.id).slice(0, 4).map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => { selectGame(g.id); setStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className="card card-hover flex items-center gap-3 p-3 text-left"
-              >
-                <span aria-hidden className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
-                  <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="48px" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-navy-900">{g.name}</span>
-                  <span className="block text-xs text-slate-500">from {formatINR(g.pricePerSlot)} · {GAME_CATEGORIES[g.category]}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          {game && step < 5 && (
+            <div className="mt-8">
+              <SectionHeading eyebrow="Keep exploring" title="Other games" sub="Switch games any time from step 1 — the summary updates live." />
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {GAMES.filter((g) => g.id !== game.id).slice(0, 4).map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => { selectGame(g.id); setStep(1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    className="card card-hover flex items-center gap-3 p-3 text-left"
+                  >
+                    <span aria-hidden className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+                      <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="48px" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-navy-900">{g.name}</span>
+                      <span className="block text-xs text-slate-500">from {formatINR(g.pricePerSlot)} · {GAME_CATEGORIES[g.category]}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+    </FlowShell>
   );
 }
+
+export default ActivitiesProcessPage;

@@ -9,6 +9,7 @@ import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { SERVICE_HERO_DATA } from '../data/serviceHero.js';
 import { OFFERS_DATA } from '../data/offers.js';
 import { IMAGES, heroSrc } from '../config/images.js';
+import { HERO_CARD } from '../data/membership.js';
 
 function getSlot(service) {
   if (service === 'hall') return 'hero-halls';
@@ -92,9 +93,27 @@ export function ServiceHero({ service = 'stay' }) {
           </div>
         </HeroImage>
 
-        {/* 5 · Right side: service mode or full tabbed booking card */}
+        {/* 5 · Right side: service mode or compact Join FRCC card */}
         <div id="booking" className="service-hero-card-wrap scroll-mt-24">
-          <BookingCard compact service={isHub ? null : service} />
+          {service === 'membership' ? (
+            <div className="booking-card booking-card--compact">
+              <p className="booking-eyebrow">{HERO_CARD.eyebrow}</p>
+              <h2 className="booking-title font-display">{HERO_CARD.title}</h2>
+              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                {HERO_CARD.description}
+              </p>
+              <div className="mt-6">
+                <Link
+                  to={HERO_CARD.buttonLink}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                >
+                  {HERO_CARD.buttonText}
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <BookingCard compact service={isHub ? null : service} />
+          )}
         </div>
       </div>
 

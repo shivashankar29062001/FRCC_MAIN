@@ -1,11 +1,12 @@
-import { localFor, REMOTE, FALLBACK, getObjectPosition } from "../config/images.js";
+import { localFor, REMOTE, getObjectPosition } from "../config/images.js";
+import { SmartImage } from "./ui/media.jsx";
 
 export function HeroImage({ slot, size = "large", children }) {
-  const src = localFor(slot) || REMOTE[slot] || FALLBACK[slot] || REMOTE['hero-home'];
+  const src = localFor(slot) || REMOTE[slot] || null;
   const objectPosition = getObjectPosition(slot);
   return (
     <section className="hero">
-      {src && (
+      {src ? (
         <img
           src={src}
           alt=""
@@ -14,6 +15,8 @@ export function HeroImage({ slot, size = "large", children }) {
           className="hero__img"
           style={{ objectPosition }}
         />
+      ) : (
+        <SmartImage image={{ src: null, slot }} fill priority />
       )}
       <div className="hero__shade" />
       {children}

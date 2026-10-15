@@ -86,19 +86,20 @@ function OutlineCta({ to, size = 'sm', className, onClick, state, children }) {
 
 // Footer service list (label + link only).
 const SERVICES = [
-  { to: '/book/hotel', label: 'Hotel' },
-  { to: '/book/hall', label: 'Halls' },
-  { to: '/book/parking', label: 'Parking' },
-  { to: '/book/activities', label: 'Activities / Games' },
+  { to: '/stay', label: 'Stay' },
+  { to: '/halls', label: 'Halls' },
+  { to: '/activities', label: 'Activities' },
+  { to: '/parking', label: 'Parking' },
   { to: '/membership', label: 'Membership' },
+  { to: '/gallery', label: 'Gallery' },
 ];
 
-// The four links that carry a photo mega-menu, in the order asked for.
+// Primary service links (plain links, no mega-menus)
 const MENU_LINKS = [
-  { key: 'stay', label: 'Stay', to: '/book/hotel' },
-  { key: 'hall', label: 'Halls', to: '/book/hall' },
-  { key: 'activities', label: 'Activities', to: '/book/activities' },
-  { key: 'parking', label: 'Parking', to: '/book/parking' },
+  { key: 'stay', label: 'Stay', to: '/stay' },
+  { key: 'hall', label: 'Halls', to: '/halls' },
+  { key: 'activities', label: 'Activities', to: '/activities' },
+  { key: 'parking', label: 'Parking', to: '/parking' },
 ];
 
 export function Navbar() {
@@ -205,10 +206,10 @@ export function Navbar() {
     || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
 
   // Active link gets a gold underline; hover is a colour change only (150ms).
-  const underline = 'relative after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-gold-500';
+  const underline = 'relative after:absolute after:inset-x-2.5 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-gold-500';
   const navLink = ({ isActive }) =>
     cx(
-      'rounded-lg px-3 py-2 transition-colors duration-150',
+      'rounded-lg px-2 py-1.5 transition-colors duration-150 whitespace-nowrap',
       isActive ? cx('text-navy-900', underline) : 'text-slate-600 hover:bg-slate-100 hover:text-navy-900',
     );
   const plainLink = 'relative rounded-lg px-3 py-2 text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-navy-900';
@@ -307,7 +308,7 @@ export function Navbar() {
   return (
     <header ref={headerRef} className="sticky top-0 z-40" onMouseLeave={() => setMenu(null)}>
       {/* 1 · Utility strip — slim, navy, desktop only */}
-      <div className="hidden border-b border-white/10 bg-navy-950 lg:block">
+      <div className="hidden border-b border-white/10 bg-navy-950 min-[1200px]:block">
         <div className="container-x flex h-9 items-center justify-between gap-4 text-xs text-slate-300">
           <div className="flex items-center gap-4">
             {SITE_INFO.phone && (
@@ -329,50 +330,23 @@ export function Navbar() {
 
       {/* 2 · Main bar — white, sticky, one hairline */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="container-x grid h-16 grid-cols-[auto_1fr_auto] items-center gap-3">
+        <div className="container-x grid h-16 grid-cols-[auto_1fr_auto] items-center gap-2">
           <BrandLogo to={user ? '/home' : '/'} />
 
-          {/* Centre · the six primary links */}
-          <nav className="hidden items-center justify-center gap-1 text-sm font-medium lg:flex" aria-label="Primary">
-            {MENU_LINKS.map((l) => {
-              const expanded = menu === l.key;
-              // On the section's own page the trigger keeps its gold underline.
-              const onThisPage = location.pathname.startsWith(l.to);
-              return (
-                <div key={l.key} className="relative" onMouseEnter={() => setMenu(l.key)}>
-                  <button
-                    type="button"
-                    aria-haspopup="true"
-                    aria-expanded={expanded}
-                    aria-controls={`mega-${l.key}`}
-                    onClick={() => setMenu(expanded ? null : l.key)}
-                    className={cx(
-                      'flex items-center gap-1.5 rounded-lg px-3 py-2 transition-colors duration-150',
-                      expanded || onThisPage
-                        ? cx('text-navy-900', underline)
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-navy-900',
-                    )}
-                  >
-                    {l.label}
-                    <ChevronDownIcon className={cx('h-3.5 w-3.5', expanded && 'rotate-180')} />
-                  </button>
-                </div>
-              );
-            })}
-
-            <Link
-              to={user ? '/home#facilities' : '/#facilities'}
-              onClick={(e) => (user ? scrollHome(e, 'facilities') : scrollToSection(e, 'facilities'))}
-              className={plainLink}
-            >
-              Facilities
-            </Link>
+          {/* Centre · the primary links */}
+          <nav className="hidden items-center justify-center gap-0.5 text-[13px] font-medium min-[1200px]:flex" aria-label="Primary">
+            <NavLink to="/stay" className={navLink}>Stay</NavLink>
+            <NavLink to="/halls" className={navLink}>Halls</NavLink>
+            <NavLink to="/activities" className={navLink}>Activities</NavLink>
+            <NavLink to="/parking" className={navLink}>Parking</NavLink>
             <NavLink to="/membership" className={navLink}>Membership</NavLink>
+            <NavLink to="/gallery" className={navLink}>Gallery</NavLink>
+            <NavLink to="/leadership" className={navLink}>Leadership</NavLink>
           </nav>
 
           {/* Right · account + the gold booking CTA */}
           <div className="flex items-center justify-end gap-2">
-            <div className="hidden items-center gap-2 lg:flex">
+            <div className="hidden items-center gap-2 min-[1200px]:flex">
               {!user && <NavLink to="/signin" state={signinState} className={navLink}>Sign in</NavLink>}
               <GoldCta to="/book" onClick={onBookNow}>Book now</GoldCta>
               {!user && <OutlineCta to="/signup" onClick={closeAll}>Join now</OutlineCta>}
@@ -380,7 +354,7 @@ export function Navbar() {
             </div>
 
             {/* Mobile · avatar (signed in) + hamburger */}
-            <div className="flex items-center gap-2 lg:hidden">
+            <div className="flex items-center gap-2 min-[1200px]:hidden">
               {user && <AccountMenu />}
               <button
                 type="button"
@@ -396,52 +370,9 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* 3 · Photo mega-menus — full width under the bar, instant open/close.
-          (Positioned from the top of the viewport: 36px strip + 64px bar.) */}
-      {MENU_LINKS.map((l) => {
-        if (menu !== l.key) return null;
-        const m = NAV_MENUS[l.key];
-        return (
-          <div
-            key={l.key}
-            id={`mega-${l.key}`}
-            role="region"
-            aria-label={`${m.label} menu`}
-            className="fixed inset-x-0 top-[100px] z-30 hidden border-b border-slate-200 bg-white shadow-lift lg:block"
-          >
-            <div className="container-x py-6">
-              <div className={cx('grid gap-3 sm:grid-cols-2', m.cards.length > 3 ? 'lg:grid-cols-4' : 'lg:grid-cols-3')}>
-                {m.cards.map((c) => (
-                  <PhotoCard
-                    key={c.to + c.label}
-                    to={c.to}
-                    onClick={closeAll}
-                    image={c.image}
-                    label={c.label}
-                    aspect="4 / 3"
-                    sizes="(min-width: 1024px) 22vw, 45vw"
-                  />
-                ))}
-              </div>
-              <div className="mt-4 flex justify-end border-t border-slate-100 pt-4">
-                {/* Navy text on white (≈15:1) — gold is the underline, not the
-                    text, so the link stays readable. */}
-                <Link
-                  to={m.viewAll.to}
-                  onClick={closeAll}
-                  className="rounded-lg px-2 py-1 text-sm font-semibold text-navy-900 underline decoration-gold-500 decoration-2 underline-offset-4 transition-colors duration-150 hover:bg-gold-50"
-                >
-                  {m.viewAll.label}
-                </Link>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
       {/* 4 · Mobile panel — full height, same links as an accordion list */}
       {open && (
-        <div className="lg:hidden">
+        <div className="min-[1200px]:hidden">
           <button
             type="button"
             aria-label="Close menu"
@@ -466,67 +397,39 @@ export function Navbar() {
 
             <div className="flex-1 px-3 py-4">
               <ul className="space-y-1">
-                {MENU_LINKS.map((l) => {
-                  const expanded = mMenu === l.key;
-                  const m = NAV_MENUS[l.key];
-                  const panelId = `mobile-menu-${l.key}`;
-                  return (
-                    <li key={l.key}>
-                      <div className="flex items-center gap-1">
-                        <NavLink to={l.to} onClick={closeAll} className={cx(mobileRow, 'flex-1')}>
-                          {l.label}
-                        </NavLink>
-                        <button
-                          type="button"
-                          aria-expanded={expanded}
-                          aria-controls={panelId}
-                          aria-label={`${expanded ? 'Hide' : 'Show'} ${l.label} links`}
-                          onClick={() => setMMenu(expanded ? null : l.key)}
-                          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900"
-                        >
-                          <ChevronDownIcon className={cx('h-4 w-4', expanded && 'rotate-180')} />
-                        </button>
-                      </div>
-                      {expanded && (
-                        <ul id={panelId} className="mt-1 space-y-1 pb-1 pl-3">
-                          {m.cards.map((c) => (
-                            <li key={c.to + c.label}>
-                              <Link
-                                to={c.to}
-                                onClick={closeAll}
-                                className="block rounded-xl px-3 py-2 text-sm text-slate-600 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900"
-                              >
-                                {c.label}
-                              </Link>
-                            </li>
-                          ))}
-                          <li>
-                            <Link
-                              to={m.viewAll.to}
-                              onClick={closeAll}
-                              className="block rounded-xl px-3 py-2 text-sm font-semibold text-navy-900 underline decoration-gold-500 decoration-2 underline-offset-4 transition-colors duration-150 hover:bg-gold-50"
-                            >
-                              {m.viewAll.label}
-                            </Link>
-                          </li>
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-
                 <li>
-                  <Link
-                    to={user ? '/home#facilities' : '/#facilities'}
-                    onClick={(e) => (user ? scrollHome(e, 'facilities') : scrollToSection(e, 'facilities'))}
-                    className={mobileRow}
-                  >
-                    Facilities
-                  </Link>
+                  <NavLink to="/stay" onClick={closeAll} className={mobileRowActive}>
+                    Stay
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/halls" onClick={closeAll} className={mobileRowActive}>
+                    Halls
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/activities" onClick={closeAll} className={mobileRowActive}>
+                    Activities
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/parking" onClick={closeAll} className={mobileRowActive}>
+                    Parking
+                  </NavLink>
                 </li>
                 <li>
                   <NavLink to="/membership" onClick={closeAll} className={mobileRowActive}>
                     Membership
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/gallery" onClick={closeAll} className={mobileRowActive}>
+                    Gallery
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/leadership" onClick={closeAll} className={mobileRowActive}>
+                    Leadership
                   </NavLink>
                 </li>
               </ul>
@@ -566,8 +469,11 @@ export function Navbar() {
 
 const FOOTER_LINKS = [
   { to: '/home', label: 'Home' },
-  { to: '/book/activities', label: 'Book an activity' },
+  { to: '/#facilities', label: 'Facilities' },
+  { to: '/activities', label: 'Book an activity' },
   { to: '/membership', label: 'Membership' },
+  { to: '/gallery', label: 'Gallery' },
+  { to: '/leadership', label: 'Leadership' },
   { to: '/profile', label: 'My profile' },
   { to: '/support', label: 'Contact / Support' },
 ];
@@ -637,7 +543,17 @@ export function Footer() {
         <div>
           <p className="text-sm font-semibold text-white">Contact</p>
           <ul className="mt-4 space-y-3 text-sm text-slate-400">
-            {addressLines.length > 0 && (
+            {SITE_INFO.locations && SITE_INFO.locations.length > 0 ? (
+              SITE_INFO.locations.map((loc) => (
+                <li key={loc.id} className="flex items-start gap-2.5">
+                  <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
+                  <div className="space-y-0.5">
+                    <span className="block font-medium text-slate-300">{loc.title}</span>
+                    <address className="not-italic text-xs leading-relaxed text-slate-400">{loc.fullAddress}</address>
+                  </div>
+                </li>
+              ))
+            ) : addressLines.length > 0 && (
               <li className="flex items-start gap-2.5">
                 <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
                 <address className="not-italic">{addressLines.join(', ')}</address>
@@ -677,33 +593,12 @@ export function Footer() {
 }
 
 export function AppLayout({ children }) {
-  const { toasts, isMember, setIsMember } = useApp();
-  // Hidden in production builds: Vite sets import.meta.env.PROD=true during
-  // `npm run build`, so the toggle never leaks to end users even if someone
-  // accidentally ships with VITE_DEMO_MODE=true in the .env.
-  const isDemoMode = !import.meta.env.PROD && import.meta.env.VITE_DEMO_MODE === 'true';
+  const { toasts } = useApp();
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
-      {/* Demo-only membership switch (visible only when VITE_DEMO_MODE=true) */}
-      {isDemoMode && (
-        <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl border border-navy-900/15 bg-white/95 px-3 py-2 text-xs font-semibold text-navy-900 shadow-lift backdrop-blur">
-          <span className="rounded bg-gold-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-navy-900">demo</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isMember}
-            aria-label="Toggle member discount"
-            onClick={() => setIsMember((v) => !v)}
-            className={`relative h-5 w-10 rounded-full transition ${isMember ? 'bg-navy-900' : 'bg-slate-300'}`}
-          >
-            <span aria-hidden className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${isMember ? 'left-[22px]' : 'left-0.5'}`} />
-          </button>
-          <span>{isMember ? 'Member: ON (30% off)' : 'Member: OFF'}</span>
-        </div>
-      )}
       <Toasts items={toasts} />
     </div>
   );

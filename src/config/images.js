@@ -38,15 +38,22 @@ const local = import.meta.glob('../assets/images/*.{jpg,jpeg,png,webp,avif}', {
 
 /**
  * URL of the first local image whose lowercase name (without extension)
- * includes `slot`. Null when nothing matches.
+ * matches `slot`. Prefers exact names over names that merely start with or include the slot.
+ * Null when nothing matches.
  * @param {string} slot
  * @returns {string | null}
  */
 export function localFor(slot) {
   const k = String(slot).toLowerCase();
   for (const path in local) {
+    if (path.includes('/gallery/')) continue;
     const name = path.slice(path.lastIndexOf('/') + 1).toLowerCase().replace(/\.[^.]+$/, '');
-    if (name.includes(k)) return local[path];
+    if (name === k) return local[path];
+  }
+  for (const path in local) {
+    if (path.includes('/gallery/')) continue;
+    const name = path.slice(path.lastIndexOf('/') + 1).toLowerCase().replace(/\.[^.]+$/, '');
+    if (name.startsWith(k)) return local[path];
   }
   return null;
 }
@@ -62,6 +69,10 @@ export const OBJECT_POSITIONS = {
   'hero-halls': 'center 40%',
   'hero-stay': 'center 55%',
   'hero-parking': 'center 55%',
+  'hero-gallery': 'center 45%',
+  'hero-hub': 'center 50%',
+  'hero-contact': 'center 50%',
+  'hero-profile': 'center 50%',
 };
 
 export function getObjectPosition(slot) {
@@ -76,6 +87,9 @@ export const REMOTE = {
   'hero-parking': 'https://images.unsplash.com/photo-1762599107107-14b8f4608011?w=2400&q=80&auto=format&fit=crop',
   'hero-facilities': 'https://images.unsplash.com/photo-1750859464437-b66433efd869?w=2400&q=80&auto=format&fit=crop',
   'hero-membership': 'https://images.unsplash.com/photo-1742844552718-758f8658351d?w=2400&q=80&auto=format&fit=crop',
+  'hero-hub': 'https://images.unsplash.com/photo-1746549858455-2d8799c01d4b?w=2400&q=80&auto=format&fit=crop',
+  'hero-profile': 'https://images.unsplash.com/photo-1756069596380-ea364729737c?w=2400&q=80&auto=format&fit=crop',
+  'hero-bookings': 'https://images.unsplash.com/photo-1781512579593-2dad26fbe861?w=2400&q=80&auto=format&fit=crop',
   exploreHotel: 'https://images.unsplash.com/photo-1638973140785-3b918e290682?w=2400&q=80&auto=format&fit=crop',
   'gallery-3': 'https://images.unsplash.com/photo-1720934016001-b057ebfd293d?w=2400&q=80&auto=format&fit=crop',
   facilitySpa: 'https://images.unsplash.com/photo-1730406928950-0047174d5fe3?w=2400&q=80&auto=format&fit=crop',
@@ -134,10 +148,7 @@ export const REMOTE = {
   'amr-eco-park': 'https://images.unsplash.com/photo-1761401438999-57f0ebef195e?w=1600&q=80&auto=format&fit=crop',
   'amr-secretariat': 'https://images.unsplash.com/photo-1640613061751-bf7a0693185a?w=1600&q=80&auto=format&fit=crop',
   'amr-capital-visitors': 'https://images.unsplash.com/photo-1673362720420-0ad5aaf41978?w=1600&q=80&auto=format&fit=crop',
-  'plan-silver': 'https://images.unsplash.com/photo-1573052905904-34ad8c27f0cc?w=1600&q=80&auto=format&fit=crop',
-  'plan-gold': 'https://images.unsplash.com/photo-1759038086454-082dc45d101d?w=1600&q=80&auto=format&fit=crop',
-  'plan-platinum': 'https://images.unsplash.com/photo-1758448500688-3ababa93fd67?w=1600&q=80&auto=format&fit=crop',
-  'plan-corporate': 'https://images.unsplash.com/photo-1587702068694-a909ef4aa346?w=1600&q=80&auto=format&fit=crop',
+  'frcc-membership': 'https://images.unsplash.com/photo-1573052905904-34ad8c27f0cc?w=1600&q=80&auto=format&fit=crop',
   'gallery-1': 'https://images.unsplash.com/photo-1771911651523-e050dc4189ea?w=1600&q=80&auto=format&fit=crop',
   'gallery-2': 'https://images.unsplash.com/photo-1671362962572-50cf4edca731?w=1600&q=80&auto=format&fit=crop',
   'gallery-4': 'https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=1600&q=80&auto=format&fit=crop',
@@ -200,22 +211,10 @@ export const REMOTE = {
   parkingValet: 'https://images.unsplash.com/photo-1739239130013-f8d430e8a147?w=1600&q=80&auto=format&fit=crop',
 };
 
-export const FALLBACK = {
-  'hero-hub': REMOTE.galleryLobby,
-  'hero-facilities': REMOTE['hero-facilities'] || REMOTE.facilityGarden,
-  'hero-profile': REMOTE.bannerProfile,
-  'hero-membership-dashboard': REMOTE.bannerMembershipSection,
-  'hero-bookings': REMOTE.membershipLounge,
-  'hero-stay': REMOTE['hero-stay'],
-  'hero-halls': REMOTE['hero-halls'],
-  'hero-parking': REMOTE['hero-parking'],
-  'hero-activities': REMOTE['hero-activities'],
-  'hero-membership': REMOTE['hero-membership'],
-  'hero-book': REMOTE.visitEntrance,
-};
+export const FALLBACK = {};
 
 export function heroSrc(slot) {
-  return localFor(slot) || REMOTE[slot] || FALLBACK[slot] || REMOTE['hero-home'];
+  return localFor(slot) || REMOTE[slot] || null;
 }
 
 /**
@@ -228,7 +227,7 @@ export function heroSrc(slot) {
 const S = (slot, name, alt, extra = {}) => ({
   slot,
   name,
-  src: localFor(slot) || REMOTE[slot] || FALLBACK[slot] || REMOTE['hero-home'],
+  src: localFor(slot) || REMOTE[slot] || null,
   srcSet: '',
   alt,
   ...extra,
@@ -381,13 +380,10 @@ export const IMAGES = {
   parkingValet: S('parkingValet', 'Valet Drop', 'Premium car waiting in the FRCC stylish indoor garage for valet handover'),
 
   // =========================================================================
-  // MEMBERSHIP PLANS — one slot per plan
+  // MEMBERSHIP PLAN — FRCC Membership
   // =========================================================================
 
-  'plan-silver': S('plan-silver', 'Silver', 'FRCC Silver lifetime membership plan'),
-  'plan-gold': S('plan-gold', 'Gold', 'FRCC Gold lifetime membership plan'),
-  'plan-platinum': S('plan-platinum', 'Platinum', 'FRCC Platinum lifetime membership plan'),
-  'plan-corporate': S('plan-corporate', 'Corporate', 'FRCC Corporate membership plan'),
+  'frcc-membership': S('frcc-membership', 'FRCC Membership', 'Film Recreation & Cultural Centre official membership plan'),
 
   // =========================================================================
   // 8-PHOTO GALLERY MOSAIC — gallery 1 to 8 (landing page lightbox)
@@ -495,9 +491,20 @@ export const IMAGES = {
  * Slot for a room type (mega-menu + section pages). Falls back to a null
  * slot carrying the type name when the type has no entry yet.
  */
+const ROOM_ALIASES = {
+  'room-standard-room': 'room-standard-garden',
+  'room-deluxe-room': 'room-deluxe-lake-view',
+  'room-premium-room': 'room-premium-twin',
+  'room-junior-suite': 'room-family-suite',
+  'room-standard': 'room-standard-garden',
+  'room-deluxe': 'room-deluxe-lake-view',
+  'room-premium': 'room-premium-twin',
+};
+
 export function roomSlot(type) {
   const key = `room-${String(type).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
-  return IMAGES[key] || { slot: key, name: type, src: null, srcSet: '', alt: '' };
+  const resolvedKey = ROOM_ALIASES[key] || key;
+  return IMAGES[resolvedKey] || IMAGES[key] || { slot: key, name: type, src: null, srcSet: '', alt: '' };
 }
 
 export default IMAGES;

@@ -1,27 +1,21 @@
-// Demo locations for FRCC
+// FRCC Locations — Vijayawada & Hyderabad
 export const LOCATIONS = [
-  {
-    id: 'hyd',
-    name: 'Hyderabad',
-    state: 'Telangana',
-    lat: 17.3850,
-    lng: 78.4867,
-    isDefault: true,
-  },
   {
     id: 'vja',
     name: 'Vijayawada',
     state: 'Andhra Pradesh',
+    address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062,
     lng: 80.6480,
-    isDefault: false,
+    isDefault: true,
   },
   {
-    id: 'amr',
-    name: 'Amaravati',
-    state: 'Andhra Pradesh',
-    lat: 16.5108,
-    lng: 80.5061,
+    id: 'hyd',
+    name: 'Hyderabad',
+    state: 'Telangana',
+    address: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
+    lat: 17.4483,
+    lng: 78.3915,
     isDefault: false,
   },
 ];

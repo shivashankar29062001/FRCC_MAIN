@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
 import { GAMES } from '../features/activities/games.config.js';
@@ -46,22 +46,15 @@ import { SITE_INFO } from '../config/siteInfo.js';
 const STORAGE_KEY = 'frcc.bookingBar.v2';
 
 const TABS = [
-  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: '/book/hotel' },
-  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: '/book/hall' },
-  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: '/book/parking' },
-  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: '/book/activities' },
+  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: '/stay' },
+  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: '/halls' },
+  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: '/parking' },
+  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: '/activities' },
   { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: '/membership' },
 ];
 
 // Game list comes from the activities team's config — the single source of truth.
 const GAME_OPTIONS = (GAMES || []).map((g) => ({ value: g.id, label: g.name }));
-
-const PLAN_OPTIONS = [
-  { value: 'silver', label: 'Silver' },
-  { value: 'gold', label: 'Gold' },
-  { value: 'platinum', label: 'Platinum' },
-  { value: 'corporate', label: 'Corporate' },
-];
 
 const GUEST_OPTIONS = ['1', '2', '3', '4', '5', '6'];
 const ROOM_OPTIONS = ['1', '2', '3', '4'];
@@ -282,12 +275,6 @@ function validate(tab, v) {
     if (v.players && Number(v.players) < 1) errs.players = 'At least 1 player.';
   }
 
-  if (tab === 'membership') {
-    need('plan', 'Choose a plan type.');
-    need('contact', 'Enter your email or mobile.');
-    if (v.contact && v.contact.trim().length < 4) errs.contact = 'That looks too short — check it once.';
-  }
-
   return errs;
 }
 
@@ -325,10 +312,6 @@ function targetFor(tabId, v) {
     if (v.game) params.set('game', v.game);
     if (date) params.set('date', date);
     if (v.players) params.set('players', v.players);
-  }
-  if (tabId === 'membership') {
-    if (v.plan) params.set('plan', v.plan);
-    if (v.contact) params.set('contact', v.contact.trim());
   }
 
   const qs = params.toString();
@@ -396,6 +379,10 @@ function useBookingForm(defaultTab, preselect) {
   };
 
   function selectTab(id) {
+    if (id === 'membership') {
+      navigate('/membership');
+      return;
+    }
     setTab(id);
     setErrors({});
     setBusy(false);
@@ -510,17 +497,6 @@ function Fields({ tab, v, errors, patch, busy }) {
         </>
       )}
 
-      {tab === 'membership' && (
-        <>
-          <Field id="membership-plan" label="Plan type" icon={MembershipIcon} error={errors.plan}>
-            <SelectInput id="membership-plan" error={errors.plan} value={v.plan || ''} onChange={(e) => patch({ plan: e.target.value })} options={PLAN_OPTIONS} placeholder="Choose a plan…" />
-          </Field>
-          <Field id="membership-contact" label="Contact" icon={MailIcon} error={errors.contact}>
-            <TextInput id="membership-contact" error={errors.contact} type="text" autoComplete="email" placeholder="Email or mobile" value={v.contact || ''} onChange={(e) => patch({ contact: e.target.value })} />
-          </Field>
-        </>
-      )}
-
       <div className="lg:shrink-0">
         <LoadingButton
           type="submit"
@@ -546,6 +522,19 @@ function ServiceTabs({ tab, onTabKey, tabRefs, selectTab }) {
       className="flex gap-0.5 overflow-x-auto no-scrollbar border-b border-slate-200 px-1"
     >
       {TABS.map((t) => {
+        if (t.id === 'membership') {
+          return (
+            <Link
+              key={t.id}
+              to="/membership"
+              id={`booking-tab-${t.id}`}
+              className="relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-semibold transition-colors duration-150 sm:px-4 text-slate-500 hover:text-navy-900"
+            >
+              <t.icon className="h-4 w-4 text-slate-400" />
+              {t.label}
+            </Link>
+          );
+        }
         const selected = t.id === tab;
         return (
           <button
@@ -614,6 +603,19 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
       className="booking-tabs"
     >
       {items.map((t) => {
+        if (t.id === 'membership') {
+          return (
+            <Link
+              key={t.id}
+              to="/membership"
+              id={`booking-card-tab-${t.id}`}
+              className="booking-tab"
+            >
+              <t.icon className="h-4 w-4" />
+              {t.label}
+            </Link>
+          );
+        }
         const selected = t.id === tab;
         return (
           <button
@@ -711,17 +713,6 @@ function CardFields({ tab, v, errors, patch, busy, compact = false }) {
         </>
       )}
 
-      {tab === 'membership' && (
-        <>
-          <CardField id="card-membership-plan" label="Plan type" icon={MembershipIcon} error={errors.plan}>
-            <SelectInput inputClass="booking-field" nativeArrow id="card-membership-plan" error={errors.plan} value={v.plan || ''} onChange={(e) => patch({ plan: e.target.value })} options={PLAN_OPTIONS} placeholder="Choose a plan…" />
-          </CardField>
-          <CardField id="card-membership-contact" label="Preferred contact" icon={MailIcon} error={errors.contact}>
-            <TextInput inputClass="booking-field" id="card-membership-contact" error={errors.contact} type="text" autoComplete="email" placeholder="Email or mobile" value={v.contact || ''} onChange={(e) => patch({ contact: e.target.value })} />
-          </CardField>
-        </>
-      )}
-
       {!compact && MEMBER_PROMO_NOTE && (
         <p className="booking-offer">
           <StarIcon className="h-3.5 w-3.5 shrink-0" /> {MEMBER_PROMO_NOTE}
@@ -771,7 +762,7 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
       </div>
       {!isCompact && SITE_INFO.phone && phoneHref && (
         <p className="booking-help">
-          Need help? Call <a href={phoneHref}>{SITE_INFO.phone}</a>
+          Need help? Call <a href={phoneHref}>{SITE_INFO.phone}</a> · <a href={SITE_INFO.whatsappLink || 'https://wa.me/917893616262'} target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </p>
       )}
     </section>

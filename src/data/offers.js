@@ -117,9 +117,9 @@ export const OFFERS_DATA = {
       link: '/membership#booking',
     },
     {
-      id: 'membership-corporate',
-      title: 'Corporate Club Membership',
-      line: 'Full sporting and venue privileges for corporate teams.',
+      id: 'membership-health-card',
+      title: '20% Diagnostic Centre Discount',
+      line: 'Health card savings at selected diagnostic centres sent to WhatsApp.',
       imageSlot: 'galleryLounge',
       link: '/membership#booking',
     },

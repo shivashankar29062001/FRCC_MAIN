@@ -23,6 +23,16 @@ const seedNotifications = [
 
 const IS_DEMO_MODE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
 const MEMBER_FLAG_KEY = 'frcc.isMember.v1';
+export const MEMBERSHIP_STORAGE_KEY = 'frcc.membership.v1';
+
+function readStoredMembership() {
+  try {
+    const raw = window.localStorage.getItem(MEMBERSHIP_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 function readMemberFlag() {
   try {
@@ -42,10 +52,14 @@ export function AppProvider({ children }) {
   });
   const [bookings, setBookings] = useState([]); // { id, type, title, date, amount, status, details }
   const [payments, setPayments] = useState([]); // { id, bookingId, method, amount, date, status }
-  // Membership data — filled by the membership team's module.
-  const [membership, setMembership] = useState(null); // { memberId, plan, name, qrPayload }
+  // Membership data — filled by the membership team's module and persisted in localStorage.
+  const [membership, setMembership] = useState(() => readStoredMembership());
   // isMember drives /membership/dashboard (active vs locked) and the navbar Member badge.
-  const [isMember, setIsMemberState] = useState(() => (user?.isMember !== undefined ? Boolean(user.isMember) : readMemberFlag()));
+  const [isMember, setIsMemberState] = useState(() => {
+    const stored = readStoredMembership();
+    if (stored && stored.memberId) return true;
+    return user?.isMember !== undefined ? Boolean(user.isMember) : readMemberFlag();
+  });
 
   const setIsMember = useCallback((next) => {
     setIsMemberState((prev) => {
@@ -61,13 +75,19 @@ export function AppProvider({ children }) {
         writeSession(updated);
         return updated;
       });
-      // Keep a placeholder membership card in sync so both dashboard views are testable.
+      // Keep membership in sync so both dashboard views are testable.
       // TODO(Phase 2): replace with GET /api/membership/me.
-      setMembership((m) =>
-        value
-          ? m || { memberId: 'FRCC-M-2026-0042', planName: 'Gold Lifetime', name: 'Member', since: '2026', validity: 'Lifetime · Active', qrPayload: 'FRCC-M-2026-0042' }
-          : null,
-      );
+      setMembership((m) => {
+        if (!value) {
+          try {
+            window.localStorage.removeItem(MEMBERSHIP_STORAGE_KEY);
+          } catch {
+            /* ignore */
+          }
+          return null;
+        }
+        return m || readStoredMembership() || { memberId: 'FRCC-2026-000042', planName: 'Gold Lifetime', name: 'Member', createdAt: '2026-01-01T00:00:00.000Z' };
+      });
       return value;
     });
   }, []);
@@ -123,8 +143,39 @@ export function AppProvider({ children }) {
 
   // Integration point for the membership team's module.
   const saveMembership = useCallback((m) => {
-    // TODO: called by GET/POST /api/membership once that team's data lands.
-    setMembership(m);
+    // TODO: called by GET/POST /api/membership once backend API lands.
+    // Store only allowed fields: {memberId, name, mobile, email, planName, createdAt}
+    if (m) {
+      const sanitized = {
+        memberId: m.memberId,
+        name: m.name,
+        mobile: m.mobile,
+        email: m.email,
+        planName: m.planName,
+        createdAt: m.createdAt || new Date().toISOString(),
+      };
+      setMembership(sanitized);
+      try {
+        window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(sanitized));
+        window.localStorage.setItem(MEMBER_FLAG_KEY, '1');
+      } catch {
+        /* ignore */
+      }
+      setIsMemberState(true);
+      setUser((curr) => {
+        if (!curr) return curr;
+        const updated = { ...curr, isMember: true };
+        writeSession(updated);
+        return updated;
+      });
+    } else {
+      setMembership(null);
+      try {
+        window.localStorage.removeItem(MEMBERSHIP_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
   const value = useMemo(

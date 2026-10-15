@@ -170,19 +170,16 @@ export function MoreToExplore({ items = [], className }) {
   );
 }
 
-// Five services, same destinations as the booking tabs (external booking URL
-// when configured, otherwise the in-app showcase page).
 const EXPERIENCE = [
-  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', showcase: '/book/hotel' },
-  { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', showcase: '/book/hall' },
-  { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', showcase: '/book/parking' },
-  { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', showcase: '/book/activities' },
+  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', showcase: '/stay' },
+  { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', showcase: '/halls' },
+  { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', showcase: '/parking' },
+  { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', showcase: '/activities' },
   { key: 'membership', label: 'Membership', line: 'One fee, lifetime access', imageKey: 'serviceMembership', showcase: '/membership' },
 ];
 
 function experienceHref(key, showcase) {
-  const url = getRedirect(key);
-  return isPlaceholder(url) ? showcase : url;
+  return showcase;
 }
 
 /**

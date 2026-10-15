@@ -16,7 +16,7 @@ import { name as siteName, shortName as siteShortName, tagline as siteTagline } 
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
-  to: '/book/hotel',
+  to: '/stay',
   heading: 'Stay',
   line: '36 rooms across two wings — member rates every night.',
   image: IMAGES.staySuite,
@@ -24,7 +24,7 @@ const STAY_FEATURE = {
 
 // 3b · Halls and events feature section
 const HALLS_FEATURE = {
-  to: '/book/hall',
+  to: '/halls',
   heading: 'Halls and events',
   line: 'Seats 40 to 400 — weddings, conferences, celebrations.',
   image: IMAGES.hallFunction,
@@ -253,7 +253,7 @@ export function LandingPage() {
               />
             ))}
           </div>
-          <SectionLink to="/book/activities" light>View all activities</SectionLink>
+          <SectionLink to="/activities" light>View all activities</SectionLink>
         </div>
       </section>
 
@@ -337,7 +337,17 @@ export function LandingPage() {
           <div>
             <h2 className="h-section">Visit us</h2>
             <ul className="mt-5 space-y-4 text-sm text-slate-700">
-              {addressLines.length > 0 && (
+              {SITE_INFO.locations && SITE_INFO.locations.length > 0 ? (
+                SITE_INFO.locations.map((loc) => (
+                  <li key={loc.id} className="flex items-start gap-2.5">
+                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
+                    <div>
+                      <span className="block font-semibold text-navy-900">{loc.title}</span>
+                      <address className="not-italic text-slate-600 text-xs sm:text-sm">{loc.fullAddress}</address>
+                    </div>
+                  </li>
+                ))
+              ) : addressLines.length > 0 && (
                 <li className="flex items-start gap-2.5">
                   <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
                   <address className="not-italic">{addressLines.join(', ')}</address>

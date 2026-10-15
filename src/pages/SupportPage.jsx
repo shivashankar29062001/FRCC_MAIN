@@ -82,7 +82,7 @@ export function SupportPage() {
   return (
     <div>
       {/* Photo hero — full-bleed photo only */}
-      <HeroImage slot="hero-facilities" />
+      <HeroImage slot="hero-contact" />
 
       <div className="container-x section-top">
         <h1 className="h-section">How can we help?</h1>
@@ -106,6 +106,22 @@ export function SupportPage() {
                     </span>
                   </li>
                 )}
+                {SITE_INFO.whatsappLink && (
+                  <li className="flex items-start gap-3">
+                    <IconTile icon={PhoneIcon} tone="gold" />
+                    <span>
+                      <span className="block text-xs font-semibold text-slate-500">WhatsApp</span>
+                      <a
+                        href={SITE_INFO.whatsappLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-navy-900 underline-offset-4 hover:underline"
+                      >
+                        +{SITE_INFO.whatsappNumber}
+                      </a>
+                    </span>
+                  </li>
+                )}
                 {SITE_INFO.email && (
                   <li className="flex items-start gap-3">
                     <IconTile icon={MailIcon} tone="gold" />
@@ -117,7 +133,17 @@ export function SupportPage() {
                     </span>
                   </li>
                 )}
-                {getAddressLines().length > 0 && (
+                {SITE_INFO.locations && SITE_INFO.locations.length > 0 ? (
+                  SITE_INFO.locations.map((loc) => (
+                    <li key={loc.id} className="flex items-start gap-3">
+                      <IconTile icon={MapPinIcon} />
+                      <div className="space-y-0.5">
+                        <span className="block text-xs font-semibold text-slate-500">{loc.title}</span>
+                        <address className="font-semibold text-navy-900 not-italic text-sm">{loc.fullAddress}</address>
+                      </div>
+                    </li>
+                  ))
+                ) : getAddressLines().length > 0 && (
                   <li className="flex items-start gap-3">
                     <IconTile icon={MapPinIcon} />
                     <span>

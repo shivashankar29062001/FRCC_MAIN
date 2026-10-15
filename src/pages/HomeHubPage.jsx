@@ -68,7 +68,7 @@ const FACILITY_GRID = [
 const OFFERS = [
   { date: 'SAT 14', title: 'Lakeside Food Fest', line: 'Forty stalls and sundown music on the garden lawns.', when: 'Sat · 5–10 PM', where: 'Garden lawns', tag: 'Open to all', tone: 'tag-green', image: IMAGES.eventFestival },
   { date: 'FRI 20', title: 'Open Badminton Night', line: 'Round-robin across four courts — rackets provided.', when: 'Fri · 7–10 PM', where: 'Courts 1–4', tag: 'Members only', tone: 'tag-gold', image: IMAGES.eventSports },
-  { date: 'Ends 31', title: 'Gold Upgrade Offer', line: 'Move to lifetime Gold this month and take 10% off halls.', when: 'All month', where: 'Membership desk', tag: 'Member offer', tone: 'tag-navy', image: IMAGES.membershipLounge },
+  { date: 'Ends 31', title: 'FRCC Member Privileges', line: 'Enjoy 30% discount on every booking and 20% health card savings.', when: 'All year', where: 'Membership desk', tag: 'Member offer', tone: 'tag-navy', image: IMAGES.membershipLounge },
 ];
 
 export function HomeHubPage() {
@@ -120,37 +120,29 @@ export function HomeHubPage() {
   const upcoming = overview.data?.upcoming || [];
   const latestNotices = (notifications || []).slice(0, 3);
 
-  // Area cards data
+  // Area cards data (Vijayawada & Hyderabad)
   const AREA_CARDS = [
-    {
-      id: 'hyd',
-      name: 'Hyderabad',
-      state: 'Telangana',
-      image: IMAGES.facilityPool,
-      tagline: 'Lakeside campus with infinity pool',
-      hotels: 2,
-      halls: 3,
-      activities: 11,
-    },
     {
       id: 'vja',
       name: 'Vijayawada',
       state: 'Andhra Pradesh',
       image: IMAGES.facilityGym,
-      tagline: 'Riverfront resort on the Krishna',
+      tagline: 'Riverfront club and cultural centre',
+      address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
       hotels: 2,
-      halls: 3,
-      activities: 11,
+      halls: 2,
+      activities: 12,
     },
     {
-      id: 'amr',
-      name: 'Amaravati',
-      state: 'Andhra Pradesh',
-      image: IMAGES.facilityGarden,
-      tagline: 'Capital green campus with eco-luxury',
-      hotels: 2,
-      halls: 3,
-      activities: 11,
+      id: 'hyd',
+      name: 'Hyderabad',
+      state: 'Telangana',
+      image: IMAGES.facilityPool,
+      tagline: 'Madhapur branch office',
+      address: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
+      hotels: 0,
+      halls: 0,
+      activities: 12,
     },
   ];
 
@@ -187,8 +179,8 @@ export function HomeHubPage() {
         </div>
       </section>
 
-      {/* Area Selector — shown when no area selected or user wants to change */}
-      {showAreaSelector && (
+      {/* Area Selector — hidden when single area, expandable when multiple areas */}
+      {showAreaSelector && AREA_CARDS.length > 1 && (
         <section className="band-white" aria-label="Choose your area">
           <div className="container-x section">
             <Reveal>
@@ -407,13 +399,6 @@ export function HomeHubPage() {
                   <span className="tag tag-gold flex items-center gap-1.5">
                     <MapPinIcon className="h-3.5 w-3.5" /> {locationData.name}
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleChangeArea}
-                    className="text-sm font-semibold text-gold-600 hover:underline"
-                  >
-                    Change area
-                  </button>
                 </div>
               )}
             </div>

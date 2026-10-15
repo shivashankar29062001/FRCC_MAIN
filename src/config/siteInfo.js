@@ -7,7 +7,18 @@
 // Social entries left as '' are hidden automatically.
 // ---------------------------------------------------------------------------
 
-import { name, shortName, tagline } from './site.js';
+import {
+  name,
+  shortName,
+  tagline,
+  phone,
+  whatsappNumber,
+  whatsappLink,
+  email,
+  hours,
+  hyderabadAddress,
+  locations,
+} from './site.js';
 
 export const SITE_INFO = {
   // Brand
@@ -15,15 +26,48 @@ export const SITE_INFO = {
   tagline,
   fullName: name,
 
-  // Contact (fictional — replace with real info before launch)
+  // Registered Office Contact
   address: {
-    line1: 'FRCC Campus, Hyderabad',
-    line2: 'Telangana 500001',
-    line3: '',
+    line1: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road',
+    line2: 'Vijayawada, NTR District',
+    line3: 'Andhra Pradesh – 520003',
   },
-  phone: '+91 40 6789 0123',
-  email: 'hello@frcc.club',
-  hours: 'Front desk open 6 AM – 11 PM daily',
+
+  // Hyderabad Office Contact
+  hyderabadAddress: {
+    line1: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd',
+    line2: 'Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur',
+    line3: 'Hyderabad, Telangana 500081',
+  },
+
+  // Locations / Offices
+  locations: [
+    {
+      id: 'vja',
+      city: 'Vijayawada',
+      title: 'Vijayawada (Registered Office)',
+      line1: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road',
+      line2: 'Vijayawada, NTR District',
+      line3: 'Andhra Pradesh – 520003',
+      fullAddress: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
+      isDefault: true,
+    },
+    {
+      id: 'hyd',
+      city: 'Hyderabad',
+      title: 'Hyderabad Office',
+      line1: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd',
+      line2: 'Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur',
+      line3: 'Hyderabad, Telangana 500081',
+      fullAddress: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
+      isDefault: false,
+    },
+  ],
+  phone,
+  whatsappNumber,
+  whatsappLink,
+  email, // SAMPLE hello@frcc.example
+  hours, // SAMPLE Front desk open 6 AM – 11 PM daily
 
   // Social (empty strings = hide the icon)
   social: {
@@ -46,8 +90,21 @@ export const SITE_INFO = {
 };
 
 // Helper to get formatted address lines (filters empty)
-export function getAddressLines() {
+export function getAddressLines(locationId) {
+  if (locationId === 'hyd') {
+    return [SITE_INFO.hyderabadAddress.line1, SITE_INFO.hyderabadAddress.line2, SITE_INFO.hyderabadAddress.line3].filter(Boolean);
+  }
   return [SITE_INFO.address.line1, SITE_INFO.address.line2, SITE_INFO.address.line3].filter(Boolean);
+}
+
+// Helper to get Hyderabad formatted address lines
+export function getHyderabadAddressLines() {
+  return [SITE_INFO.hyderabadAddress.line1, SITE_INFO.hyderabadAddress.line2, SITE_INFO.hyderabadAddress.line3].filter(Boolean);
+}
+
+// Helper to get all locations
+export function getAllLocations() {
+  return SITE_INFO.locations || [];
 }
 
 // Helper to get social entries that have URLs

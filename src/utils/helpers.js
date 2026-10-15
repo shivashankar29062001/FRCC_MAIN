@@ -57,3 +57,5 @@ export function bookingTitle(type, details = {}) {
     default: return 'Booking';
   }
 }
+
+export { formatInr, formatINR } from './pricing.js';
