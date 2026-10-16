@@ -13,6 +13,7 @@ import { formatINR } from '../../features/activities/games.config.js';
 import { calculateTotal } from '../../utils/pricing.js';
 import { MEMBER_DISCOUNT_LABEL, MEMBER_PROMO_NOTE } from '../../config/pricing.js';
 import { MEMBERSHIP_REDIRECT_URL } from '../../config/services.js';
+import { LocationTrigger } from '../location/LocationTrigger.jsx';
 
 /**
  * @param {{ rows?: Array<{label: string, value: string}>,
@@ -66,12 +67,28 @@ export function BookingSummary({
       </button>
       <div className={cx('border-t border-slate-100', !open && 'hidden lg:block')}>
         <dl className="space-y-3 p-5 text-sm">
-          {rows.map((r) => (
-            <div key={r.label} className="flex items-start justify-between gap-3">
-              <dt className="text-slate-500">{r.label}</dt>
-              <dd className="text-right font-medium text-navy-900">{r.value}</dd>
-            </div>
-          ))}
+          {rows.map((r) => {
+            const isLoc = /location|venue|campus|address|area/i.test(r.label);
+            return (
+              <div key={r.label} className="flex items-start justify-between gap-3">
+                <dt className="text-slate-500">{r.label}</dt>
+                <dd className="text-right font-medium text-navy-900">
+                  {isLoc ? (
+                    <LocationTrigger
+                      locationId={r.locationId || r.value}
+                      className="text-navy-900 hover:text-gold-600 font-medium inline-flex text-right"
+                      showIcon={true}
+                      iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                    >
+                      <span>{r.value}</span>
+                    </LocationTrigger>
+                  ) : (
+                    r.value
+                  )}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
         {displayLines.length > 0 && (
           <div className="border-t border-slate-100 px-5 py-4">

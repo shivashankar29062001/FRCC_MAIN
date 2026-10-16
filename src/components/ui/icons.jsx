@@ -84,6 +84,7 @@ export const ArrowUpRightIcon = makeIcon('ArrowUpRightIcon', (
   </>
 ));
 export const ChevronDownIcon = makeIcon('ChevronDownIcon', <path d="m6 9.5 6 6 6-6" />);
+export const ChevronUpIcon = makeIcon('ChevronUpIcon', <path d="m18 14.5-6-6-6 6" />);
 export const ChevronLeftIcon = makeIcon('ChevronLeftIcon', <path d="m14.5 6-6 6 6 6" />);
 export const ChevronRightIcon = makeIcon('ChevronRightIcon', <path d="m9.5 6 6 6-6 6" />);
 

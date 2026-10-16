@@ -1,4 +1,3 @@
-import { HeroImage } from '../components/HeroImage.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { leadershipMembers } from '../data/leadership.js';
 
@@ -44,10 +43,7 @@ export function LeadershipPage() {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* 1. Image-only hero */}
-      <HeroImage slot="hero-leadership" />
-
-      {/* 2. Page title & subtitle directly below the hero */}
+      {/* Page title & subtitle */}
       <div className="container-x section-top pb-20">
         <div className="mb-10">
           <h1 className="h-section">Leadership</h1>

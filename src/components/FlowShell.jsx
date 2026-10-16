@@ -5,6 +5,7 @@ import { SmartImage } from './ui/media.jsx';
 import { useApp } from '../app/store/AppContext.jsx';
 import { memberDiscountPercent } from '../config/site.js';
 import { formatInr } from '../utils/pricing.js';
+import { LocationTrigger } from './location/LocationTrigger.jsx';
 
 const SERVICE_CONFIG = {
   stay: { label: 'Stay', to: '/stay' },
@@ -45,6 +46,11 @@ function SelectionSummaryCard({ summary = {} }) {
   }
   if (summary.guests && !rows.some((r) => r.label?.toLowerCase().includes('guest'))) {
     extraRows.push({ label: 'Guests', value: String(summary.guests) });
+  }
+  if (!rows.some((r) => r.label?.toLowerCase().includes('location'))) {
+    const locVal = summary.location || summary.area || summary.locationName || summary.areaName || 'Vijayawada Campus';
+    const locId = summary.locationId || (summary.service === 'parking' ? 'vja-parking' : summary.service === 'hall' || summary.service === 'halls' ? 'vja-halls' : summary.service === 'stay' || summary.service === 'hotel' ? 'vja-hotel' : summary.service === 'activities' ? 'vja-activities' : 'vja-club');
+    extraRows.push({ label: 'Location', value: locVal, locationId: locId });
   }
   const allRows = [...extraRows, ...rows];
 
@@ -115,7 +121,20 @@ function SelectionSummaryCard({ summary = {} }) {
           {allRows.map((r, i) => (
             <div key={i} className="flex justify-between items-start gap-2">
               <dt className="text-slate-500 shrink-0">{r.label}</dt>
-              <dd className="font-semibold text-navy-900 text-right truncate">{r.value}</dd>
+              <dd className="font-semibold text-navy-900 text-right truncate">
+                {r.label?.toLowerCase().includes('location') ? (
+                  <LocationTrigger
+                    locationId={r.locationId || r.value}
+                    className="text-navy-900 hover:text-gold-600 font-semibold truncate inline-flex"
+                    showIcon={true}
+                    iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                  >
+                    <span className="truncate">{r.value}</span>
+                  </LocationTrigger>
+                ) : (
+                  r.value
+                )}
+              </dd>
             </div>
           ))}
         </dl>

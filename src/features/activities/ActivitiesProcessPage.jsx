@@ -30,6 +30,7 @@ import {
   ChevronLeftIcon,
   ArrowRightIcon,
 } from '../../components/ui/icons.jsx';
+import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 
 // ---------------------------------------------------------------------------
 // /book/activities/process — the Activities booking page (redirect target of
@@ -507,6 +508,8 @@ export function ActivitiesProcessPage() {
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
       guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
+      location: 'Vijayawada Campus · Sports Complex',
+      locationId: 'vja-activities',
       price: quote.subtotal,
       memberDiscount: quote.discount > 0 ? quote.discount : undefined,
       total: quote.total,
@@ -534,6 +537,12 @@ export function ActivitiesProcessPage() {
             <Card>
               <p className="eyebrow">Step 1 · Select Game</p>
               <h2 className="h-sub mt-1">Which game are you booking?</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                <span>All facilities and courts are open daily at FRCC.</span>
+                <LocationTrigger locationId="vja-activities" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+                  Vijayawada Campus · View on map &amp; get directions
+                </LocationTrigger>
+              </div>
               {paramGame && !paramValid && (
                 <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
                   “{paramGame}” isn’t a known game — pick one below to start.

@@ -21,6 +21,7 @@ import {
   ArrowRightIcon,
   PrinterIcon,
 } from '../../components/ui/icons.jsx';
+import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 
 const STORAGE_KEY = 'frcc_stay_booking_draft';
 
@@ -159,6 +160,8 @@ export function HotelPage() {
       date: draft.checkin && draft.checkout ? `${formatDMY(draft.checkin)} – ${formatDMY(draft.checkout)}` : undefined,
       slot: `${nights} Night${nights > 1 ? 's' : ''}`,
       guests: `${draft.adults} Adults${Number(draft.children) > 0 ? `, ${draft.children} Children` : ''}`,
+      location: `${selectedArea.name} Campus · Riverfront Hotel`,
+      locationId: 'vja-hotel',
       price: basePrice,
       memberDiscount: discount > 0 ? discount : undefined,
       total,
@@ -259,7 +262,12 @@ export function HotelPage() {
           <Card>
             <p className="eyebrow">{HOTEL_AREAS.length > 1 ? 'Step 1 · Area & Dates' : 'Step 1 · Stay Dates'}</p>
             <h2 className="h-sub mt-1">{HOTEL_AREAS.length > 1 ? 'Select location and travel dates' : 'Select travel dates & guests'}</h2>
-            <p className="mt-1 text-sm text-slate-600">{HOTEL_AREAS.length > 1 ? 'Choose campus region, check-in and check-out dates, and number of guests.' : 'Choose check-in and check-out dates, and number of guests.'}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+              <span>{HOTEL_AREAS.length > 1 ? 'Choose campus region, check-in and check-out dates, and number of guests.' : 'Choose check-in and check-out dates, and number of guests.'}</span>
+              <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+                Vijayawada Campus · View on map &amp; get directions
+              </LocationTrigger>
+            </div>
 
             <div className="mt-6 space-y-6">
               {/* Area selector — hidden when only one location */}

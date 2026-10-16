@@ -23,6 +23,8 @@ import {
   YoutubeIcon,
 } from '../ui/icons.jsx';
 import { Logo } from '../Logo.jsx';
+import { LocationTrigger } from '../location/LocationTrigger.jsx';
+import { LocationPanel } from '../location/LocationPanel.jsx';
 
 // ---------------------------------------------------------------------------
 // Site chrome: the two-level navigation (utility strip + main bar), the mobile
@@ -545,18 +547,28 @@ export function Footer() {
           <ul className="mt-4 space-y-3 text-sm text-slate-400">
             {SITE_INFO.locations && SITE_INFO.locations.length > 0 ? (
               SITE_INFO.locations.map((loc) => (
-                <li key={loc.id} className="flex items-start gap-2.5">
-                  <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
-                  <div className="space-y-0.5">
-                    <span className="block font-medium text-slate-300">{loc.title}</span>
-                    <address className="not-italic text-xs leading-relaxed text-slate-400">{loc.fullAddress}</address>
-                  </div>
+                <li key={loc.id} className="space-y-0.5">
+                  <span className="block font-medium text-slate-300">{loc.title}</span>
+                  <LocationTrigger
+                    locationId={loc.id === 'vja' ? 'vja-club' : 'hyd-office'}
+                    address={loc.fullAddress}
+                    iconClassName="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-400 group-hover:text-gold-300 transition-colors"
+                    className="text-xs leading-relaxed text-slate-400 hover:text-gold-300"
+                  >
+                    <address className="not-italic">{loc.fullAddress}</address>
+                  </LocationTrigger>
                 </li>
               ))
             ) : addressLines.length > 0 && (
-              <li className="flex items-start gap-2.5">
-                <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-400" />
-                <address className="not-italic">{addressLines.join(', ')}</address>
+              <li className="space-y-0.5">
+                <LocationTrigger
+                  locationId="vja-club"
+                  address={addressLines.join(', ')}
+                  iconClassName="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-400 group-hover:text-gold-300 transition-colors"
+                  className="text-xs leading-relaxed text-slate-400 hover:text-gold-300"
+                >
+                  <address className="not-italic">{addressLines.join(', ')}</address>
+                </LocationTrigger>
               </li>
             )}
             {SITE_INFO.phone && (
@@ -599,6 +611,7 @@ export function AppLayout({ children }) {
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />
+      <LocationPanel />
       <Toasts items={toasts} />
     </div>
   );

@@ -20,6 +20,7 @@ import { HeroImage } from '../components/HeroImage.jsx';
 import { ServiceHero } from '../components/ServiceHero.jsx';
 import { IMAGES } from '../config/images.js';
 import { SITE_INFO } from '../config/siteInfo.js';
+import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { firstNameOf, greetingFor } from '../utils/helpers.js';
 import {
   ArrowRightIcon,
@@ -210,8 +211,17 @@ export function HomeHubPage() {
                     </div>
                     <div className="flex-1 flex flex-col p-6">
                       <h3 className="h-card group-hover:text-gold-600 transition">{area.name}</h3>
-                      <p className="mt-2 text-sm text-slate-600 line-clamp-2">{area.tagline}</p>
-                      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                      <p className="mt-1 text-sm text-slate-600 line-clamp-2">{area.tagline}</p>
+                      <div className="mt-2">
+                        <LocationTrigger
+                          locationId={area.id === 'vja' ? 'vja-club' : 'hyd-office'}
+                          address={area.address}
+                          className="text-xs text-slate-500 hover:text-navy-950"
+                        >
+                          <span className="line-clamp-1">{area.address}</span>
+                        </LocationTrigger>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span className="flex items-center gap-1"><MapPinIcon className="h-3.5 w-3.5" /> {area.hotels} hotels</span>
                         <span className="flex items-center gap-1"><CalendarIcon className="h-3.5 w-3.5" /> {area.halls} halls</span>
                         <span className="flex items-center gap-1"><CalendarIcon className="h-3.5 w-3.5" /> {area.activities} activities</span>

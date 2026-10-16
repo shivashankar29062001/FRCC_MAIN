@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './app/store/AppContext.jsx';
 import { LocationProvider } from './app/context/LocationContext.jsx';
+import { LocationModalProvider } from './app/context/LocationModalContext.jsx';
 import { AppLayout } from './components/layout/chrome.jsx';
 import { ProtectedRoute } from './app/routes/ProtectedRoute.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
@@ -26,9 +27,10 @@ export default function App() {
   return (
     <AppProvider>
       <LocationProvider>
-        <BrowserRouter>
-          <ErrorBoundary>
-            <AppLayout>
+        <LocationModalProvider>
+          <BrowserRouter>
+            <ErrorBoundary>
+              <AppLayout>
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/signup" element={<SignupPage />} />
@@ -63,6 +65,7 @@ export default function App() {
           </AppLayout>
         </ErrorBoundary>
       </BrowserRouter>
+        </LocationModalProvider>
       </LocationProvider>
     </AppProvider>
   );

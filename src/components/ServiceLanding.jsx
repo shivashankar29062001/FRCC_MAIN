@@ -27,6 +27,7 @@ import {
   HotelIcon,
   CalendarIcon,
 } from './ui/icons.jsx';
+import { LocationTrigger } from './location/LocationTrigger.jsx';
 
 const BENEFIT_ICONS = {
   GamepadIcon,
@@ -78,6 +79,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         ],
         priceDisplay: formatInr(r.pricePerNight),
         priceUnit: ' / night',
+        locationId: 'vja-hotel',
+        locationName: 'Vijayawada Campus · NTR District',
         buttonLabel: 'Select room',
         to: `/book/hotel?item=${encodeURIComponent(r.id)}`,
       }));
@@ -105,6 +108,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           ],
           priceDisplay: formatInr(h.price || h.prices?.fullDay || 50000),
           priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
+          locationId: 'vja-halls',
+          locationName: 'Vijayawada Campus · Convention Block',
           buttonLabel: 'Select hall',
           to: `/book/hall?item=${encodeURIComponent(h.id)}`,
         };
@@ -124,6 +129,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         ],
         priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
         priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
+        locationId: 'vja-parking',
+        locationName: 'Vijayawada Campus · Automated Parking',
         buttonLabel: 'Reserve parking',
         to: `/book/parking?item=${encodeURIComponent(z.id)}`,
       }));
@@ -158,6 +165,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           ],
           priceDisplay,
           priceUnit,
+          locationId: 'vja-activities',
+          locationName: 'Vijayawada Campus · Sports Complex',
           buttonLabel: 'Book game',
           to: `/book/activities/process?item=${encodeURIComponent(g.id)}&game=${encodeURIComponent(g.id)}`,
         };
@@ -177,6 +186,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         priceDisplay: formatInr(p.price || p.amount),
         priceUnit: ' (one-time)',
         healthCardNote: p.healthCardNote,
+        locationId: 'vja-membership',
+        locationName: 'Vijayawada Campus · Member Relations Desk',
         buttonLabel: 'Join now',
         to: `/membership/join?item=${encodeURIComponent(p.id)}&plan=${encodeURIComponent(p.id)}`,
       }));
@@ -349,6 +360,19 @@ export function ServiceLanding({ service = 'stay', hero }) {
                 </div>
                 <div className="flex flex-1 flex-col p-5 sm:p-6">
                   <h3 className="font-display text-xl font-bold text-navy-900">{item.name}</h3>
+
+                  {item.locationName && (
+                    <div className="mt-1">
+                      <LocationTrigger
+                        locationId={item.locationId}
+                        className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                        showIcon={true}
+                        iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                      >
+                        {item.locationName}
+                      </LocationTrigger>
+                    </div>
+                  )}
 
                   {/* 2 to 3 key facts */}
                   <ul className="mt-3.5 flex-1 space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600">

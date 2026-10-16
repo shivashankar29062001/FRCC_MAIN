@@ -21,6 +21,7 @@ import {
   ArrowRightIcon,
   PrinterIcon,
 } from '../../components/ui/icons.jsx';
+import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 
 const STORAGE_KEY = 'frcc_parking_booking_draft';
 
@@ -152,6 +153,8 @@ export function ParkingPage() {
       detail: `${selectedArea.name} · ${draft.vehicleType === 'bike' ? 'Two Wheeler' : 'Car'}`,
       date: draft.date ? formatDMY(draft.date) : undefined,
       slot: `${draft.selectedSlot} (${draft.duration === 'full-day' ? 'Full Day Pass' : `${draft.duration} Hours`})`,
+      location: `${selectedArea.name} Campus · Parking Facility`,
+      locationId: 'vja-parking',
       isFree: true,
       price: 0,
       total: 0,
@@ -227,7 +230,12 @@ export function ParkingPage() {
           <Card>
             <p className="eyebrow">Step 1 · Date &amp; Duration</p>
             <h2 className="h-sub mt-1">When are you parking?</h2>
-            <p className="mt-1 text-sm text-slate-600">Select arrival campus location, date, time, and vehicle category.</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+              <span>Select arrival campus location, date, time, and vehicle category.</span>
+              <LocationTrigger locationId="vja-parking" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+                Vijayawada Campus · View on map &amp; get directions
+              </LocationTrigger>
+            </div>
 
             <div className="mt-6 space-y-6">
               {/* Campus Selector (visible only if multiple areas exist) */}

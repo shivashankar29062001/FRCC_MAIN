@@ -10,6 +10,7 @@ import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
 import { ArrowRightIcon, MapPinIcon, ClockIcon, PhoneIcon } from '../components/ui/icons.jsx';
+import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { TypeWriter } from '../components/TypeWriter.jsx';
 import { name as siteName, shortName as siteShortName, tagline as siteTagline } from '../config/site.js';
@@ -340,17 +341,31 @@ export function LandingPage() {
               {SITE_INFO.locations && SITE_INFO.locations.length > 0 ? (
                 SITE_INFO.locations.map((loc) => (
                   <li key={loc.id} className="flex items-start gap-2.5">
-                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
-                    <div>
-                      <span className="block font-semibold text-navy-900">{loc.title}</span>
-                      <address className="not-italic text-slate-600 text-xs sm:text-sm">{loc.fullAddress}</address>
-                    </div>
+                    <LocationTrigger
+                      locationId={loc.id === 'vja' ? 'vja-club' : 'hyd-office'}
+                      address={loc.fullAddress}
+                      className="text-slate-600 hover:text-gold-600"
+                      showIcon={true}
+                      iconClassName="mt-0.5 h-4 w-4 shrink-0 text-gold-600"
+                    >
+                      <div>
+                        <span className="block font-semibold text-navy-900">{loc.title}</span>
+                        <address className="not-italic text-slate-600 text-xs sm:text-sm">{loc.fullAddress}</address>
+                      </div>
+                    </LocationTrigger>
                   </li>
                 ))
               ) : addressLines.length > 0 && (
                 <li className="flex items-start gap-2.5">
-                  <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
-                  <address className="not-italic">{addressLines.join(', ')}</address>
+                  <LocationTrigger
+                    locationId="vja-club"
+                    address={addressLines.join(', ')}
+                    className="text-slate-600 hover:text-gold-600"
+                    showIcon={true}
+                    iconClassName="mt-0.5 h-4 w-4 shrink-0 text-gold-600"
+                  >
+                    <address className="not-italic">{addressLines.join(', ')}</address>
+                  </LocationTrigger>
                 </li>
               )}
               {SITE_INFO.hours && (

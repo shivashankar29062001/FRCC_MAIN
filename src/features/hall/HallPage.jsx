@@ -22,6 +22,7 @@ import {
   ArrowRightIcon,
   PrinterIcon,
 } from '../../components/ui/icons.jsx';
+import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 
 const STORAGE_KEY = 'frcc_hall_booking_draft';
 
@@ -176,6 +177,8 @@ export function HallPage() {
       date: draft.date ? formatDMY(draft.date) : undefined,
       slot: timeDetail,
       guests: guestDetail,
+      location: `${selectedArea.name} Campus · Convention Halls`,
+      locationId: 'vja-halls',
       price: basePrice,
       memberDiscount: discount > 0 ? discount : undefined,
       total,
@@ -265,7 +268,12 @@ export function HallPage() {
           <Card>
             <p className="eyebrow">Step 1 · Area &amp; Hall Type</p>
             <h2 className="h-sub mt-1">Select location and venue preference</h2>
-            <p className="mt-1 text-sm text-slate-600">Choose the campus area and whether you need AC halls, Non-AC open venues, or executive boardrooms.</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+              <span>Choose the campus area and whether you need AC halls, Non-AC open venues, or executive boardrooms.</span>
+              <LocationTrigger locationId="vja-halls" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+                Vijayawada Campus · View on map &amp; get directions
+              </LocationTrigger>
+            </div>
 
             <div className="mt-6 space-y-6">
               {/* Area selector (visible only if multiple areas exist) */}

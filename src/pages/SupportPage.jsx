@@ -15,6 +15,7 @@ import {
   LinkedinIcon,
   YoutubeIcon,
 } from '../components/ui/icons.jsx';
+import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 
 // FAQ shown on the support page.
 const FAQ = [
@@ -139,17 +140,33 @@ export function SupportPage() {
                       <IconTile icon={MapPinIcon} />
                       <div className="space-y-0.5">
                         <span className="block text-xs font-semibold text-slate-500">{loc.title}</span>
-                        <address className="font-semibold text-navy-900 not-italic text-sm">{loc.fullAddress}</address>
+                        <LocationTrigger
+                          locationId={loc.id === 'vja' ? 'vja-club' : 'hyd-office'}
+                          address={loc.fullAddress}
+                          className="font-semibold text-navy-900 not-italic text-sm hover:text-gold-600 block"
+                          showIcon={true}
+                          iconClassName="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-500"
+                        >
+                          <address className="not-italic inline">{loc.fullAddress}</address>
+                        </LocationTrigger>
                       </div>
                     </li>
                   ))
                 ) : getAddressLines().length > 0 && (
                   <li className="flex items-start gap-3">
                     <IconTile icon={MapPinIcon} />
-                    <span>
+                    <div>
                       <span className="block text-xs font-semibold text-slate-500">Address</span>
-                      <address className="font-semibold text-navy-900 not-italic">{getAddressLines().join(', ')}</address>
-                    </span>
+                      <LocationTrigger
+                        locationId="vja-club"
+                        address={getAddressLines().join(', ')}
+                        className="font-semibold text-navy-900 not-italic text-sm hover:text-gold-600 block"
+                        showIcon={true}
+                        iconClassName="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-500"
+                      >
+                        <address className="not-italic inline">{getAddressLines().join(', ')}</address>
+                      </LocationTrigger>
+                    </div>
                   </li>
                 )}
                 {SITE_INFO.hours && (

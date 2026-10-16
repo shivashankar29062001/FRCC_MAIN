@@ -17,6 +17,7 @@ import {
   ArrowRightIcon,
   CheckIcon,
 } from '../components/ui/icons.jsx';
+import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 
 // ---------------------------------------------------------------------------
 // /membership/dashboard — Shows both membership cards for a stored membership.
@@ -108,7 +109,15 @@ export function MembershipDashboardPage() {
       <div className="container-x section-top">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
         <h1 className="h-section mt-3">{`${membership?.planName || 'FRCC Membership'} · ${memberId}`}</h1>
-        <p className="mt-1 text-slate-600">Lifetime Active Membership · Film Recreation &amp; Cultural Centre</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-600 text-sm">
+          <span>Lifetime Active Membership · Film Recreation &amp; Cultural Centre</span>
+          <LocationTrigger
+            locationId="vja-membership"
+            className="text-slate-600 hover:text-navy-950 font-medium"
+          >
+            Vijayawada Campus · Member Desk
+          </LocationTrigger>
+        </div>
 
         {/* Digital Privilege Cards Section: shows both cards */}
         <section aria-label="Official FRCC Cards" className="mt-8">
