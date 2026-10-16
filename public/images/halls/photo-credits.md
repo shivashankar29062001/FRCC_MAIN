@@ -1,0 +1,51 @@
+# Photo credits
+
+All photos are real photography downloaded from [Unsplash](https://unsplash.com) —
+free to use for commercial and non-commercial purposes under the
+[Unsplash License](https://unsplash.com/license) (no attribution required;
+sources listed below for reference).
+
+Regenerate with `node server/scripts/download-images.js` and verify with `npm run check:images`.
+
+- `/images/halls/hyderabad-board-room/hyderabad-board-room-1.jpg` — https://images.unsplash.com/photo-1431540015161-0bf868a2d407 (Unsplash License)
+- `/images/halls/hyderabad-board-room/hyderabad-board-room-2.jpg` — https://images.unsplash.com/photo-1497366811353-6870744d04b2 (Unsplash License)
+- `/images/halls/hyderabad-board-room/hyderabad-board-room-3.jpg` — https://images.unsplash.com/photo-1552664730-d307ca884978 (Unsplash License)
+- `/images/halls/hyderabad-board-room/hyderabad-board-room-4.jpg` — https://images.unsplash.com/photo-1517048676732-d65bc937f952 (Unsplash License)
+- `/images/halls/hyderabad-meeting-room/hyderabad-meeting-room-1.jpg` — https://images.unsplash.com/photo-1497366858526-0766cadbe8fa (Unsplash License)
+- `/images/halls/hyderabad-meeting-room/hyderabad-meeting-room-2.jpg` — https://images.unsplash.com/photo-1542626991-cbc4e32524cc (Unsplash License)
+- `/images/halls/hyderabad-meeting-room/hyderabad-meeting-room-3.jpg` — https://images.unsplash.com/photo-1531482615713-2afd69097998 (Unsplash License)
+- `/images/halls/hyderabad-meeting-room/hyderabad-meeting-room-4.jpg` — https://images.unsplash.com/photo-1517245386807-bb43f82c33c4 (Unsplash License)
+- `/images/halls/hyderabad-conference-room/hyderabad-conference-room-1.jpg` — https://images.unsplash.com/photo-1524178232363-1fb2b075b655 (Unsplash License)
+- `/images/halls/hyderabad-conference-room/hyderabad-conference-room-2.jpg` — https://images.unsplash.com/photo-1540575467063-178a50c2df87 (Unsplash License)
+- `/images/halls/hyderabad-conference-room/hyderabad-conference-room-3.jpg` — https://images.unsplash.com/photo-1503428593586-e225b39bddfe (Unsplash License)
+- `/images/halls/hyderabad-conference-room/hyderabad-conference-room-4.jpg` — https://images.unsplash.com/photo-1568992687947-868a62a9f521 (Unsplash License)
+- `/images/halls/hyderabad-convention-room/hyderabad-convention-room-1.jpg` — https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04 (Unsplash License)
+- `/images/halls/hyderabad-convention-room/hyderabad-convention-room-2.jpg` — https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3 (Unsplash License)
+- `/images/halls/hyderabad-convention-room/hyderabad-convention-room-3.jpg` — https://images.unsplash.com/photo-1522158637959-30385a09e0da (Unsplash License)
+- `/images/halls/hyderabad-convention-room/hyderabad-convention-room-4.jpg` — https://images.unsplash.com/photo-1560439514-4e9645039924 (Unsplash License)
+- `/images/halls/hyderabad-banquet-hall/hyderabad-banquet-hall-1.jpg` — https://images.unsplash.com/photo-1519167758481-83f550bb49b3 (Unsplash License)
+- `/images/halls/hyderabad-banquet-hall/hyderabad-banquet-hall-2.jpg` — https://images.unsplash.com/photo-1530023367847-a683933f4172 (Unsplash License)
+- `/images/halls/hyderabad-banquet-hall/hyderabad-banquet-hall-3.jpg` — https://images.unsplash.com/photo-1511795409834-ef04bbd61622 (Unsplash License)
+- `/images/halls/hyderabad-banquet-hall/hyderabad-banquet-hall-4.jpg` — https://images.unsplash.com/photo-1464366400600-7168b8af9bc3 (Unsplash License)
+- `/images/halls/vijayawada-board-room/vijayawada-board-room-1.jpg` — https://images.unsplash.com/photo-1517502884422-41eaead166d4 (Unsplash License)
+- `/images/halls/vijayawada-board-room/vijayawada-board-room-2.jpg` — https://images.unsplash.com/photo-1521737711867-e3b97375f902 (Unsplash License)
+- `/images/halls/vijayawada-board-room/vijayawada-board-room-3.jpg` — https://images.unsplash.com/photo-1522071820081-009f0129c71c (Unsplash License)
+- `/images/halls/vijayawada-board-room/vijayawada-board-room-4.jpg` — https://images.unsplash.com/photo-1556761175-b413da4baf72 (Unsplash License)
+- `/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-1.jpg` — https://images.unsplash.com/photo-1571624436279-b272aff752b5 (Unsplash License)
+- `/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-2.jpg` — https://images.unsplash.com/photo-1568992688065-536aad8a12f6 (Unsplash License)
+- `/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-3.jpg` — https://images.unsplash.com/photo-1573497491208-6b1acb260507 (Unsplash License)
+- `/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-4.jpg` — https://images.unsplash.com/photo-1556761175-5973dc0f32e7 (Unsplash License)
+- `/images/halls/vijayawada-conference-room/vijayawada-conference-room-1.jpg` — https://images.unsplash.com/photo-1523580494863-6f3031224c94 (Unsplash License)
+- `/images/halls/vijayawada-conference-room/vijayawada-conference-room-2.jpg` — https://images.unsplash.com/photo-1591115765373-5207764f72e7 (Unsplash License)
+- `/images/halls/vijayawada-conference-room/vijayawada-conference-room-3.jpg` — https://images.unsplash.com/photo-1489599849927-2ee91cede3ba (Unsplash License)
+- `/images/halls/vijayawada-conference-room/vijayawada-conference-room-4.jpg` — https://images.unsplash.com/photo-1561489396-888724a1543d (Unsplash License)
+- `/images/halls/vijayawada-convention-room/vijayawada-convention-room-1.jpg` — https://images.unsplash.com/photo-1511578314322-379afb476865 (Unsplash License)
+- `/images/halls/vijayawada-convention-room/vijayawada-convention-room-2.jpg` — https://images.unsplash.com/photo-1540039155733-5bb30b53aa14 (Unsplash License)
+- `/images/halls/vijayawada-convention-room/vijayawada-convention-room-3.jpg` — https://images.unsplash.com/photo-1505373877841-8d25f7d46678 (Unsplash License)
+- `/images/halls/vijayawada-convention-room/vijayawada-convention-room-4.jpg` — https://images.unsplash.com/photo-1531058020387-3be344556be6 (Unsplash License)
+- `/images/halls/vijayawada-banquet-hall/vijayawada-banquet-hall-1.jpg` — https://images.unsplash.com/photo-1524824267900-2fa9cbf7a506 (Unsplash License)
+- `/images/halls/vijayawada-banquet-hall/vijayawada-banquet-hall-2.jpg` — https://images.unsplash.com/photo-1519225421980-715cb0215aed (Unsplash License)
+- `/images/halls/vijayawada-banquet-hall/vijayawada-banquet-hall-3.jpg` — https://images.unsplash.com/photo-1556125574-d7f27ec36a06 (Unsplash License)
+- `/images/halls/vijayawada-banquet-hall/vijayawada-banquet-hall-4.jpg` — https://images.unsplash.com/photo-1517457373958-b7bdd4587205 (Unsplash License)
+- `/images/halls/hyderabad-club/hyderabad-club-hero.jpg` — https://images.unsplash.com/photo-1486406146926-c627a92ad1ab (Unsplash License)
+- `/images/halls/vijayawada-club/vijayawada-club-hero.jpg` — https://images.unsplash.com/photo-1542314831-068cd1dbfeeb (Unsplash License)
