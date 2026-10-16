@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { FlowShell } from '../../components/FlowShell.jsx';
@@ -9,6 +9,9 @@ import { parseDMY } from '../../utils/dates.js';
 import { IMAGES } from '../../config/images.js';
 import { PLANS_DATA } from '../../data/membership.js';
 import { formatInr } from '../../utils/pricing.js';
+
+// TODO-REMOVE-TEST-COUPON
+const COUPON_ENABLED = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_TEST_COUPON !== 'false';
 import {
   MembershipIdCard,
   HealthCard,
@@ -148,7 +151,23 @@ export function MembershipJoinPage() {
   const [isAadhaarFocused, setIsAadhaarFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [paying, setPaying] = useState(false);
+  const submittedRef = useRef(false); // Idempotency guard to prevent duplicate submissions
+
+  // TODO-REMOVE-TEST-COUPON
+  const [showCouponInput, setShowCouponInput] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+  // TODO-REMOVE-TEST-COUPON: log when payment step is loaded
+  useEffect(() => {
+    if (step === 4) {
+      console.info('[coupon] payment step loaded', { enabled: COUPON_ENABLED });
+    }
+  }, [step]);
 
   // Sync wizard state to sessionStorage (without file)
   useEffect(() => {
@@ -231,8 +250,17 @@ export function MembershipJoinPage() {
     );
   }, [formData.aadhaarLast4, aadhaarFile, formData.aadhaarConsent]);
 
+  // Pricing and coupon calculations
+  const planBasePrice = selectedPlan?.price || selectedPlan?.amount || 0;
+  // TODO-REMOVE-TEST-COUPON
+  const discountAmount = (COUPON_ENABLED && appliedCoupon)
+    ? Math.round((planBasePrice * (appliedCoupon.percent_off ?? 100)) / 100)
+    : 0;
+  // TODO-REMOVE-TEST-COUPON
+  const finalPrice = Math.max(0, planBasePrice - discountAmount);
+
   // Step 5 Validation
-  const isStep5Valid = Boolean(formData.paymentMethod);
+  const isStep5Valid = Boolean(formData.paymentMethod || finalPrice === 0);
 
   const isCurrentStepValid = useMemo(() => {
     if (step === 0) return isStep1Valid;
@@ -351,41 +379,92 @@ export function MembershipJoinPage() {
   const confirmedPlanName =
     selectedPlan?.name || membership?.planName || 'FRCC Membership';
 
+  // TODO-REMOVE-TEST-COUPON
+  async function handleApplyCoupon() {
+    setCouponError('');
+    const code = couponInput.trim().toUpperCase();
+    if (!code) {
+      setCouponError('Please enter a coupon code.');
+      return;
+    }
+    setValidatingCoupon(true);
+    try {
+      const { validateCoupon } = await import('../../services/couponService.js');
+      const res = await validateCoupon(code);
+      if (res.valid) {
+        setAppliedCoupon(res);
+        setCouponError('');
+        pushToast(`Coupon ${res.code} applied (${res.percent_off}% off)!`);
+      } else {
+        setCouponError(res.error || 'Invalid or expired coupon code.');
+      }
+    } catch (err) {
+      setCouponError(err?.message || 'Error validating coupon code.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  }
+
+  // TODO-REMOVE-TEST-COUPON
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
+  }
+
   // Step 5 Payment submission
-  function handlePay() {
-    if (!formData.paymentMethod) {
+  async function handlePay() {
+    if (finalPrice > 0 && !formData.paymentMethod) {
       setFieldErrors({ paymentMethod: 'Choose a payment method.' });
       return;
     }
+    // Idempotency: prevent duplicate submissions on double click or refresh
+    if (paying || submittedRef.current) return;
+    submittedRef.current = true;
     setPaying(true);
+    setSubmitError('');
 
-    // TODO(Phase 2): Integrate Razorpay gateway:
-    // 1. const order = await createRazorpayOrder({ planId: selectedPlan.id, amount: selectedPlan.price });
-    // 2. Open Razorpay checkout modal with order.id
-    // 3. await verifyRazorpayPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
-    // 4. Update backend server membership database
-
-    setTimeout(() => {
-      setPaying(false);
+    try {
       const year = new Date().getFullYear();
       const random6 = String(Math.floor(100000 + Math.random() * 900000));
-      // TODO(Backend): Replace client-side mock memberId generation with server-issued ID from POST /api/membership
       const memberId = formData.memberId || membership?.memberId || `FRCC-${year}-${random6}`;
 
-      // Store only {memberId, name, mobile, email, planName, createdAt}
+      // Store safe fields: user id, member id, plan, status "active", amount_paid, payment_method, coupon_code, is_test
+      // Never store full Aadhaar number or file
       const record = {
+        userId: user?.id || user?.userId || null,
         memberId,
         name: formData.fullName || user?.name || 'Member',
         mobile: formData.mobile || '',
         email: formData.email || '',
         planName: selectedPlan?.name || 'FRCC Membership',
+        planPrice: planBasePrice,
+        amountPaid: finalPrice, // TODO-REMOVE-TEST-COUPON
+        paymentMethod: finalPrice === 0 ? 'coupon' : (formData.paymentMethod || 'upi'), // TODO-REMOVE-TEST-COUPON
+        couponCode: (COUPON_ENABLED && appliedCoupon) ? appliedCoupon.code : null, // TODO-REMOVE-TEST-COUPON
+        isTest: Boolean(appliedCoupon?.is_test), // TODO-REMOVE-TEST-COUPON
+        status: 'active',
         createdAt: new Date().toISOString(),
       };
-      saveMembership(record);
+
+      const saved = await saveMembership(record);
+      const insertedId = saved?.id || saved?.memberId || memberId;
+      console.info('[membership] inserted row id:', insertedId);
+
       updateForm({ memberId });
-      pushToast(`Payment verified! Welcome to ${selectedPlan?.name || 'FRCC'} Membership.`);
+      pushToast(
+        finalPrice === 0
+          ? `Welcome to ${selectedPlan?.name || 'FRCC'}! Test coupon membership activated.`
+          : `Payment verified! Welcome to ${selectedPlan?.name || 'FRCC'} Membership.`
+      );
       setStep(5);
-    }, 1500);
+    } catch (err) {
+      console.error('Failed to save membership:', err);
+      submittedRef.current = false;
+      setSubmitError(err?.message || 'Failed to save membership to database. Please try again.');
+    } finally {
+      setPaying(false);
+    }
   }
 
   const joinSummary = useMemo(() => {
@@ -397,12 +476,13 @@ export function MembershipJoinPage() {
         ...(formData.fullName ? [{ label: 'Applicant', value: formData.fullName }] : []),
         ...(selectedPlan ? [{ label: 'Plan', value: `${selectedPlan.name} (${selectedPlan.period})` }] : []),
         ...(formData.mobile ? [{ label: 'Mobile', value: `+91 ${formData.mobile}` }] : []),
+        ...(appliedCoupon ? [{ label: 'Coupon', value: `${appliedCoupon.code} (-${appliedCoupon.percent_off}%)` }] : []),
       ],
-      price: selectedPlan?.price,
-      memberDiscount: 0,
-      total: selectedPlan?.price,
+      price: planBasePrice,
+      memberDiscount: discountAmount,
+      total: finalPrice,
     };
-  }, [selectedPlan, formData.fullName, formData.mobile]);
+  }, [selectedPlan, formData.fullName, formData.mobile, planBasePrice, discountAmount, finalPrice, appliedCoupon]);
 
   return (
     <FlowShell
@@ -920,58 +1000,158 @@ export function MembershipJoinPage() {
                     </div>
                     <div className="flex justify-between items-center text-slate-600">
                       <span>Plan Fee</span>
-                      <span className="font-semibold text-navy-900">{formatInr(selectedPlan.price || selectedPlan.amount)}</span>
+                      <span className="font-semibold text-navy-900">
+                        {/* TODO-REMOVE-TEST-COUPON */}
+                        {appliedCoupon ? (
+                          <span className="line-through text-slate-400 font-normal">{formatInr(planBasePrice)}</span>
+                        ) : (
+                          formatInr(planBasePrice)
+                        )}
+                      </span>
                     </div>
-                    <div className="flex justify-between items-center text-slate-600">
-                      <span>Member Discount</span>
-                      <span className="text-emerald-700 font-medium">{formatInr(0)}</span>
-                    </div>
+                    {/* TODO-REMOVE-TEST-COUPON */}
+                    {appliedCoupon ? (
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Coupon discount ({appliedCoupon.percent_off}%)</span>
+                        <span className="text-emerald-700 font-semibold">-{formatInr(discountAmount)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center text-slate-600">
+                        <span>Member Discount</span>
+                        <span className="text-emerald-700 font-medium">{formatInr(0)}</span>
+                      </div>
+                    )}
                     <div className="border-t border-slate-200/80 pt-3 flex justify-between items-center">
                       <span className="font-bold text-navy-900 text-base">Total Amount</span>
                       <span className="font-display text-2xl font-bold text-navy-900">
-                        {formatInr(selectedPlan.price || selectedPlan.amount)}
+                        {formatInr(finalPrice)}
                       </span>
                     </div>
                   </div>
+
+                  {/* TODO-REMOVE-TEST-COUPON */}
+                  {COUPON_ENABLED && (
+                    <div className="mt-4 border-t border-slate-200/60 pt-4">
+                      {appliedCoupon ? (
+                        <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 border border-emerald-200 text-sm">
+                          <span className="text-emerald-900 font-medium">
+                            Coupon <strong className="font-mono">{appliedCoupon.code}</strong> applied ({appliedCoupon.percent_off}% off)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleRemoveCoupon}
+                            className="text-xs font-semibold text-rose-600 underline hover:text-rose-800 cursor-pointer ml-3"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : showCouponInput ? (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={couponInput}
+                              onChange={(e) => {
+                                setCouponInput(e.target.value.toUpperCase());
+                                setCouponError('');
+                                setSubmitError('');
+                              }}
+                              placeholder="Enter coupon code"
+                              className="field text-sm uppercase flex-1"
+                              disabled={validatingCoupon}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyCoupon}
+                              disabled={validatingCoupon || !couponInput.trim()}
+                              className="btn-base px-4 py-2 bg-navy-900 text-white text-xs font-semibold hover:bg-navy-800 disabled:opacity-50 cursor-pointer"
+                            >
+                              {validatingCoupon ? 'Checking…' : 'Apply'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowCouponInput(false);
+                                setCouponError('');
+                              }}
+                              className="px-2 text-xs text-slate-500 hover:text-navy-900 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {couponError && (
+                            <p className="text-xs text-rose-600 font-medium">{couponError}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowCouponInput(true)}
+                          className="text-sm font-semibold text-gold-700 hover:text-gold-800 underline underline-offset-4 cursor-pointer"
+                        >
+                          Have a coupon?
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Payment Methods */}
-                <div>
-                  <label className="label">Select Payment Method *</label>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mt-2">
-                    {[
-                      { id: 'upi', label: 'UPI', hint: 'Google Pay, PhonePe, Paytm' },
-                      { id: 'card', label: 'Card', hint: 'Credit or Debit cards' },
-                      { id: 'netbanking', label: 'Net Banking', hint: 'All major banks' },
-                    ].map((m) => {
-                      const active = formData.paymentMethod === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => updateForm({ paymentMethod: m.id })}
-                          className={`flex flex-col text-left p-4 rounded-xl border transition cursor-pointer ${
-                            active
-                              ? 'border-gold-500 bg-gold-50/40 ring-1 ring-gold-500'
-                              : 'border-slate-200 bg-white hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span className="font-semibold text-navy-900 text-sm">{m.label}</span>
-                            <span
-                              className={`h-4 w-4 rounded-full border flex items-center justify-center ${
-                                active ? 'border-navy-900' : 'border-slate-300'
-                              }`}
-                            >
-                              {active && <span className="h-2 w-2 rounded-full bg-navy-900" />}
-                            </span>
-                          </div>
-                          <span className="text-xs text-slate-500 mt-1">{m.hint}</span>
-                        </button>
-                      );
-                    })}
+                {/* Database error banner if submission fails */}
+                {submitError && (
+                  <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">
+                    <p className="font-semibold">Unable to complete membership</p>
+                    <p className="text-xs text-rose-700 mt-0.5">{submitError}</p>
                   </div>
-                </div>
+                )}
+
+                {/* Payment Methods */}
+                {/* TODO-REMOVE-TEST-COUPON */}
+                {finalPrice === 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm text-emerald-900">
+                    <p className="font-semibold">No payment required</p>
+                    <p className="text-xs text-emerald-800 mt-0.5">
+                      100% coupon discount applied. Click Complete membership below to activate your account.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="label">Select Payment Method *</label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 mt-2">
+                      {[
+                        { id: 'upi', label: 'UPI', hint: 'Google Pay, PhonePe, Paytm' },
+                        { id: 'card', label: 'Card', hint: 'Credit or Debit cards' },
+                        { id: 'netbanking', label: 'Net Banking', hint: 'All major banks' },
+                      ].map((m) => {
+                        const active = formData.paymentMethod === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => updateForm({ paymentMethod: m.id })}
+                            className={`flex flex-col text-left p-4 rounded-xl border transition cursor-pointer ${
+                              active
+                                ? 'border-gold-500 bg-gold-50/40 ring-1 ring-gold-500'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span className="font-semibold text-navy-900 text-sm">{m.label}</span>
+                              <span
+                                className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                                  active ? 'border-navy-900' : 'border-slate-300'
+                                }`}
+                              >
+                                {active && <span className="h-2 w-2 rounded-full bg-navy-900" />}
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-500 mt-1">{m.hint}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-5">
@@ -987,12 +1167,13 @@ export function MembershipJoinPage() {
                 <LoadingButton
                   variant="gold"
                   loading={paying}
-                  loadingLabel="Processing payment…"
+                  loadingLabel={finalPrice === 0 ? 'Activating membership…' : 'Processing payment…'}
                   onClick={handlePay}
                   disabled={!isStep5Valid || paying}
                   className="px-8 py-2.5 text-sm font-semibold inline-flex items-center gap-2"
                 >
-                  Pay now ({formatInr(selectedPlan.price || selectedPlan.amount)})
+                  {/* TODO-REMOVE-TEST-COUPON */}
+                  {finalPrice === 0 ? 'Complete membership' : `Pay now (${formatInr(finalPrice)})`}
                 </LoadingButton>
               </div>
             </Card>

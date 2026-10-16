@@ -294,6 +294,7 @@ function targetFor(tabId, v) {
     if (checkout) params.set('checkout', checkout);
     if (v.adults) params.set('adults', v.adults);
     if (v.rooms) params.set('rooms', v.rooms);
+    params.set('item', v.item || v.room || 'standard');
   }
   if (tabId === 'hall') {
     const date = parseDMY(v.date);

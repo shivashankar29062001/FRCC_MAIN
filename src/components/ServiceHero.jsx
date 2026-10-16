@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HeroImage } from './HeroImage.jsx';
+import { HeroSlider } from './HeroSlider.jsx';
 import { BookingCard } from './BookingPanel.jsx';
 import { TypeWriter } from './TypeWriter.jsx';
 import { SmartImage } from './ui/media.jsx';

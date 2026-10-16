@@ -30,7 +30,7 @@
 //   - game → true for game slots (fallback also shows a gold icon)
 // ---------------------------------------------------------------------------
 
-const local = import.meta.glob('../assets/images/*.{jpg,jpeg,png,webp,avif}', {
+const local = import.meta.glob(['../assets/images/*.{jpg,jpeg,png,webp,avif}', '../assets/images/**/*.{jpg,jpeg,png,webp,avif}'], {
   eager: true,
   query: '?url',
   import: 'default',
@@ -211,10 +211,19 @@ export const REMOTE = {
   parkingValet: 'https://images.unsplash.com/photo-1739239130013-f8d430e8a147?w=1600&q=80&auto=format&fit=crop',
 };
 
-export const FALLBACK = {};
+export const FALLBACK = {
+  'hero-home-2': REMOTE.exploreHotel,
+  'hero-home-3': REMOTE.exploreHall,
+  'hero-home-4': REMOTE.exploreCourts,
+  'hero-home-5': REMOTE.facilityPool,
+  'hero-hub-2': REMOTE.galleryLounge,
+  'hero-hub-3': REMOTE.facilityRestaurant,
+  'hero-hub-4': REMOTE.hallStage,
+  'hero-hub-5': REMOTE.badminton,
+};
 
 export function heroSrc(slot) {
-  return localFor(slot) || REMOTE[slot] || null;
+  return localFor(slot) || REMOTE[slot] || FALLBACK[slot] || null;
 }
 
 /**
@@ -253,6 +262,12 @@ export const IMAGES = {
   'hero-home': S('hero-home', 'FRCC Campus', 'FRCC campus aerial view'),
   'hero-hub': S('hero-hub', 'Member Home', 'FRCC campus view'),
   'hero-stay': S('hero-stay', 'Stay', 'Wide view of the FRCC hotel entrance and grand lobby'),
+  'hero-dining': S('hero-dining', 'Dining', 'FRCC dining venues'),
+  'dining-restaurant': S('dining-restaurant', 'Restaurant', 'FRCC Restaurant multi-cuisine dining'),
+  'dining-coffee-shop': S('dining-coffee-shop', 'Coffee Shop', 'FRCC Coffee Shop artisan brews and bakes'),
+  'dining-pub': S('dining-pub', 'Pub', 'FRCC Pub evening drinks and bar bites'),
+  'dining-lounge-bar': S('dining-lounge-bar', 'Lounge Bar', 'FRCC Lounge Bar evening cocktails and small plates'),
+  'dining-rooftop-restaurant': S('dining-rooftop-restaurant', 'Rooftop Restaurant', 'FRCC Rooftop Restaurant open-air grills'),
   'hero-halls': S('hero-halls', 'Halls', 'Wide shot of the FRCC grand convention hall dressed for an event'),
   'hero-activities': S('hero-activities', 'Activities', 'Wide action shot of a badminton match inside the FRCC sports hall'),
   'hero-parking': S('hero-parking', 'Parking', 'Wide view of the FRCC covered parking deck'),
@@ -316,6 +331,8 @@ export const IMAGES = {
   'swimming-pool': GAME('swimming-pool', 'Swimming Pool', 'FRCC resort swimming pool with clear water and sun loungers'),
   'kids-play-area': GAME('kids-play-area', 'Kids Play Area', 'FRCC bright, safe indoor children\'s play area with a slide'),
   football: GAME('football', 'Football', 'FRCC football match in play on the campus pitch'),
+  squash: GAME('squash', 'Squash', 'FRCC indoor squash courts with glass back'),
+  basketball: GAME('basketball', 'Basketball', 'FRCC outdoor floodlit basketball court'),
 
   // =========================================================================
   // ROOMS — one slot per room type (mega-menu + section pages)

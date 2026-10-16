@@ -6,6 +6,7 @@ import { PhotoCard } from '../ui/explore.jsx';
 import { cx, initialsOf } from '../../utils/helpers.js';
 import { SITE_INFO, getAddressLines, getActiveSocialLinks } from '../../config/siteInfo.js';
 import { MEMBER_PROMO_NOTE } from '../../config/pricing.js';
+import { diningLabel } from '../../config/site.js';
 import { NAV_MENUS } from '../../config/navMenus.js';
 import {
   UserIcon,
@@ -89,6 +90,7 @@ function OutlineCta({ to, size = 'sm', className, onClick, state, children }) {
 // Footer service list (label + link only).
 const SERVICES = [
   { to: '/stay', label: 'Stay' },
+  { to: '/dining', label: diningLabel },
   { to: '/halls', label: 'Halls' },
   { to: '/activities', label: 'Activities' },
   { to: '/parking', label: 'Parking' },
@@ -99,6 +101,7 @@ const SERVICES = [
 // Primary service links (plain links, no mega-menus)
 const MENU_LINKS = [
   { key: 'stay', label: 'Stay', to: '/stay' },
+  { key: 'dining', label: diningLabel, to: '/dining' },
   { key: 'hall', label: 'Halls', to: '/halls' },
   { key: 'activities', label: 'Activities', to: '/activities' },
   { key: 'parking', label: 'Parking', to: '/parking' },
@@ -326,7 +329,13 @@ export function Navbar() {
           </div>
           {/* Member offer — read from /config/pricing.js, so the % is never
               restated here and always matches the real discount. */}
-          {MEMBER_PROMO_NOTE && <p className="text-gold-400">{MEMBER_PROMO_NOTE}</p>}
+          <div className="flex items-center gap-4">
+            {MEMBER_PROMO_NOTE && <p className="text-gold-400">{MEMBER_PROMO_NOTE}</p>}
+            <div className="flex items-center gap-3 border-l border-white/20 pl-3">
+              <NavLink to="/gallery" className="transition-colors duration-150 hover:text-gold-400">Gallery</NavLink>
+              <NavLink to="/leadership" className="transition-colors duration-150 hover:text-gold-400">Leadership</NavLink>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -338,12 +347,11 @@ export function Navbar() {
           {/* Centre · the primary links */}
           <nav className="hidden items-center justify-center gap-0.5 text-[13px] font-medium min-[1200px]:flex" aria-label="Primary">
             <NavLink to="/stay" className={navLink}>Stay</NavLink>
+            <NavLink to="/dining" className={navLink}>{diningLabel}</NavLink>
             <NavLink to="/halls" className={navLink}>Halls</NavLink>
             <NavLink to="/activities" className={navLink}>Activities</NavLink>
             <NavLink to="/parking" className={navLink}>Parking</NavLink>
             <NavLink to="/membership" className={navLink}>Membership</NavLink>
-            <NavLink to="/gallery" className={navLink}>Gallery</NavLink>
-            <NavLink to="/leadership" className={navLink}>Leadership</NavLink>
           </nav>
 
           {/* Right · account + the gold booking CTA */}
@@ -402,6 +410,11 @@ export function Navbar() {
                 <li>
                   <NavLink to="/stay" onClick={closeAll} className={mobileRowActive}>
                     Stay
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/dining" onClick={closeAll} className={mobileRowActive}>
+                    {diningLabel}
                   </NavLink>
                 </li>
                 <li>

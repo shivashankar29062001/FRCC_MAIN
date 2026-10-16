@@ -6,9 +6,9 @@
 // real routes/URLs those teams ship (e.g. "https://booking.frcc.club/hotel").
 // ---------------------------------------------------------------------------
 
-export const HOTEL_BOOKING_URL = '#';
-export const HALL_BOOKING_URL = '#';
-export const PARKING_BOOKING_URL = '#';
+export const HOTEL_BOOKING_URL = '/book/hotel';
+export const HALL_BOOKING_URL = '/halls/book';
+export const PARKING_BOOKING_URL = '/parking/book';
 export const ACTIVITIES_BOOKING_URL = '/book/activities/process';
 export const MEMBERSHIP_URL = '/membership';
 

@@ -13,6 +13,7 @@ import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
 import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
 import { games as activityGames } from '../data/activities.js';
 import { formatInr } from '../utils/pricing.js';
+import { HALL_BOOKING_URL, PARKING_BOOKING_URL } from '../config/redirects.js';
 import {
   plans as membershipPlans,
   BENEFITS_DATA,
@@ -110,8 +111,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
           locationId: 'vja-halls',
           locationName: 'Vijayawada Campus · Convention Block',
-          buttonLabel: 'Select hall',
-          to: `/book/hall?item=${encodeURIComponent(h.id)}`,
+          buttonLabel: 'Book Hall',
+          to: HALL_BOOKING_URL,
         };
       });
     }
@@ -131,8 +132,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
         locationId: 'vja-parking',
         locationName: 'Vijayawada Campus · Automated Parking',
-        buttonLabel: 'Reserve parking',
-        to: `/book/parking?item=${encodeURIComponent(z.id)}`,
+        buttonLabel: 'Book Parking',
+        to: PARKING_BOOKING_URL,
       }));
     }
 

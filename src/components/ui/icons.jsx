@@ -71,6 +71,12 @@ export const MembershipIcon = makeIcon('MembershipIcon', (
 ));
 
 /* Arrows / chevrons */
+export const ArrowLeftIcon = makeIcon('ArrowLeftIcon', (
+  <>
+    <path d="M20 12H5" />
+    <path d="m11 18-6-6 6-6" />
+  </>
+));
 export const ArrowRightIcon = makeIcon('ArrowRightIcon', (
   <>
     <path d="M4 12h15" />

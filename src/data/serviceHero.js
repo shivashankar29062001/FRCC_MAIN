@@ -19,6 +19,19 @@ export const SERVICE_HERO_DATA = {
     linkTarget: '#content',
     statSuffix: 'on every stay',
   },
+  dining: {
+    eyebrow: 'FRCC DINING',
+    headline: 'Restaurants, lounges and cafes',
+    phrases: [
+      'Multi-cuisine family restaurant.',
+      'Artisan coffee and fresh bakes.',
+      'Evening lounge bar and pub.',
+      'Open-air rooftop grills.',
+    ],
+    linkText: 'Explore venues',
+    linkTarget: '#content',
+    statSuffix: 'on dining',
+  },
   hall: {
     eyebrow: 'CELEBRATIONS & EVENTS',
     headline: 'Grand spaces for grand days',

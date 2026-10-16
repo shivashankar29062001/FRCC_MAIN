@@ -9,8 +9,8 @@ import { LandingPage } from './pages/LandingPage.jsx';
 import { SignupPage, SigninPage } from './pages/AuthPages.jsx';
 import { HomeHubPage } from './pages/HomeHubPage.jsx';
 import { HotelPage } from './features/hotel/HotelPage.jsx';
-import { HallPage } from './features/hall/HallPage.jsx';
-import { ParkingPage } from './features/parking/ParkingPage.jsx';
+import { HallPage, HallBookingPage } from './features/hall/index.js';
+import { ParkingPage, ParkingBookingPage } from './features/parking/index.js';
 import { ActivitiesPage } from './features/activities/ActivitiesPage.jsx';
 import { ActivitiesProcessPage } from './features/activities/ActivitiesProcessPage.jsx';
 import { MembershipLandingPage } from './features/membership/MembershipPage.jsx';
@@ -21,6 +21,9 @@ import { MembershipDashboardPage } from './pages/MembershipDashboardPage.jsx';
 import { SupportPage } from './pages/SupportPage.jsx';
 import { GalleryPage } from './pages/GalleryPage.jsx';
 import { LeadershipPage } from './pages/LeadershipPage.jsx';
+import { DiningLandingPage } from './features/dining/DiningLandingPage.jsx';
+import { VenueMenuPage } from './features/dining/VenueMenuPage.jsx';
+import { TableBookingPage } from './features/dining/TableBookingPage.jsx';
 import { NotFoundPage, LogoutPage } from './pages/SystemPages.jsx';
 
 export default function App() {
@@ -38,13 +41,17 @@ export default function App() {
               <Route path="/home" element={<ProtectedRoute><HomeHubPage /></ProtectedRoute>} />
               <Route path="/book/hotel" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
               <Route path="/book/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
+              <Route path="/stay/book" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
               <Route path="/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
-              <Route path="/book/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/book/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
+              <Route path="/dining" element={<DiningLandingPage />} />
+              <Route path="/dining/:venueId" element={<VenueMenuPage />} />
+              <Route path="/dining/book" element={<TableBookingPage />} />
+              <Route path="/book/dining" element={<Navigate to="/dining/book" replace />} />
               <Route path="/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
               <Route path="/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/book/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
+              <Route path="/halls/book" element={<ProtectedRoute><HallBookingPage /></ProtectedRoute>} />
               <Route path="/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
+              <Route path="/parking/book" element={<ProtectedRoute><ParkingBookingPage /></ProtectedRoute>} />
               <Route path="/book/activities" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />
               <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
               <Route path="/book/activities/process" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />

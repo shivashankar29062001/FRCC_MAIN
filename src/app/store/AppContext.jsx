@@ -1,19 +1,19 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { readSession, writeSession, clearSession, createSessionUser, setLoggedOutMarker, clearLoggedOutMarker } from '../session.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { readSession, writeSession, clearSession, setLoggedOutMarker, clearLoggedOutMarker } from '../session.js';
+import { supabase } from '../../services/supabase.js';
+import * as authService from '../../services/authService.js';
+import * as bookingsService from '../../services/bookingsService.js';
+import * as membershipService from '../../services/membershipService.js';
+import * as notificationsService from '../../services/notificationsService.js';
 
 // ---------------------------------------------------------------------------
-// Global state: session (login + user id), bookings, payments,
+// Global state: Supabase session, bookings, payments,
 // membership, toasts, notifications.
-// Session logic lives in ../session.js so other teams can share it.
 // ---------------------------------------------------------------------------
 const AppContext = createContext(null);
 
-let seq = 1000;
 export function newId(prefix = 'FRCC') {
-  seq += 1;
-  const d = new Date();
-  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  return `${prefix}-${ymd}-${seq}`;
+  return bookingsService.generateBookingId(prefix);
 }
 
 const seedNotifications = [
@@ -21,9 +21,8 @@ const seedNotifications = [
   { id: 'n2', title: 'Weekend gala', body: 'Convention Hall open house this Saturday.', date: 'Yesterday' },
 ];
 
-const IS_DEMO_MODE = typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true';
-const MEMBER_FLAG_KEY = 'frcc.isMember.v1';
 export const MEMBERSHIP_STORAGE_KEY = 'frcc.membership.v1';
+export const MEMBER_FLAG_KEY = 'frcc.isMember.v1';
 
 function readStoredMembership() {
   try {
@@ -34,32 +33,109 @@ function readStoredMembership() {
   }
 }
 
-function readMemberFlag() {
-  try {
-    const saved = window.localStorage.getItem(MEMBER_FLAG_KEY);
-    if (saved !== null) return saved === '1';
-    return IS_DEMO_MODE;
-  } catch {
-    return IS_DEMO_MODE;
-  }
-}
-
 export function AppProvider({ children }) {
-  // null = logged out (ProtectedRoute checks truthiness), otherwise the session shape.
   const [user, setUser] = useState(() => {
     const s = readSession();
     return s.loggedIn ? s : null;
   });
-  const [bookings, setBookings] = useState([]); // { id, type, title, date, amount, status, details }
-  const [payments, setPayments] = useState([]); // { id, bookingId, method, amount, date, status }
-  // Membership data — filled by the membership team's module and persisted in localStorage.
+
+  const [bookings, setBookings] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [membership, setMembership] = useState(() => readStoredMembership());
-  // isMember drives /membership/dashboard (active vs locked) and the navbar Member badge.
   const [isMember, setIsMemberState] = useState(() => {
     const stored = readStoredMembership();
     if (stored && stored.memberId) return true;
-    return user?.isMember !== undefined ? Boolean(user.isMember) : readMemberFlag();
+    return Boolean(user?.isMember);
   });
+  const [toasts, setToasts] = useState([]);
+  const [notifications, setNotifications] = useState(seedNotifications);
+
+  const pushToast = useCallback((message, kind = 'success') => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((t) => [...t, { id, message, kind }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+  }, []);
+
+  // Fetch full user data from Supabase
+  const hydrateUserData = useCallback(async (supabaseUser) => {
+    if (!supabaseUser) return;
+    try {
+      const [profile, memberData, remoteBookings, remotePayments, remoteNotifs] = await Promise.all([
+        authService.getUserProfile(supabaseUser.id),
+        membershipService.getUserMembership(supabaseUser.id),
+        bookingsService.getUserBookings(supabaseUser.id),
+        bookingsService.getUserPayments(supabaseUser.id),
+        notificationsService.getNotifications(supabaseUser.id),
+      ]);
+
+      const memberStatus = Boolean(profile?.is_member || (memberData && memberData.status === 'Active'));
+
+      const sessionObj = {
+        id: supabaseUser.id,
+        userId: profile?.user_id_code || `FRCC-U-${supabaseUser.id.substring(0, 6).toUpperCase()}`,
+        name: profile?.name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Member',
+        emailOrPhone: profile?.email || supabaseUser.email || profile?.phone || '',
+        phone: profile?.phone || supabaseUser.user_metadata?.phone || '',
+        isMember: memberStatus,
+        loggedIn: true,
+      };
+
+      setUser(sessionObj);
+      writeSession(sessionObj);
+      setIsMemberState(memberStatus);
+
+      if (memberData) {
+        setMembership(memberData);
+        try {
+          window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(memberData));
+          window.localStorage.setItem(MEMBER_FLAG_KEY, memberStatus ? '1' : '0');
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (remoteBookings.length > 0) setBookings(remoteBookings);
+      if (remotePayments.length > 0) setPayments(remotePayments);
+      if (remoteNotifs.length > 0) {
+        setNotifications(
+          remoteNotifs.map((n) => ({
+            id: n.id,
+            title: n.title,
+            body: n.body,
+            type: n.type,
+            date: new Date(n.created_at).toLocaleDateString(),
+          }))
+        );
+      }
+    } catch (err) {
+      console.warn('Hydrate user data error:', err);
+    }
+  }, []);
+
+  // Listen to Supabase Auth state changes
+  useEffect(() => {
+    const { data: authListener } = authService.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await hydrateUserData(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        clearSession();
+        setUser(null);
+        setMembership(null);
+        setIsMemberState(false);
+      }
+    });
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        hydrateUserData(session.user);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [hydrateUserData]);
 
   const setIsMember = useCallback((next) => {
     setIsMemberState((prev) => {
@@ -75,92 +151,86 @@ export function AppProvider({ children }) {
         writeSession(updated);
         return updated;
       });
-      // Keep membership in sync so both dashboard views are testable.
-      // TODO(Phase 2): replace with GET /api/membership/me.
-      setMembership((m) => {
-        if (!value) {
-          try {
-            window.localStorage.removeItem(MEMBERSHIP_STORAGE_KEY);
-          } catch {
-            /* ignore */
-          }
-          return null;
-        }
-        return m || readStoredMembership() || { memberId: 'FRCC-2026-000042', planName: 'Gold Lifetime', name: 'Member', createdAt: '2026-01-01T00:00:00.000Z' };
-      });
       return value;
     });
   }, []);
-  const [toasts, setToasts] = useState([]);
-  const [notifications] = useState(seedNotifications);
 
-  const pushToast = useCallback((message, kind = 'success') => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((t) => [...t, { id, message, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
+  const login = useCallback(async ({ emailOrPhone, password }) => {
+    clearLoggedOutMarker();
+    const { user: authUser } = await authService.signIn({ emailOrPhone, password });
+    if (authUser) {
+      await hydrateUserData(authUser);
+    }
+    return authUser;
+  }, [hydrateUserData]);
+
+  const signup = useCallback(async ({ name, emailOrPhone, password }) => {
+    const { user: authUser } = await authService.signUp({ name, emailOrPhone, password });
+    return authUser;
   }, []);
 
-  const login = useCallback((payload) => {
-    // TODO: POST /api/auth/login → verify credentials → issue session.
-    const memberFlag = payload.isMember !== undefined ? Boolean(payload.isMember) : readMemberFlag();
-    const next = createSessionUser({ ...payload, isMember: memberFlag });
-    writeSession(next);
-    clearLoggedOutMarker(); // clear logout marker on successful login
-    setUser(next);
-    setIsMemberState(memberFlag);
-    return next;
-  }, []);
-
-  const signup = useCallback((payload) => {
-    // TODO: POST /api/auth/signup with Name / Mail-Mobile / password hash + OTP.
-    return createSessionUser(payload);
-  }, []);
-
-  const logout = useCallback(() => {
-    // TODO: POST /api/auth/logout → revoke server session.
+  const logout = useCallback(async () => {
+    try {
+      await authService.signOut();
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    }
     clearSession();
-    setLoggedOutMarker(); // prevent demo auto-login until next sign-in
+    setLoggedOutMarker();
     try {
       window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
     } catch {
       /* ignore */
     }
     setUser(null);
+    setMembership(null);
+    setIsMemberState(false);
   }, []);
 
-  const addBooking = useCallback((booking) => {
-    const id = booking.id || newId('FRCC');
-    const record = { ...booking, id, status: booking.status || 'Confirmed', createdAt: new Date().toISOString() };
+  const addBooking = useCallback(async (booking) => {
+    const bookingId = booking.id || booking.bookingId || newId('FRCC');
+    const record = { ...booking, bookingId, id: bookingId, status: booking.status || 'Confirmed' };
+
     setBookings((b) => [record, ...b]);
+
+    let payRecord = null;
     if (booking.payment) {
-      setPayments((p) => [
-        { id: newId('PAY'), bookingId: id, method: booking.payment.method, amount: booking.payment.amount ?? 0, date: new Date().toLocaleString(), status: 'Success' },
-        ...p,
-      ]);
+      payRecord = {
+        id: bookingsService.generatePaymentId(),
+        bookingId,
+        method: booking.payment.method,
+        amount: booking.payment.amount ?? 0,
+        status: 'Success',
+      };
+      setPayments((p) => [payRecord, ...p]);
     }
+
+    try {
+      await bookingsService.createBooking(record, payRecord);
+    } catch (err) {
+      console.warn('Error saving booking to Supabase:', err);
+    }
+
     return record;
   }, []);
 
-  // Integration point for the membership team's module.
-  const saveMembership = useCallback((m) => {
-    // TODO: called by GET/POST /api/membership once backend API lands.
-    // Store only allowed fields: {memberId, name, mobile, email, planName, createdAt}
+  const saveMembership = useCallback(async (m) => {
     if (m) {
+      const memberId = m.memberId || membershipService.generateMemberId();
       const sanitized = {
-        memberId: m.memberId,
+        memberId,
         name: m.name,
         mobile: m.mobile,
         email: m.email,
         planName: m.planName,
+        planPrice: m.planPrice ?? 0,
+        amountPaid: m.amountPaid ?? m.planPrice ?? 0, // TODO-REMOVE-TEST-COUPON
+        paymentMethod: m.paymentMethod || 'upi', // TODO-REMOVE-TEST-COUPON
+        couponCode: m.couponCode || null, // TODO-REMOVE-TEST-COUPON
+        isTest: Boolean(m.isTest), // TODO-REMOVE-TEST-COUPON
         createdAt: m.createdAt || new Date().toISOString(),
       };
       setMembership(sanitized);
-      try {
-        window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(sanitized));
-        window.localStorage.setItem(MEMBER_FLAG_KEY, '1');
-      } catch {
-        /* ignore */
-      }
       setIsMemberState(true);
       setUser((curr) => {
         if (!curr) return curr;
@@ -168,15 +238,35 @@ export function AppProvider({ children }) {
         writeSession(updated);
         return updated;
       });
+
+      try {
+        window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(sanitized));
+        window.localStorage.setItem(MEMBER_FLAG_KEY, '1');
+      } catch {
+        /* ignore */
+      }
+
+      // Save to database and return result; do not swallow errors so callers can display feedback
+      const saved = await membershipService.saveUserMembership(sanitized);
+      return saved;
     } else {
       setMembership(null);
+      setIsMemberState(false);
       try {
         window.localStorage.removeItem(MEMBERSHIP_STORAGE_KEY);
+        window.localStorage.removeItem(MEMBER_FLAG_KEY);
       } catch {
         /* ignore */
       }
     }
   }, []);
+
+  const refreshUserData = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await hydrateUserData(session.user);
+    }
+  }, [hydrateUserData]);
 
   const value = useMemo(
     () => ({
@@ -196,8 +286,9 @@ export function AppProvider({ children }) {
       toasts,
       pushToast,
       notifications,
+      refreshUserData,
     }),
-    [user, login, signup, logout, bookings, payments, membership, isMember, setIsMember, saveMembership, addBooking, toasts, pushToast, notifications],
+    [user, login, signup, logout, bookings, payments, membership, isMember, setIsMember, saveMembership, addBooking, toasts, pushToast, notifications, refreshUserData],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

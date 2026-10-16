@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
+import { HeroSlider } from '../components/HeroSlider.jsx';
 import { PhotoTile, FilterRow, SectionLink, ExperienceSection } from '../components/ui/explore.jsx';
 import { Lightbox } from '../components/ui/lightbox.jsx';
 import { IMAGES } from '../config/images.js';
@@ -100,7 +101,7 @@ export function LandingPage() {
     <div>
       {/* 1 · HERO */}
       <div className="landing-hero-wrap">
-        <HeroImage slot="hero-home">
+        <HeroSlider slotsKey="home">
           <div className="landing-hero-overlay" aria-hidden="true" />
           <div className="container-x relative z-10 h-full flex items-center">
             <div className="landing-hero-text max-w-[520px] text-white">
@@ -164,7 +165,7 @@ export function LandingPage() {
 
             </div>
           </div>
-        </HeroImage>
+        </HeroSlider>
 
         {/* 1b · BOOKING CARD */}
         <div id="booking" className="landing-hero-card-wrap scroll-mt-24">
