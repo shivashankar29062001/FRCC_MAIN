@@ -124,6 +124,29 @@ export const OFFERS_DATA = {
       link: '/membership#booking',
     },
   ],
+  dining: [
+    {
+      id: 'dining-member-discount',
+      title: `${MEMBER_DISCOUNT_PERCENT}% Member Dining Privilege`,
+      line: 'Exclusive member savings across all campus restaurants, cafes and bars.',
+      imageSlot: 'dining-restaurant',
+      link: '/dining/book',
+    },
+    {
+      id: 'dining-weekend-buffet',
+      title: 'Chef Special Weekend Brunch',
+      line: 'Lavish multi-cuisine spreads with live counters and outdoor terrace seating.',
+      imageSlot: 'dining-coffee-shop',
+      link: '/dining/book',
+    },
+    {
+      id: 'dining-rooftop-grill',
+      title: 'Sunset Rooftop Grills & Sizzlers',
+      line: 'Evening open-air dining with scenic panoramic views and artisan cocktails.',
+      imageSlot: 'dining-rooftop-restaurant',
+      link: '/dining/book',
+    },
+  ],
 };
 
 export default OFFERS_DATA;

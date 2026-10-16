@@ -251,6 +251,22 @@ export function HotelPage() {
     return displayRooms.find((r) => r.id === draft.selectedRoomId) || displayRooms[0] || ALL_ROOMS[0];
   }, [displayRooms, draft.selectedRoomId]);
 
+  // Step 3 Filtered Rooms
+  const filteredStep3Rooms = useMemo(() => {
+    if (categoryFilter === 'all') return displayRooms;
+    return displayRooms.filter((r) => {
+      const cat = (r.category || '').toLowerCase();
+      const name = (r.name || '').toLowerCase();
+      if (categoryFilter === 'suite') {
+        return cat.includes('suite') || name.includes('suite');
+      }
+      if (categoryFilter === 'normal') {
+        return !cat.includes('suite') && !name.includes('suite');
+      }
+      return true;
+    });
+  }, [displayRooms, categoryFilter]);
+
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [showCouponInput, setShowCouponInput] = useState(false);
@@ -878,7 +894,17 @@ export function HotelPage() {
         )}
 
         {/* Step 3: Choose Room */}
-        {step === 2 && (
+        {step === 2 && (!draft.checkin || !draft.checkout || !isStep1Valid ? (
+          <Card className="text-center p-8">
+            <h2 className="font-display text-xl font-bold text-navy-900">Dates or room details missing</h2>
+            <p className="mt-2 text-sm text-slate-600">Please choose your check-in and check-out dates to continue.</p>
+            <div className="mt-6 flex justify-center">
+              <Button variant="primary" onClick={() => setStep(0)}>
+                Back to step 1
+              </Button>
+            </div>
+          </Card>
+        ) : (
           <Card>
             <p className="eyebrow">Step 3 · Choose Room</p>
             <h2 className="h-sub mt-1">Available rooms for your stay</h2>
@@ -1036,7 +1062,7 @@ export function HotelPage() {
               </Button>
             </div>
           </Card>
-        )}
+        ))}
 
         {/* Step 4: Guest Details */}
         {step === 3 && (

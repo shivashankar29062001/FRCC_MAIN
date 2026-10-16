@@ -66,6 +66,7 @@ export function localFor(slot) {
 
 export const OBJECT_POSITIONS = {
   'hero-home': 'center 45%',
+  'hero-dining': 'center 45%',
   'hero-halls': 'center 40%',
   'hero-stay': 'center 55%',
   'hero-parking': 'center 55%',
@@ -82,6 +83,12 @@ export function getObjectPosition(slot) {
 export const REMOTE = {
   'hero-home': 'https://images.unsplash.com/photo-1728051104503-e1a4a19d638c?w=2400&q=80&auto=format&fit=crop',
   'hero-stay': 'https://images.unsplash.com/photo-1762245308715-b721cf3267b6?w=2400&q=80&auto=format&fit=crop',
+  'hero-dining': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=2400&q=80&auto=format&fit=crop',
+  'dining-restaurant': 'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=1600&q=80&auto=format&fit=crop',
+  'dining-coffee-shop': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1600&q=80&auto=format&fit=crop',
+  'dining-pub': 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1600&q=80&auto=format&fit=crop',
+  'dining-lounge-bar': 'https://images.unsplash.com/photo-1572116469696-31de0f17cc34?w=1600&q=80&auto=format&fit=crop',
+  'dining-rooftop-restaurant': 'https://images.unsplash.com/photo-1537047902294-62a40c20a6ae?w=1600&q=80&auto=format&fit=crop',
   'hero-halls': 'https://images.unsplash.com/photo-1783314867628-220ab03cac99?w=2400&q=80&auto=format&fit=crop',
   'hero-activities': 'https://images.unsplash.com/photo-1775993167284-8e6a6e56ab69?w=2400&q=80&auto=format&fit=crop',
   'hero-parking': 'https://images.unsplash.com/photo-1762599107107-14b8f4608011?w=2400&q=80&auto=format&fit=crop',
@@ -212,6 +219,7 @@ export const REMOTE = {
 };
 
 export const FALLBACK = {
+  'hero-dining': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=2400&q=80&auto=format&fit=crop',
   'hero-home-2': REMOTE.exploreHotel,
   'hero-home-3': REMOTE.exploreHall,
   'hero-home-4': REMOTE.exploreCourts,

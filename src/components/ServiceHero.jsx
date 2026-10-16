@@ -1,16 +1,95 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { HeroImage } from './HeroImage.jsx';
 import { HeroSlider } from './HeroSlider.jsx';
 import { BookingCard } from './BookingPanel.jsx';
 import { TypeWriter } from './TypeWriter.jsx';
 import { SmartImage } from './ui/media.jsx';
-import { ArrowRightIcon } from './ui/icons.jsx';
+import { ArrowRightIcon, CalendarIcon, UsersIcon } from './ui/icons.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { SERVICE_HERO_DATA } from '../data/serviceHero.js';
 import { OFFERS_DATA } from '../data/offers.js';
 import { IMAGES, heroSrc } from '../config/images.js';
 import { HERO_CARD } from '../data/membership.js';
+import { venues } from '../data/dining.js';
+import { todayISO } from '../utils/helpers.js';
+import { formatDMY } from '../utils/dates.js';
+
+function DiningHeroCard() {
+  const navigate = useNavigate();
+  const [venue, setVenue] = useState('restaurant');
+  const [date, setDate] = useState(() => formatDMY(todayISO()));
+  const [guests, setGuests] = useState('2');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (venue) params.set('venue', venue);
+    if (date) params.set('date', date);
+    if (guests) params.set('guests', guests);
+    navigate(`/dining/book?${params.toString()}`);
+  }
+
+  return (
+    <div className="booking-card booking-card--compact">
+      <p className="booking-eyebrow">TABLE RESERVATION</p>
+      <h2 className="booking-title font-display">Reserve your table</h2>
+      <p className="mt-1 text-xs text-slate-300">Reserve a table at any of our campus dining venues</p>
+      <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
+        <div>
+          <label htmlFor="hero-dining-venue" className="booking-label">Venue</label>
+          <select
+            id="hero-dining-venue"
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
+            className="booking-field w-full text-sm"
+          >
+            {venues.map((v) => (
+              <option key={v.id} value={v.id} className="text-navy-950 bg-white">
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="hero-dining-date" className="booking-label">Date (DD/MM/YYYY)</label>
+            <input
+              id="hero-dining-date"
+              type="text"
+              placeholder="DD/MM/YYYY"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="booking-field w-full text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="hero-dining-guests" className="booking-label">Guests</label>
+            <select
+              id="hero-dining-guests"
+              value={guests}
+              onChange={(e) => setGuests(e.target.value)}
+              className="booking-field w-full text-sm"
+            >
+              {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((g) => (
+                <option key={g} value={String(g)} className="text-navy-950 bg-white">
+                  {g} {g === 1 ? 'Guest' : 'Guests'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <button
+          type="submit"
+          className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 mt-1 transition"
+        >
+          <span>Find a table</span>
+          <ArrowRightIcon className="h-4 w-4" />
+        </button>
+      </form>
+    </div>
+  );
+}
 
 function getSlot(service) {
   if (service === 'hall') return 'hero-halls';
@@ -112,6 +191,8 @@ export function ServiceHero({ service = 'stay' }) {
                 </Link>
               </div>
             </div>
+          ) : service === 'dining' ? (
+            <DiningHeroCard />
           ) : (
             <BookingCard compact service={isHub ? null : service} />
           )}
