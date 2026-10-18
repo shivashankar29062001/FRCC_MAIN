@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../store/AppContext.jsx';
-import { XIcon } from '../components/ui/icons.jsx';
+import { XIcon } from '../../components/ui/icons.jsx';
 
 const AuthModalContext = createContext(null);
 
