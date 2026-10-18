@@ -3,8 +3,10 @@
 // Powering Stay, Halls, Parking, Activities, and Membership landing pages.
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
 import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
@@ -47,6 +49,24 @@ const ALL_EXPLORE_LINKS = [
 ];
 
 export function ServiceLanding({ service = 'stay', hero }) {
+  const { user } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (location.state?.authPrompt && location.state?.from && !user) {
+      openAuthPrompt(location.state.from);
+    }
+  }, [location.state, user, openAuthPrompt]);
+
+  function handleActionClick(e, to) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(to);
+    }
+  }
+
   // Normalize service key ('hotel' -> 'stay', 'hall' -> 'halls')
   const normService = service === 'hotel' ? 'stay' : service === 'hall' ? 'halls' : service;
   const heroService = normService === 'halls' ? 'hall' : normService;
@@ -405,6 +425,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
                   <div className="mt-5 pt-1">
                     <Link
                       to={item.to}
+                      onClick={(e) => handleActionClick(e, item.to)}
                       className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
                     >
                       {item.buttonLabel}
@@ -498,6 +519,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
               <div className="mt-8 flex justify-center">
                 <Link
                   to={FINAL_STRIP.buttonLink}
+                  onClick={(e) => handleActionClick(e, FINAL_STRIP.buttonLink)}
                   className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-3.5 text-base font-semibold inline-flex items-center gap-2"
                 >
                   {FINAL_STRIP.buttonText}

@@ -5,6 +5,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
+import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
 import { ServiceHero } from '../../components/ServiceHero.jsx';
 import { FlowShell } from '../../components/FlowShell.jsx';
 import { Card } from '../../components/ui/feedback.jsx';
@@ -62,6 +63,20 @@ export function HotelPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, isMember, pushToast, addBooking } = useApp();
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (location.state?.authPrompt && location.state?.from && !user) {
+      openAuthPrompt(location.state.from);
+    }
+  }, [location.state, user, openAuthPrompt]);
+
+  function handleSelectRoom(e, targetUrl) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(targetUrl);
+    }
+  }
 
   const isBookingFlow = location.pathname.startsWith('/book/') || location.pathname === '/stay/book';
 
@@ -680,6 +695,7 @@ export function HotelPage() {
                     </div>
                     <Link
                       to={`/book/hotel?item=${encodeURIComponent(room.id)}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`}
+                      onClick={(e) => handleSelectRoom(e, `/book/hotel?item=${encodeURIComponent(room.id)}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`)}
                       className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 font-semibold px-4 py-2 text-xs rounded-xl transition shadow-sm inline-flex items-center justify-center"
                     >
                       Select room

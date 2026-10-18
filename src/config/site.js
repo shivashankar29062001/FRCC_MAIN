@@ -18,6 +18,7 @@ export const memberDiscountPercent = 30; // 30% discount on every booking
 export const healthCardDiscountPercent = 30; // 30% discount at selected diagnostic centres
 export const memberPromoNote = MEMBER_PROMO_NOTE;
 export const diningLabel = 'Dining';
+export const requireSignIn = 'booking'; // 'booking' | 'services'
 
 // Registered office address
 export const address = 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003';
@@ -79,6 +80,7 @@ export const siteConfig = {
   healthCardDiscountPercent,
   memberPromoNote,
   diningLabel,
+  requireSignIn,
   whatsappTarget,
   club,
   autoRedirectToWhatsApp,

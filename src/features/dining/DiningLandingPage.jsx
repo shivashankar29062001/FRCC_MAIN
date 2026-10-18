@@ -2,8 +2,10 @@
 // /src/features/dining/DiningLandingPage.jsx — Public Dining Landing Page
 // ---------------------------------------------------------------------------
 
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from '../../app/store/AppContext.jsx';
+import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
 import { ServiceHero } from '../../components/ServiceHero.jsx';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { IMAGES } from '../../config/images.js';
@@ -21,7 +23,16 @@ const FILTERS = [
 
 export function DiningLandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const [filter, setFilter] = useState('all');
+
+  useEffect(() => {
+    if (location.state?.authPrompt && location.state?.from && !user) {
+      openAuthPrompt(location.state.from);
+    }
+  }, [location.state, user, openAuthPrompt]);
 
   // Book a table bar state
   const [barVenue, setBarVenue] = useState('restaurant');
@@ -34,7 +45,19 @@ export function DiningLandingPage() {
     if (barVenue) params.set('venue', barVenue);
     if (barDate) params.set('date', barDate);
     if (barGuests) params.set('guests', barGuests);
-    navigate(`/dining/book?${params.toString()}`);
+    const targetUrl = `/dining/book?${params.toString()}`;
+    if (!user) {
+      openAuthPrompt(targetUrl);
+      return;
+    }
+    navigate(targetUrl);
+  }
+
+  function handleBookTableClick(e, targetUrl) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(targetUrl);
+    }
   }
 
   const filteredVenues = venues.filter((v) => {
@@ -198,6 +221,7 @@ export function DiningLandingPage() {
                   </Link>
                   <Link
                     to={`/dining/book?venue=${v.id}`}
+                    onClick={(e) => handleBookTableClick(e, `/dining/book?venue=${v.id}`)}
                     className="btn-base flex-1 justify-center py-2 text-xs font-semibold bg-gold-500 text-navy-950 hover:bg-gold-400 cursor-pointer"
                   >
                     Book a table

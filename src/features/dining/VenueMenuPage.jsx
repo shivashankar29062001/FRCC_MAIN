@@ -4,6 +4,8 @@
 
 import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
+import { useApp } from '../../app/store/AppContext.jsx';
+import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
 import { venues, samplePrices } from '../../data/dining.js';
 import { IMAGES } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
@@ -45,8 +47,17 @@ function VegIndicator({ veg }) {
 export function VenueMenuPage() {
   const { venueId } = useParams();
   const venue = venues.find((v) => v.id === venueId);
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
 
   const [activeCategory, setActiveCategory] = useState(() => venue?.menu?.[0]?.category || '');
+
+  function handleBookTable(e, targetUrl) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(targetUrl);
+    }
+  }
 
   if (!venue) {
     return <Navigate to="/dining" replace />;
@@ -112,6 +123,7 @@ export function VenueMenuPage() {
 
             <Link
               to={`/dining/book?venue=${venue.id}`}
+              onClick={(e) => handleBookTable(e, `/dining/book?venue=${venue.id}`)}
               className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-6 py-2.5 font-semibold text-sm hidden sm:inline-flex"
             >
               Book a table
@@ -197,6 +209,7 @@ export function VenueMenuPage() {
           </div>
           <Link
             to={`/dining/book?venue=${venue.id}`}
+            onClick={(e) => handleBookTable(e, `/dining/book?venue=${venue.id}`)}
             className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-6 py-2.5 font-bold text-sm shrink-0 cursor-pointer"
           >
             Book a table

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
@@ -40,10 +41,8 @@ const ACTIVITY_TABS = [
   { value: 'water', label: GAME_CATEGORIES.water },
 ];
 
-const GAMES_URL = getRedirect('activities');
 function gameHref(gameId) {
-  if (isPlaceholder(GAMES_URL)) return '/book/activities';
-  return `${GAMES_URL}?game=${encodeURIComponent(gameId)}`;
+  return `/activities?game=${encodeURIComponent(gameId)}`;
 }
 
 // 3d · Campus life gallery — 8 photos
@@ -78,7 +77,13 @@ export function LandingPage() {
 
   // ProtectedRoute lands logged-out visitors here with state.from
   const pendingFrom = typeof state?.from === 'string' ? state.from : null;
-  // signinState forwarded via navbar; kept here only if a local sign-in link is added.
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (state?.authPrompt && pendingFrom) {
+      openAuthPrompt(pendingFrom);
+    }
+  }, [state?.authPrompt, pendingFrom, openAuthPrompt]);
 
   // Deep links jump straight to section — instant, no smooth scroll
   useEffect(() => {
