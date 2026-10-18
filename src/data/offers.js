@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 
 export const OFFERS_DATA = {
   stay: [
@@ -118,7 +119,7 @@ export const OFFERS_DATA = {
     },
     {
       id: 'membership-health-card',
-      title: '20% Diagnostic Centre Discount',
+      title: `${healthCardDiscountPercent}% Diagnostic Centre Discount`,
       line: 'Health card savings at selected diagnostic centres sent to WhatsApp.',
       imageSlot: 'galleryLounge',
       link: '/membership#booking',

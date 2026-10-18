@@ -15,7 +15,7 @@ export const whatsappTarget = 'member'; // 'member' | 'club'
 export const autoRedirectToWhatsApp = false;
 
 export const memberDiscountPercent = 30; // 30% discount on every booking
-export const healthCardDiscountPercent = 20; // 20% discount at selected diagnostic centres
+export const healthCardDiscountPercent = 30; // 30% discount at selected diagnostic centres
 export const memberPromoNote = MEMBER_PROMO_NOTE;
 export const diningLabel = 'Dining';
 

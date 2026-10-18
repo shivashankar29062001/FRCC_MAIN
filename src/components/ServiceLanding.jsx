@@ -14,6 +14,7 @@ import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js
 import { games as activityGames } from '../data/activities.js';
 import { formatInr } from '../utils/pricing.js';
 import { HALL_BOOKING_URL, PARKING_BOOKING_URL } from '../config/redirects.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 import {
   plans as membershipPlans,
   BENEFITS_DATA,
@@ -181,7 +182,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         image: IMAGES[p.imageSlot] || IMAGES.serviceMembership,
         facts: p.benefits || [
           '30% discount on every booking',
-          'Health card: 20% discount at collaborating diagnostic centres',
+          `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
           'Membership ID card and Health card',
         ],
         priceDisplay: formatInr(p.price || p.amount),

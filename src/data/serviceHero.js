@@ -3,7 +3,7 @@
 // Facts drawn exclusively from verified campus entities (rooms, venues, etc.)
 // ---------------------------------------------------------------------------
 
-import { name, shortName, tagline } from '../config/site.js';
+import { name, shortName, tagline, healthCardDiscountPercent } from '../config/site.js';
 
 export const SERVICE_HERO_DATA = {
   stay: {
@@ -76,7 +76,7 @@ export const SERVICE_HERO_DATA = {
     headline: 'Belong for a lifetime',
     phrases: [
       '30% discount on every booking.',
-      'Health card: 20% discount.',
+      `Health card: ${healthCardDiscountPercent}% discount.`,
       'One card across the campus.',
       'ID & Health card on WhatsApp.',
     ],

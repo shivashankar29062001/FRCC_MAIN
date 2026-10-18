@@ -399,7 +399,7 @@ export function MembershipIdCard({
 /**
  * 2. <HealthCard />
  * Title "FRCC Health Card", name, member ID, "Lifetime",
- * line "20% discount at collaborating diagnostic centres" (percent from site config),
+ * line "30% discount at collaborating diagnostic centres" (percent from site config),
  * and the healthCardNote from the data ("Discount valid only at diagnostic centres collaborating with FRCC.").
  * Show the centre list only when diagnosticCentres in the data is not empty.
  * 856x540 viewBox, Navy (#0b1a33) and Gold (#d4af55), FRCC emblem, no animations.
@@ -415,7 +415,7 @@ export function HealthCard({
   const name = member?.name || 'Member Name';
   const memberId = member?.memberId || 'FRCC-2026-000000';
   const plan = PLANS_DATA[0] || {};
-  const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 20;
+  const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 30;
   const healthCardNote = plan.healthCardNote || 'Discount valid only at diagnostic centres collaborating with FRCC.';
   const diagnosticCentres = Array.isArray(plan.diagnosticCentres) ? plan.diagnosticCentres : [];
 

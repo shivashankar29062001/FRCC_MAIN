@@ -5,6 +5,7 @@ import { Breadcrumbs } from '../components/ui/sections.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
 import { MEMBERSHIP_URL } from '../config/redirects.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 import {
   MembershipIdCard,
   HealthCard,
@@ -26,14 +27,14 @@ import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 
 const BENEFITS = [
   '30% discount on every booking (stay, halls, games, gym, pool)',
-  'FRCC Health Card: 20% discount at collaborating diagnostic centres',
+  `FRCC Health Card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
   'Complimentary parking privilege across all club visits',
   'Priority sports slots & pool access reserved for members',
 ];
 
 const OFFERS = [
   { title: '30% off every booking', desc: 'Member discount on luxury stay & event venues', tag: 'Rooms & Halls' },
-  { title: '20% off diagnostic centres', desc: 'Health card savings with authorized partner labs', tag: 'Health' },
+  { title: `${healthCardDiscountPercent}% off diagnostic centres`, desc: 'Health card savings with authorized partner labs', tag: 'Health' },
   { title: 'Priority sports slots', desc: 'Courts & swimming pool held exclusively for members', tag: 'Sports' },
 ];
 
@@ -154,7 +155,7 @@ export function MembershipDashboardPage() {
                   <span className="text-xs font-bold uppercase tracking-wider text-navy-900">
                     FRCC Health Card
                   </span>
-                  <span className="tag tag-gold !text-[11px]">20% Diagnostics Pass</span>
+                  <span className="tag tag-gold !text-[11px]">{healthCardDiscountPercent}% Diagnostics Pass</span>
                 </div>
                 <HealthCard id="frcc-health-card" member={membership} />
               </div>
