@@ -3,7 +3,7 @@
 // ONE Plan: FRCC Membership
 // ---------------------------------------------------------------------------
 
-import { healthCardDiscountPercent } from '../config/site.js';
+import { memberDiscountPercent, healthCardDiscountPercent } from '../config/site.js';
 
 export const HERO_CARD = {
   eyebrow: 'Membership',
@@ -31,13 +31,17 @@ export const plans = [
     amount: 100000,
     validity: 'lifetime',
     period: 'lifetime',
-    discountPercent: 30, // 30% discount on every booking
+    discountPercent: memberDiscountPercent, // 30% discount on every booking
     healthCardDiscountPercent, // 30% discount at collaborating diagnostic centres
     imageSlot: 'serviceMembership',
     benefits: [
-      '30% discount on every booking',
+      `${memberDiscountPercent}% discount on every booking`,
       `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
       'Membership ID card and Health card',
+      'Connect with film lovers',
+      'Build industry relationships',
+      'Experience the world of cinema',
+      'Be part of exclusive film and cultural activities',
     ],
     diagnosticCentres: [], // empty, list not provided yet
     healthCardNote: 'Discount valid only at diagnostic centres collaborating with FRCC.',

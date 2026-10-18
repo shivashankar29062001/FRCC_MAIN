@@ -24,6 +24,7 @@ import { LeadershipPage } from './pages/LeadershipPage.jsx';
 import { DiningLandingPage } from './features/dining/DiningLandingPage.jsx';
 import { VenueMenuPage } from './features/dining/VenueMenuPage.jsx';
 import { TableBookingPage } from './features/dining/TableBookingPage.jsx';
+import { EventsPage, EventDetailPage, AdminEventsPage } from './features/events/index.js';
 import { NotFoundPage, LogoutPage } from './pages/SystemPages.jsx';
 
 export default function App() {
@@ -56,6 +57,9 @@ export default function App() {
               <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
               <Route path="/book/activities/process" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />
               <Route path="/membership" element={<MembershipLandingPage />} />
+              <Route path="/events" element={<EventsPage />} />
+              <Route path="/events/:id" element={<EventDetailPage />} />
+              <Route path="/admin/events" element={<AdminEventsPage />} />
               <Route path="/gallery" element={<GalleryPage />} />
               <Route path="/leadership" element={<LeadershipPage />} />
               <Route path="/book/membership" element={<Navigate to="/membership" replace />} />

@@ -245,6 +245,23 @@ export const PrinterIcon = makeIcon('PrinterIcon', (
     <path d="M6 14h12v8H6z" />
   </>
 ));
+export const PlusIcon = makeIcon('PlusIcon', (
+  <>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </>
+));
+export const EditIcon = makeIcon('EditIcon', (
+  <>
+    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </>
+));
+export const TrashIcon = makeIcon('TrashIcon', (
+  <>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </>
+));
 export const RefreshCwIcon = makeIcon('RefreshCwIcon', (
   <>
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

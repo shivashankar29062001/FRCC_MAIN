@@ -228,6 +228,16 @@ export const FALLBACK = {
   'hero-hub-3': REMOTE.facilityRestaurant,
   'hero-hub-4': REMOTE.hallStage,
   'hero-hub-5': REMOTE.badminton,
+  // TODO-REPLACE-SQUASH-BASKETBALL-PHOTO
+  squash: REMOTE.badminton,
+  basketball: REMOTE.tennis,
+  'hero-events': REMOTE.membershipEvents || REMOTE.galleryEvent,
+  'event-short-film-screening-night': REMOTE.membershipEvents,
+  'event-classic-cinema-weekend': REMOTE.hallStage,
+  'event-filmmakers-and-artists-meetup': REMOTE.galleryLounge,
+  'event-acting-workshop': REMOTE.hallStage,
+  'event-script-reading-circle': REMOTE.galleryLounge,
+  'event-cultural-evening-music-and-dance': REMOTE.eventFestival,
 };
 
 export function heroSrc(slot) {
@@ -235,7 +245,7 @@ export function heroSrc(slot) {
 }
 
 /**
- * Create an image slot: local file wins, else the REMOTE fallback, else null.
+ * Create an image slot: local file wins, else the REMOTE fallback, else FALLBACK, else null.
  * @param {string} slot   unique slot id (localFor keyword)
  * @param {string} name   item name for the SmartImage fallback tile
  * @param {string} alt    meaningful alt text
@@ -244,7 +254,7 @@ export function heroSrc(slot) {
 const S = (slot, name, alt, extra = {}) => ({
   slot,
   name,
-  src: localFor(slot) || REMOTE[slot] || null,
+  src: localFor(slot) || REMOTE[slot] || FALLBACK[slot] || null,
   srcSet: '',
   alt,
   ...extra,
@@ -510,6 +520,19 @@ export const IMAGES = {
   exploreMoreParking: S('exploreMoreParking', 'Parking', 'FRCC well-lit car park with parked vehicles'),
   exploreMoreActivities: S('exploreMoreActivities', 'Activities', 'FRCC indoor games arena with a badminton match in play'),
   exploreMoreMembership: S('exploreMoreMembership', 'Membership', 'FRCC members lounge with sofas and warm lighting'),
+
+  // =========================================================================
+  // EVENTS PAGE & SAMPLES
+  // =========================================================================
+
+  heroEvents: S('hero-events', 'Events', 'Film screenings and cultural events at FRCC'),
+  'hero-events': S('hero-events', 'Events', 'Film screenings and cultural events at FRCC'),
+  'event-short-film-screening-night': S('event-short-film-screening-night', 'Short Film Screening Night', 'Short film screening evening at FRCC'),
+  'event-classic-cinema-weekend': S('event-classic-cinema-weekend', 'Classic Cinema Weekend', 'Classic cinema screening on the auditorium screen'),
+  'event-filmmakers-and-artists-meetup': S('event-filmmakers-and-artists-meetup', 'Filmmakers and Artists Meetup', 'Filmmakers and artists meetup at FRCC'),
+  'event-acting-workshop': S('event-acting-workshop', 'Acting Workshop', 'Interactive acting and performance workshop at FRCC'),
+  'event-script-reading-circle': S('event-script-reading-circle', 'Script Reading Circle', 'Script reading and development circle at FRCC'),
+  'event-cultural-evening-music-and-dance': S('event-cultural-evening-music-and-dance', 'Cultural Evening', 'Cultural evening with music and dance at FRCC'),
 };
 
 /**
@@ -530,6 +553,25 @@ export function roomSlot(type) {
   const key = `room-${String(type).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
   const resolvedKey = ROOM_ALIASES[key] || key;
   return IMAGES[resolvedKey] || IMAGES[key] || { slot: key, name: type, src: null, srcSet: '', alt: '' };
+}
+
+/**
+ * Resolves an image object for a game by slot / id.
+ * Chain: local file, then REMOTE[slot], then FALLBACK[slot].
+ * @param {string} id
+ */
+export function gameSlot(id) {
+  const key = String(id || '').toLowerCase();
+  if (IMAGES[key]) return IMAGES[key];
+  // TODO-REPLACE-SQUASH-BASKETBALL-PHOTO
+  return {
+    slot: key,
+    name: id,
+    src: localFor(key) || REMOTE[key] || FALLBACK[key] || null,
+    srcSet: '',
+    alt: id,
+    game: true,
+  };
 }
 
 export default IMAGES;

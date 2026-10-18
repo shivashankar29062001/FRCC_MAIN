@@ -193,6 +193,22 @@ export function ServiceHero({ service = 'stay' }) {
             </div>
           ) : service === 'dining' ? (
             <DiningHeroCard />
+          ) : service === 'events' ? (
+            <div className="booking-card booking-card--compact">
+              <p className="booking-eyebrow">FRCC EVENTS</p>
+              <h2 className="booking-title font-display">Experience the Culture</h2>
+              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                Screenings, workshops, discussions, and cultural evenings celebrating cinema and arts.
+              </p>
+              <div className="mt-6">
+                <a
+                  href="#content"
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                >
+                  Explore events
+                </a>
+              </div>
+            </div>
           ) : (
             <BookingCard compact service={isHub ? null : service} />
           )}

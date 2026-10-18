@@ -6,7 +6,7 @@ import { HeroImage } from '../components/HeroImage.jsx';
 import { HeroSlider } from '../components/HeroSlider.jsx';
 import { PhotoTile, FilterRow, SectionLink, ExperienceSection } from '../components/ui/explore.jsx';
 import { Lightbox } from '../components/ui/lightbox.jsx';
-import { IMAGES } from '../config/images.js';
+import { IMAGES, gameSlot } from '../config/images.js';
 import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
@@ -248,7 +248,7 @@ export function LandingPage() {
               <PhotoTile
                 key={g.id}
                 to={gameHref(g.id)}
-                image={IMAGES[g.imageKey]}
+                image={gameSlot(g.imageKey)}
                 label={g.name}
                 aspect="4 / 3"
                 sizes="(min-width: 1024px) 23vw, (min-width: 640px) 46vw, 92vw"

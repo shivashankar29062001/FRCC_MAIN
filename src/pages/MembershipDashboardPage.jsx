@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../app/store/AppContext.jsx';
 import { useMockQuery } from '../app/hooks/useMockQuery.js';
 import { Card, EmptyState, LoadingState, SkeletonGrid, ErrorState } from '../components/ui/feedback.jsx';
@@ -103,6 +104,36 @@ export function MembershipDashboardPage() {
 
   // Active state — shows both cards for the stored membership
   const memberId = membership?.memberId || 'FRCC-MEMBER';
+  const [pdfError, setPdfError] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  async function handleDownloadForm() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { downloadApplicationFormPdf } = await import('../lib/applicationForm.js');
+      await downloadApplicationFormPdf(membership);
+    } catch (err) {
+      console.error('[MembershipDashboardPage] PDF build error:', err);
+      setPdfError(err?.message || 'Failed to generate application form PDF. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  async function handleSendWhatsApp() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { sendMembershipToWhatsApp } = await import('../lib/applicationForm.js');
+      await sendMembershipToWhatsApp(membership);
+    } catch (err) {
+      console.error('[MembershipDashboardPage] WhatsApp PDF send error:', err);
+      setPdfError(err?.message || 'Failed to prepare application form for WhatsApp. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
 
   return (
     <div>
@@ -127,14 +158,45 @@ export function MembershipDashboardPage() {
               <p className="eyebrow">Digital Privilege Cards</p>
               <h2 className="h-sub">Your FRCC Membership &amp; Health Cards</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => downloadBothCards(memberId)}
-              className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-5 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm inline-flex items-center gap-2 self-start sm:self-auto"
-            >
-              Download cards
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => downloadBothCards(memberId)}
+                className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+              >
+                Download cards
+              </button>
+              <button
+                type="button"
+                disabled={pdfBusy}
+                onClick={handleDownloadForm}
+                className="btn-base bg-navy-900 text-white hover:bg-navy-800 disabled:opacity-60 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+              >
+                {pdfBusy ? 'Generating PDF…' : 'Download application form'}
+              </button>
+              <button
+                type="button"
+                disabled={pdfBusy}
+                onClick={handleSendWhatsApp}
+                className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+              >
+                Send to WhatsApp
+              </button>
+            </div>
           </div>
+
+          {pdfError && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between">
+              <span>{pdfError}</span>
+              <button
+                type="button"
+                onClick={() => setPdfError(null)}
+                className="text-xs font-semibold text-red-800 hover:underline ml-3"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Reveal>

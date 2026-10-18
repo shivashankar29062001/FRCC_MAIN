@@ -84,6 +84,19 @@ export const SERVICE_HERO_DATA = {
     linkTarget: '#content',
     statSuffix: 'on every booking',
   },
+  events: {
+    eyebrow: 'FILM & CULTURAL EVENTS',
+    headline: 'Cinema, conversations and culture',
+    phrases: [
+      'Short film screenings.',
+      'Workshops and masterclasses.',
+      'Filmmakers and artists meetups.',
+      'Cultural evenings and performances.',
+    ],
+    linkText: 'Explore events',
+    linkTarget: '#content',
+    statSuffix: 'on member passes',
+  },
   hub: {
     eyebrow: `WELCOME TO ${shortName}`,
     headline: name,

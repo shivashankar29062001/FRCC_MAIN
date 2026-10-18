@@ -39,9 +39,22 @@ export async function getUserMembership(userId = null, memberId = null) {
     email: data.email,
     planName: data.plan_name,
     planPrice: Number(data.plan_price || 0),
+    amountPaid: Number(data.amount_paid ?? data.plan_price ?? 0),
+    paymentMethod: data.payment_method,
+    couponCode: data.coupon_code,
+    isTest: data.is_test,
     status: data.status,
     createdAt: data.created_at,
     validUntil: data.valid_until,
+    dateOfBirth: data.date_of_birth || '',
+    gender: data.gender || '',
+    address: data.address_line || data.address || '',
+    addressLine: data.address_line || data.address || '',
+    city: data.city || '',
+    state: data.state || '',
+    pincode: data.pincode || '',
+    emergencyContact: data.emergency_contact || '',
+    aadhaarMasked: data.aadhaar_masked || '',
   };
 }
 
@@ -62,9 +75,22 @@ export async function saveUserMembership(membershipData) {
       email: membershipData.email || '',
       planName: membershipData.planName || 'FRCC Membership',
       planPrice: Number(membershipData.planPrice || 0),
+      amountPaid: Number(membershipData.amountPaid ?? membershipData.planPrice ?? 0),
+      paymentMethod: membershipData.paymentMethod || 'upi',
+      couponCode: membershipData.couponCode || null,
+      isTest: Boolean(membershipData.isTest),
       status: 'Active',
       createdAt: membershipData.createdAt || new Date().toISOString(),
       validUntil: null,
+      dateOfBirth: membershipData.dateOfBirth || membershipData.dob || '',
+      gender: membershipData.gender || '',
+      address: membershipData.address || membershipData.addressLine || '',
+      addressLine: membershipData.addressLine || membershipData.address || '',
+      city: membershipData.city || '',
+      state: membershipData.state || '',
+      pincode: membershipData.pincode || '',
+      emergencyContact: membershipData.emergencyContact || '',
+      aadhaarMasked: membershipData.aadhaarMasked || '',
     };
   }
 
@@ -84,6 +110,14 @@ export async function saveUserMembership(membershipData) {
     amount_paid: Number(membershipData.amountPaid ?? membershipData.planPrice ?? 0), // TODO-REMOVE-TEST-COUPON
     coupon_code: membershipData.couponCode || null, // TODO-REMOVE-TEST-COUPON
     is_test: Boolean(membershipData.isTest), // TODO-REMOVE-TEST-COUPON
+    date_of_birth: membershipData.dateOfBirth || membershipData.dob || null,
+    gender: membershipData.gender || null,
+    address_line: membershipData.addressLine || membershipData.address || null,
+    city: membershipData.city || null,
+    state: membershipData.state || null,
+    pincode: membershipData.pincode || null,
+    emergency_contact: membershipData.emergencyContact || null,
+    aadhaar_masked: membershipData.aadhaarMasked || null,
     created_at: membershipData.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -94,7 +128,7 @@ export async function saveUserMembership(membershipData) {
     .select()
     .single();
 
-  // If table exists but coupon audit columns haven't been migrated yet, retry with base columns
+  // If table exists but some new columns haven't been migrated yet, retry with base columns
   if (error && error.message && error.message.includes('column')) {
     const fallbackPayload = {
       user_id: currentUserId,

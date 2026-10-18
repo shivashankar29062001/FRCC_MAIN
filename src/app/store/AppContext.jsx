@@ -229,6 +229,15 @@ export function AppProvider({ children }) {
         couponCode: m.couponCode || null, // TODO-REMOVE-TEST-COUPON
         isTest: Boolean(m.isTest), // TODO-REMOVE-TEST-COUPON
         createdAt: m.createdAt || new Date().toISOString(),
+        dateOfBirth: m.dateOfBirth || m.dob || '',
+        gender: m.gender || '',
+        address: m.address || m.addressLine || '',
+        addressLine: m.addressLine || m.address || '',
+        city: m.city || '',
+        state: m.state || '',
+        pincode: m.pincode || '',
+        emergencyContact: m.emergencyContact || '',
+        aadhaarMasked: m.aadhaarMasked || '',
       };
       setMembership(sanitized);
       setIsMemberState(true);

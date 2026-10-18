@@ -158,3 +158,32 @@ export function onAuthStateChange(callback) {
     callback(event, session);
   });
 }
+
+/**
+ * Check whether the current user is an admin.
+ * Calls RPC is_admin() or checks the admins table directly.
+ */
+export async function checkIsAdmin(userId = null) {
+  try {
+    const { data, error } = await supabase.rpc('is_admin');
+    if (!error && typeof data === 'boolean') return data;
+  } catch {
+    /* ignore and try direct query */
+  }
+
+  let uid = userId;
+  if (!uid) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    uid = sessionData?.session?.user?.id;
+  }
+  if (!uid) return false;
+
+  const { data, error } = await supabase
+    .from('admins')
+    .select('user_id')
+    .eq('user_id', uid)
+    .maybeSingle();
+
+  return Boolean(!error && data?.user_id);
+}
+

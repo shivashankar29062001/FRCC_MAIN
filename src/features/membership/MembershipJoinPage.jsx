@@ -169,6 +169,37 @@ export function MembershipJoinPage() {
     }
   }, [step]);
 
+  const [pdfError, setPdfError] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  async function handleDownloadForm() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { downloadApplicationFormPdf } = await import('../../lib/applicationForm.js');
+      await downloadApplicationFormPdf(confirmedMemberRecord);
+    } catch (err) {
+      console.error('[MembershipJoinPage] PDF build error:', err);
+      setPdfError(err?.message || 'Failed to generate application form PDF. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  async function handleSendWhatsApp() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { sendMembershipToWhatsApp } = await import('../../lib/applicationForm.js');
+      await sendMembershipToWhatsApp(confirmedMemberRecord);
+    } catch (err) {
+      console.error('[MembershipJoinPage] WhatsApp PDF send error:', err);
+      setPdfError(err?.message || 'Failed to prepare application form for WhatsApp. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   // Sync wizard state to sessionStorage (without file)
   useEffect(() => {
     try {
@@ -379,6 +410,39 @@ export function MembershipJoinPage() {
   const confirmedPlanName =
     selectedPlan?.name || membership?.planName || 'FRCC Membership';
 
+  const confirmedMemberRecord = useMemo(() => {
+    const emergencyContact =
+      formData.emergencyName && formData.emergencyMobile
+        ? `${formData.emergencyName} (${formData.emergencyMobile})`
+        : (formData.emergencyMobile || formData.emergencyName || membership?.emergencyContact || '');
+    const aadhaarMasked = formData.aadhaarLast4
+      ? `XXXX XXXX ${formData.aadhaarLast4}`
+      : (membership?.aadhaarMasked || '');
+
+    return {
+      memberId: confirmedMemberId,
+      name: formData.fullName || user?.name || membership?.name || 'Member',
+      mobile: formData.mobile || user?.phone || membership?.mobile || '',
+      email: formData.email || user?.email || membership?.email || '',
+      planName: confirmedPlanName,
+      planPrice: planBasePrice,
+      amountPaid: finalPrice,
+      paymentMethod: formData.paymentMethod || membership?.paymentMethod || 'upi',
+      couponCode: (COUPON_ENABLED && appliedCoupon) ? appliedCoupon.code : (membership?.couponCode || null),
+      isTest: Boolean(appliedCoupon?.is_test || membership?.isTest),
+      createdAt: membership?.createdAt || new Date().toISOString(),
+      dateOfBirth: formData.dob || membership?.dateOfBirth || '',
+      gender: formData.gender || membership?.gender || '',
+      address: formData.address || membership?.address || '',
+      addressLine: formData.address || membership?.addressLine || '',
+      city: formData.city || membership?.city || '',
+      state: formData.state || membership?.state || '',
+      pincode: formData.pincode || membership?.pincode || '',
+      emergencyContact,
+      aadhaarMasked,
+    };
+  }, [confirmedMemberId, confirmedPlanName, formData, user, membership, planBasePrice, finalPrice, appliedCoupon]);
+
   // TODO-REMOVE-TEST-COUPON
   async function handleApplyCoupon() {
     setCouponError('');
@@ -429,8 +493,17 @@ export function MembershipJoinPage() {
       const random6 = String(Math.floor(100000 + Math.random() * 900000));
       const memberId = formData.memberId || membership?.memberId || `FRCC-${year}-${random6}`;
 
-      // Store safe fields: user id, member id, plan, status "active", amount_paid, payment_method, coupon_code, is_test
-      // Never store full Aadhaar number or file
+      // Store personal details: date of birth, gender, address, city, state, pincode, emergency contact, masked Aadhaar
+      // Never store full Aadhaar number or file (only "XXXX XXXX 1234")
+      const emergencyContact =
+        formData.emergencyName && formData.emergencyMobile
+          ? `${formData.emergencyName} (${formData.emergencyMobile})`
+          : (formData.emergencyMobile || formData.emergencyName || '');
+
+      const aadhaarMasked = formData.aadhaarLast4
+        ? `XXXX XXXX ${formData.aadhaarLast4}`
+        : '';
+
       const record = {
         userId: user?.id || user?.userId || null,
         memberId,
@@ -445,6 +518,15 @@ export function MembershipJoinPage() {
         isTest: Boolean(appliedCoupon?.is_test), // TODO-REMOVE-TEST-COUPON
         status: 'active',
         createdAt: new Date().toISOString(),
+        dateOfBirth: formData.dob || '',
+        gender: formData.gender || '',
+        address: formData.address || '',
+        addressLine: formData.address || '',
+        city: formData.city || '',
+        state: formData.state || '',
+        pincode: formData.pincode || '',
+        emergencyContact,
+        aadhaarMasked,
       };
 
       const saved = await saveMembership(record);
@@ -1229,24 +1311,53 @@ export function MembershipJoinPage() {
                 </div>
               </div>
 
-              {/* Action buttons: Outline "Download cards" button & Plain link "Go to my membership" */}
-              <div className="mt-8 flex flex-col items-center justify-center gap-4">
+              {/* Action buttons: Download cards, Download application form, Send to WhatsApp */}
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={() => downloadBothCards(confirmedMemberId)}
-                  className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-8 py-3 font-semibold text-sm rounded-xl transition shadow-sm"
+                  className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-6 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm"
                 >
                   Download cards
                 </button>
+                <button
+                  type="button"
+                  disabled={pdfBusy}
+                  onClick={handleDownloadForm}
+                  className="btn-base bg-navy-900 text-white hover:bg-navy-800 disabled:opacity-60 px-6 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm"
+                >
+                  {pdfBusy ? 'Generating PDF…' : 'Download application form'}
+                </button>
+                <button
+                  type="button"
+                  disabled={pdfBusy}
+                  onClick={handleSendWhatsApp}
+                  className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-6 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm"
+                >
+                  Send to WhatsApp
+                </button>
+              </div>
 
-                <div className="mt-2">
-                  <Link
-                    to="/membership/dashboard"
-                    className="text-sm font-semibold text-navy-900 hover:text-gold-600 underline underline-offset-4 inline-block"
+              {pdfError && (
+                <div className="mt-4 mx-auto max-w-md rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center justify-between">
+                  <span>{pdfError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPdfError(null)}
+                    className="text-xs font-semibold text-red-800 hover:underline ml-3"
                   >
-                    Go to my membership
-                  </Link>
+                    Dismiss
+                  </button>
                 </div>
+              )}
+
+              <div className="mt-4">
+                <Link
+                  to="/membership/dashboard"
+                  className="text-sm font-semibold text-navy-900 hover:text-gold-600 underline underline-offset-4 inline-block"
+                >
+                  Go to my membership
+                </Link>
               </div>
             </Card>
           )}

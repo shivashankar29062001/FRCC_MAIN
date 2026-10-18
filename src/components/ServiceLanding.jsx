@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
-import { IMAGES, roomSlot } from '../config/images.js';
+import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
 import { areas as hotelAreas, rooms as hotelRooms } from '../data/hotel.js';
 import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
 import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
@@ -159,7 +159,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         return {
           id: g.id,
           name: g.name,
-          image: IMAGES[g.imageKey] || IMAGES.badminton,
+          image: gameSlot(g.imageKey),
           facts: [
             `${g.slotMinutes} min session duration`,
             `Capacity: Up to ${g.maxPlayers} players`,

@@ -763,14 +763,13 @@ export function HealthCard({
 }
 
 /**
- * Downloads an SVG DOM element as a high-resolution PNG file using pure HTML5 Canvas (no external libraries).
+ * Converts an SVG DOM element to a high-resolution PNG Blob using pure HTML5 Canvas.
  *
  * @param {SVGElement} svgElement
- * @param {string} filename
- * @returns {Promise<void>}
+ * @returns {Promise<Blob|null>}
  */
-export async function downloadSvgAsPng(svgElement, filename) {
-  if (!svgElement) return;
+export async function getSvgAsPngBlob(svgElement) {
+  if (!svgElement) return null;
 
   const svgXml = new XMLSerializer().serializeToString(svgElement);
   const svgBlob = new Blob([svgXml], { type: 'image/svg+xml;charset=utf-8' });
@@ -791,26 +790,35 @@ export async function downloadSvgAsPng(svgElement, filename) {
       URL.revokeObjectURL(blobUrl);
 
       canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve();
-          return;
-        }
-        const a = document.createElement('a');
-        a.download = filename;
-        a.href = URL.createObjectURL(blob);
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        resolve();
+        resolve(blob);
       }, 'image/png');
     };
     img.onerror = () => {
       URL.revokeObjectURL(blobUrl);
-      resolve();
+      resolve(null);
     };
     img.src = blobUrl;
   });
+}
+
+/**
+ * Downloads an SVG DOM element as a high-resolution PNG file using pure HTML5 Canvas (no external libraries).
+ *
+ * @param {SVGElement} svgElement
+ * @param {string} filename
+ * @returns {Promise<void>}
+ */
+export async function downloadSvgAsPng(svgElement, filename) {
+  const blob = await getSvgAsPngBlob(svgElement);
+  if (!blob) return;
+  const URL = window.URL || window.webkitURL;
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /**
@@ -840,6 +848,7 @@ export async function downloadBothCards(memberId = 'FRCC-MEMBER') {
 export default {
   MembershipIdCard,
   HealthCard,
+  getSvgAsPngBlob,
   downloadSvgAsPng,
   downloadBothCards,
 };
