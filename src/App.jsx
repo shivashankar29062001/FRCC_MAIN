@@ -49,7 +49,7 @@ export default function App() {
     <AppProvider>
       <LocationProvider>
         <LocationModalProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
             <AuthModalProvider>
               <ErrorBoundary>
                 <AppLayout>

@@ -1,0 +1,63 @@
+name: Deploy FRCC to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - completed
+      - features/payment
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Website
+        env:
+          GITHUB_ACTIONS: 'true'
+          VITE_BASE_PATH: '/FRCC_MAIN/'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://dkvirykibcsnfmgzsfes.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdmlyeWtpYmNzbmZtZ3pzZmVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMjAxMjEsImV4cCI6MjEwNzY5NjEyMX0.gfWG4HMnQ-X5Mls-VatZ2T7xMSNF4pGNjUkB1Ve2uMI' }}
+          VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID || vars.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder' }}
+          VITE_ENABLE_TEST_COUPON: ${{ vars.VITE_ENABLE_TEST_COUPON || 'true' }}
+        run: |
+          npm run build
+          # Create 404.html as a copy of index.html for React Router SPA deep link support on GitHub Pages
+          cp dist/index.html dist/404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
