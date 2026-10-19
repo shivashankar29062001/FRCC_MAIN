@@ -1,0 +1,466 @@
+/* ==========================================================================
+   STEP 6 - CONFIRM BOOKING
+   FRCC design: warm off-white page, white card, dark navy text,
+   gold accent, green success checkmark.
+   ========================================================================== */
+
+.booking-confirmation-scrim {
+  width: 100%;
+  background: #F8F6EF;
+  border-radius: 20px;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.booking-confirmation-card {
+  max-width: 760px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 2.25rem 2rem 2rem;
+  box-shadow: 0 8px 30px rgba(11, 24, 51, 0.08), 0 1px 3px rgba(11, 24, 51, 0.05);
+  color: #0B1833;
+  box-sizing: border-box;
+  animation: confirmation-appear 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes confirmation-appear {
+  0% { transform: translateY(8px) scale(0.99); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Success header -------------------------------------------------------- */
+.confirmation-success-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.confirmation-check-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: #E7F6EC;
+  color: #1C9E5C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.35rem;
+  box-shadow: 0 0 0 8px rgba(28, 158, 92, 0.06);
+}
+
+.confirmation-heading {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #0B1833;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.confirmation-subtext {
+  font-size: 0.95rem;
+  color: #4A5568;
+  max-width: 460px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Booking reference ----------------------------------------------------- */
+.confirmation-reference-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  background: #FBF6E9;
+  border: 1px dashed #D6A72F;
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.reference-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8A6D1F;
+}
+
+.reference-value {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #0B1833;
+  word-break: break-all;
+  text-align: center;
+}
+
+/* Details grid ---------------------------------------------------------- */
+.confirmation-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.25rem;
+  border: 1px solid #EEF0F3;
+  border-radius: 14px;
+  padding: 1.15rem 1.25rem;
+  background: #FCFCFB;
+  margin-bottom: 1.25rem;
+}
+
+.confirmation-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #F1F2F4;
+  min-width: 0;
+}
+
+.confirmation-detail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #4A5568;
+  min-width: 0;
+}
+
+.confirmation-detail-label svg {
+  color: #D6A72F;
+  flex-shrink: 0;
+}
+
+.confirmation-detail-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0B1833;
+  text-align: right;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.confirmation-detail-value.is-mono {
+  font-family: Consolas, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
+.confirmation-detail-value.is-amount {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0B1833;
+}
+
+.confirmation-detail-value.is-pill {
+  background: rgba(214, 167, 47, 0.15);
+  color: #8A6D1F;
+  border: 1px solid rgba(214, 167, 47, 0.4);
+  border-radius: 8px;
+  padding: 0.15rem 0.6rem;
+  font-weight: 800;
+}
+
+/* Payment status badge -------------------------------------------------- */
+.confirmation-status-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.confirmation-status-badge.is-paid {
+  background: #E7F6EC;
+  color: #1C7C46;
+  border: 1px solid rgba(28, 158, 92, 0.35);
+}
+
+/* Cancelled variant ----------------------------------------------------- */
+.confirmation-check-circle.is-cancelled {
+  background: #FEF2F2;
+  color: #B91C1C;
+  box-shadow: 0 0 0 8px rgba(185, 28, 28, 0.06);
+}
+
+.confirmation-heading.is-cancelled {
+  color: #B91C1C;
+}
+
+.confirmation-status-badge.is-pending {
+  background: #FDF3DF;
+  color: #9A6A12;
+  border: 1px solid rgba(214, 167, 47, 0.45);
+}
+
+.confirmation-status-badge.is-confirmed {
+  background: #E7F6EC;
+  color: #1C7C46;
+  border: 1px solid rgba(28, 158, 92, 0.35);
+}
+
+.confirmation-status-badge.is-cancelled {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border: 1px solid rgba(185, 28, 28, 0.35);
+}
+
+/* Sync note ------------------------------------------------------------- */
+.confirmation-sync-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.35rem;
+}
+
+.confirmation-sync-note svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.confirmation-sync-note.is-success {
+  background: #E7F6EC;
+  border: 1px solid rgba(28, 158, 92, 0.3);
+  color: #1C7C46;
+}
+
+.confirmation-sync-note.is-info {
+  background: #FDF8EC;
+  border: 1px solid rgba(214, 167, 47, 0.35);
+  color: #7A5D14;
+}
+
+.confirmation-sync-note.is-warn {
+  background: #FEF2F2;
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  color: #B91C1C;
+}
+
+.confirmation-sync-note.is-demo {
+  background: #FFF7E6;
+  border: 1px solid #D6A72F;
+  color: #8A6D1F;
+}
+
+/* Actions --------------------------------------------------------------- */
+.confirmation-actions-container {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-confirmation-done,
+.btn-confirmation-another {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.btn-confirmation-done {
+  background: #D6A72F;
+  color: #0B1833;
+  box-shadow: 0 4px 16px rgba(214, 167, 47, 0.35);
+}
+
+.btn-confirmation-done:hover {
+  background: #C2921F;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(214, 167, 47, 0.45);
+}
+
+.btn-confirmation-another {
+  background: #FFFFFF;
+  color: #0B1833;
+  border: 1.5px solid #E5E7EB;
+}
+
+.btn-confirmation-another:hover {
+  background: #F8F6EF;
+  border-color: #D6A72F;
+  color: #0B1833;
+}
+
+.btn-confirmation-cancel {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.5rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  background: #FFFFFF;
+  color: #B91C1C;
+  border: 1.5px solid #F3C1C1;
+}
+
+.btn-confirmation-cancel:hover:not(:disabled) {
+  background: #FEF2F2;
+  border-color: #B91C1C;
+}
+
+.btn-confirmation-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Cancel confirmation dialog -------------------------------------------- */
+.cancel-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(11, 24, 51, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.cancel-confirm-dialog {
+  max-width: 420px;
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 1.75rem 1.5rem 1.5rem;
+  box-shadow: 0 20px 50px rgba(11, 24, 51, 0.25);
+  text-align: center;
+  box-sizing: border-box;
+  animation: confirmation-appear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cancel-confirm-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: #FEF2F2;
+  color: #B91C1C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cancel-confirm-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0B1833;
+  margin: 0 0 0.5rem;
+  line-height: 1.35;
+}
+
+.cancel-confirm-text {
+  font-size: 0.88rem;
+  color: #4A5568;
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+}
+
+.cancel-confirm-text strong {
+  color: #0B1833;
+}
+
+.cancel-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-cancel-keep,
+.btn-cancel-confirm {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-cancel-keep {
+  background: #FFFFFF;
+  color: #0B1833;
+  border: 1.5px solid #D1D5DB;
+}
+
+.btn-cancel-keep:hover:not(:disabled) {
+  background: #F8F6EF;
+  border-color: #0B1833;
+}
+
+.btn-cancel-confirm {
+  background: #B91C1C;
+  color: #FFFFFF;
+  border: 1.5px solid #B91C1C;
+}
+
+.btn-cancel-confirm:hover:not(:disabled) {
+  background: #991B1B;
+}
+
+.btn-cancel-keep:disabled,
+.btn-cancel-confirm:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.cancel-confirm-error {
+  font-size: 0.8rem;
+  color: #B91C1C;
+  margin: 0.9rem 0 0;
+  line-height: 1.4;
+}
+
+.spinner {
+  animation: cancel-spin 0.9s linear infinite;
+}
+
+@keyframes cancel-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive ------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .booking-confirmation-scrim {
+    padding: 1.25rem 0.85rem;
+  }
+  .booking-confirmation-card {
+    padding: 1.6rem 1.15rem 1.4rem;
+  }
+  .confirmation-heading {
+    font-size: 1.5rem;
+  }
+  .confirmation-details-grid {
+    grid-template-columns: 1fr;
+  }
+  .reference-value {
+    font-size: 1.05rem;
+  }
+  .confirmation-actions-container {
+    flex-direction: column;
+  }
+  .cancel-confirm-actions {
+    flex-direction: column;
+  }
+}
