@@ -754,6 +754,7 @@ select.booking-field {
 .convention-scope h2,
 .convention-scope h3,
 .convention-scope h4 {
-  @apply font-serif text-navy;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  color: #0b1a33;
 }
 
