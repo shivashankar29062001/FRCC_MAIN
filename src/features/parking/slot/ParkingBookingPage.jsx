@@ -18,7 +18,8 @@ import {
   BOOKING_STATUS,
   BOOKING_STATUS_CODE,
   cancelBookingToAdmin,
-  isBookingCancelApiConfigured
+  isBookingCancelApiConfigured,
+  fetchBookedSlotsFromSupabase
 } from './services/bookingService.js';
 
 const generateInitialSlots = () => {
@@ -119,6 +120,23 @@ export default function ParkingBookingPage() {
       setStep(STEP_SLOT);
     }
   }, [formData.date, formData.time, formData.days, step]);
+
+  // Synchronize slot occupancy dynamically from Supabase
+  useEffect(() => {
+    if (formData.date) {
+      fetchBookedSlotsFromSupabase(formData.date).then((bookedIds) => {
+        if (bookedIds && bookedIds.length > 0) {
+          const bookedSet = new Set(bookedIds);
+          setSlots(INITIAL_SLOTS.map((s) => ({
+            ...s,
+            status: bookedSet.has(s.id) ? 'booked' : 'available',
+          })));
+        } else {
+          setSlots(INITIAL_SLOTS);
+        }
+      });
+    }
+  }, [formData.date]);
 
   useEffect(() => {
     if (step === STEP_SLOT && selectedSlot) {
