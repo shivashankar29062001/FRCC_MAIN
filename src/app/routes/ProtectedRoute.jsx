@@ -19,19 +19,19 @@ function isSafeRedirect(value) {
 
 // Maps gated routes to matching public service pages
 function getPublicFallback(pathname) {
-  if (pathname.startsWith('/book/hotel') || pathname.startsWith('/book/stay') || pathname.startsWith('/stay/book') || pathname === '/stay') {
+  if (pathname.startsWith('/book/hotel') || pathname.startsWith('/book/stay') || pathname.startsWith('/stay/book')) {
     return '/stay';
   }
   if (pathname.startsWith('/dining/book') || pathname.startsWith('/book/dining')) {
     return '/dining';
   }
-  if (pathname.startsWith('/halls/book') || pathname === '/halls' || pathname === '/hall') {
+  if (pathname.startsWith('/halls/book') || pathname.startsWith('/book/hall') || pathname.startsWith('/convention/book')) {
     return '/halls';
   }
-  if (pathname.startsWith('/parking/book') || pathname === '/parking') {
+  if (pathname.startsWith('/parking/book') || pathname.startsWith('/book/parking')) {
     return '/parking';
   }
-  if (pathname.startsWith('/book/activities') || pathname === '/activities') {
+  if (pathname.startsWith('/book/activities')) {
     return '/activities';
   }
   if (pathname.startsWith('/membership/join') || pathname.startsWith('/membership/dashboard')) {
@@ -68,6 +68,9 @@ export function ProtectedRoute({ children, forceGated = false }) {
       }
     }
     const fallbackPath = getPublicFallback(loc.pathname);
+    if (fallbackPath === loc.pathname) {
+      return <Navigate to="/" replace state={{ from, authPrompt: true }} />;
+    }
     return <Navigate to={fallbackPath} replace state={{ from, authPrompt: true }} />;
   }
 
