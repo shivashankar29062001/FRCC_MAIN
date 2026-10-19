@@ -39,8 +39,7 @@ const ALIASES = {
   'secretary': ['secretory'],
   'joint-secretary': ['joint_secretory', 'joint_secretary', 'jointsecretary', 'joint-secretory'],
   'treasurer': ['treserurer', 'treaserer', 'treasurer'],
-  'executive-member-1': ['excutive_member', 'excutive-member'],
-  'executive-member-2': ['executive_member', 'executive-member'],
+  'executive-member-2': ['executive_member', 'executive-member', 'excutive_member', 'excutive-member'],
 };
 
 function getFilename(filePath) {
@@ -135,16 +134,9 @@ export const leadershipMembers = [
     bio: '',
   },
   {
-    id: 'executive-member-1',
-    role: 'Executive Member',
-    name: 'Janga Prasanthi',
-    image: 'executive-member-1',
-    bio: '',
-  },
-  {
     id: 'executive-member-2',
     role: 'Executive Member',
-    name: 'Kommoji Vamsi Krishna',
+    name: 'Kommoji Vamshi Krishna',
     image: 'executive-member-2',
     bio: '',
   },

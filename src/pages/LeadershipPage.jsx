@@ -98,16 +98,18 @@ export function LeadershipPage() {
         </div>
 
         {/* Row 3: Executive Members */}
-        <div className="mt-14">
-          <h2 className="font-display text-xl sm:text-2xl font-semibold text-navy-900 text-center mb-6">
-            Executive Members
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            {executiveMembers.map((member) => (
-              <MemberCard key={member.id} member={member} />
-            ))}
+        {executiveMembers.length > 0 && (
+          <div className="mt-14">
+            <h2 className="font-display text-xl sm:text-2xl font-semibold text-navy-900 text-center mb-6">
+              {executiveMembers.length === 1 ? 'Executive Member' : 'Executive Members'}
+            </h2>
+            <div className={executiveMembers.length === 1 ? 'max-w-xs mx-auto' : 'grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto'}>
+              {executiveMembers.map((member) => (
+                <MemberCard key={member.id} member={member} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
