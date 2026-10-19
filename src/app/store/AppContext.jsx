@@ -68,7 +68,9 @@ export function AppProvider({ children }) {
         notificationsService.getNotifications(supabaseUser.id),
       ]);
 
-      const memberStatus = Boolean(profile?.is_member || (memberData && memberData.status === 'Active'));
+      const memberStatus = Boolean(
+        profile?.is_member || (memberData && String(memberData.status).toLowerCase() === 'active')
+      );
 
       const sessionObj = {
         id: supabaseUser.id,
@@ -218,17 +220,20 @@ export function AppProvider({ children }) {
     if (m) {
       const memberId = m.memberId || membershipService.generateMemberId();
       const sanitized = {
+        userId: m.userId || user?.id || null,
         memberId,
-        name: m.name,
-        mobile: m.mobile,
-        email: m.email,
-        planName: m.planName,
-        planPrice: m.planPrice ?? 0,
-        amountPaid: m.amountPaid ?? m.planPrice ?? 0, // TODO-REMOVE-TEST-COUPON
+        name: m.name || m.fullName || '',
+        mobile: m.mobile || '',
+        email: m.email || '',
+        planName: m.planName || m.plan || 'FRCC Membership',
+        planPrice: Number(m.planPrice || 0),
+        amountPaid: Number(m.amountPaid ?? m.planPrice ?? 0), // TODO-REMOVE-TEST-COUPON
         paymentMethod: m.paymentMethod || 'upi', // TODO-REMOVE-TEST-COUPON
         couponCode: m.couponCode || null, // TODO-REMOVE-TEST-COUPON
         isTest: Boolean(m.isTest), // TODO-REMOVE-TEST-COUPON
+        status: m.status || 'Active',
         createdAt: m.createdAt || new Date().toISOString(),
+        validUntil: m.validUntil || null,
         dateOfBirth: m.dateOfBirth || m.dob || '',
         gender: m.gender || '',
         address: m.address || m.addressLine || '',
@@ -257,6 +262,15 @@ export function AppProvider({ children }) {
 
       // Save to database and return result; do not swallow errors so callers can display feedback
       const saved = await membershipService.saveUserMembership(sanitized);
+      if (saved) {
+        const merged = { ...sanitized, ...saved };
+        setMembership(merged);
+        try {
+          window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(merged));
+        } catch {
+          /* ignore */
+        }
+      }
       return saved;
     } else {
       setMembership(null);

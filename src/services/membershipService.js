@@ -10,52 +10,62 @@ export function generateMemberId() {
  * Fetch membership for a given user or member ID.
  */
 export async function getUserMembership(userId = null, memberId = null) {
-  let query = supabase.from('memberships').select('*');
+  try {
+    let query = supabase.from('memberships').select('*');
 
-  if (userId) {
-    query = query.eq('user_id', userId);
-  } else if (memberId) {
-    query = query.eq('member_id', memberId);
-  } else {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentId = sessionData?.session?.user?.id;
-    if (!currentId) return null;
-    query = query.eq('user_id', currentId);
-  }
+    if (userId) {
+      query = query.eq('user_id', userId);
+    } else if (memberId) {
+      query = query.eq('member_id', memberId);
+    } else {
+      const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr) {
+        console.error('[membershipService] Auth session error in getUserMembership:', sessionErr);
+      }
+      const currentId = sessionData?.session?.user?.id;
+      if (!currentId) return null;
+      query = query.eq('user_id', currentId);
+    }
 
-  const { data, error } = await query.order('created_at', { ascending: false }).maybeSingle();
+    const { data, error } = await query.order('created_at', { ascending: false }).maybeSingle();
 
-  if (error) {
-    console.warn('Error fetching membership:', error);
+    if (error) {
+      console.error('[membershipService] Error fetching membership from Supabase:', error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      memberId: data.member_id,
+      name: data.name,
+      mobile: data.mobile,
+      email: data.email,
+      planName: data.plan_name || 'FRCC Membership',
+      planPrice: Number(data.plan_price || 0),
+      amountPaid: Number(data.amount_paid ?? data.plan_price ?? 0),
+      paymentMethod: data.payment_method,
+      couponCode: data.coupon_code,
+      isTest: data.is_test,
+      status: data.status || 'Active',
+      createdAt: data.created_at,
+      validUntil: data.valid_until,
+      dateOfBirth: data.date_of_birth || '',
+      gender: data.gender || '',
+      address: data.address_line || data.address || '',
+      addressLine: data.address_line || data.address || '',
+      city: data.city || '',
+      state: data.state || '',
+      pincode: data.pincode || '',
+      emergencyContact: data.emergency_contact || '',
+      aadhaarMasked: data.aadhaar_masked || '',
+    };
+  } catch (err) {
+    console.error('[membershipService] Unexpected error in getUserMembership:', err);
     return null;
   }
-
-  if (!data) return null;
-
-  return {
-    memberId: data.member_id,
-    name: data.name,
-    mobile: data.mobile,
-    email: data.email,
-    planName: data.plan_name,
-    planPrice: Number(data.plan_price || 0),
-    amountPaid: Number(data.amount_paid ?? data.plan_price ?? 0),
-    paymentMethod: data.payment_method,
-    couponCode: data.coupon_code,
-    isTest: data.is_test,
-    status: data.status,
-    createdAt: data.created_at,
-    validUntil: data.valid_until,
-    dateOfBirth: data.date_of_birth || '',
-    gender: data.gender || '',
-    address: data.address_line || data.address || '',
-    addressLine: data.address_line || data.address || '',
-    city: data.city || '',
-    state: data.state || '',
-    pincode: data.pincode || '',
-    emergencyContact: data.emergency_contact || '',
-    aadhaarMasked: data.aadhaar_masked || '',
-  };
 }
 
 /**
@@ -69,6 +79,7 @@ export async function saveUserMembership(membershipData) {
     const mockId = `mock-mem-${Date.now()}`;
     return {
       id: mockId,
+      userId: membershipData.userId || null,
       memberId,
       name: membershipData.name || 'Member',
       mobile: membershipData.mobile || '',
@@ -94,8 +105,11 @@ export async function saveUserMembership(membershipData) {
     };
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const currentUserId = sessionData?.session?.user?.id || null;
+  const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr) {
+    console.error('[membershipService] Auth session error in saveUserMembership:', sessionErr);
+  }
+  const currentUserId = membershipData.userId || sessionData?.session?.user?.id || null;
 
   const payload = {
     user_id: currentUserId,
@@ -126,10 +140,11 @@ export async function saveUserMembership(membershipData) {
     .from('memberships')
     .upsert(payload, { onConflict: 'member_id' })
     .select()
-    .single();
+    .maybeSingle();
 
   // If table exists but some new columns haven't been migrated yet, retry with base columns
   if (error && error.message && error.message.includes('column')) {
+    console.warn('[membershipService] Retrying membership upsert with base columns:', error.message);
     const fallbackPayload = {
       user_id: currentUserId,
       member_id: memberId,
@@ -147,7 +162,7 @@ export async function saveUserMembership(membershipData) {
       .from('memberships')
       .upsert(fallbackPayload, { onConflict: 'member_id' })
       .select()
-      .single();
+      .maybeSingle();
     if (!retry.error) {
       data = retry.data;
       error = null;
@@ -155,7 +170,7 @@ export async function saveUserMembership(membershipData) {
   }
 
   if (error) {
-    console.error('Error saving membership:', error);
+    console.error('[membershipService] Error saving membership to Supabase:', error);
     throw error;
   }
 
@@ -176,14 +191,28 @@ export async function saveUserMembership(membershipData) {
 
   return {
     id: data?.id || memberId,
+    userId: currentUserId,
     memberId: data?.member_id || memberId,
-    name: data?.name,
-    mobile: data?.mobile,
-    email: data?.email,
-    planName: data?.plan_name,
-    planPrice: Number(data?.plan_price || 0),
+    name: data?.name || membershipData.name || 'Member',
+    mobile: data?.mobile || membershipData.mobile || '',
+    email: data?.email || membershipData.email || '',
+    planName: data?.plan_name || membershipData.planName || 'FRCC Membership',
+    planPrice: Number(data?.plan_price || membershipData.planPrice || 0),
+    amountPaid: Number(data?.amount_paid ?? membershipData.amountPaid ?? 0),
+    paymentMethod: data?.payment_method || membershipData.paymentMethod || 'upi',
+    couponCode: data?.coupon_code || membershipData.couponCode || null,
+    isTest: Boolean(data?.is_test ?? membershipData.isTest),
     status: data?.status || 'Active',
-    createdAt: data?.created_at,
-    validUntil: data?.valid_until,
+    createdAt: data?.created_at || membershipData.createdAt || new Date().toISOString(),
+    validUntil: data?.valid_until || membershipData.validUntil || null,
+    dateOfBirth: membershipData.dateOfBirth || '',
+    gender: membershipData.gender || '',
+    address: membershipData.address || membershipData.addressLine || '',
+    addressLine: membershipData.addressLine || membershipData.address || '',
+    city: membershipData.city || '',
+    state: membershipData.state || '',
+    pincode: membershipData.pincode || '',
+    emergencyContact: membershipData.emergencyContact || '',
+    aadhaarMasked: membershipData.aadhaarMasked || '',
   };
 }

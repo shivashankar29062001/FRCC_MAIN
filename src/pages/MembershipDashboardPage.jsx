@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
-import { useMockQuery } from '../app/hooks/useMockQuery.js';
-import { Card, EmptyState, LoadingState, SkeletonGrid, ErrorState } from '../components/ui/feedback.jsx';
+import { supabase } from '../services/supabase.js';
+import * as membershipService from '../services/membershipService.js';
+import { Card, EmptyState, LoadingState, SkeletonGrid, ErrorState, StatusTag } from '../components/ui/feedback.jsx';
 import { Breadcrumbs } from '../components/ui/sections.jsx';
-import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
-import { MEMBERSHIP_URL } from '../config/redirects.js';
 import { healthCardDiscountPercent } from '../config/site.js';
 import {
   MembershipIdCard,
   HealthCard,
   downloadBothCards,
+  downloadSvgAsPng,
 } from '../features/membership/MembershipCards.jsx';
 import {
   AwardIcon,
@@ -20,10 +21,11 @@ import {
   CheckIcon,
 } from '../components/ui/icons.jsx';
 import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
+import { formatDMY } from '../utils/dates.js';
 
 // ---------------------------------------------------------------------------
 // /membership/dashboard — Shows both membership cards for a stored membership.
-// Safely falls back to a locked benefits view if no membership exists (no crash).
+// Compact navy header with serif title + gold accent and member name (no hero image).
 // ---------------------------------------------------------------------------
 
 const BENEFITS = [
@@ -40,34 +42,202 @@ const OFFERS = [
 ];
 
 export function MembershipDashboardPage() {
-  const { isMember, membership } = useApp();
-  const { loading, error, retry } = useMockQuery(() => ({ ready: true }));
+  const { user, isMember: appIsMember, membership: appMembership, refreshUserData } = useApp();
 
+  // All hooks declared unconditionally at the top level
+  const [membership, setMembership] = useState(() => appMembership || null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [pdfError, setPdfError] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  // Fetch membership data safely from Supabase with fallbacks
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadMembership() {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1. Wait for Supabase auth session to be ready
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) {
+          console.error('[MembershipDashboardPage] Supabase auth session error:', sessionErr);
+        }
+
+        const currentUserId = sessionData?.session?.user?.id || user?.id || null;
+
+        let data = null;
+
+        // Query by user_id if logged in
+        if (currentUserId) {
+          data = await membershipService.getUserMembership(currentUserId);
+        }
+
+        // Fallback: query by member_id from context or local storage
+        if (!data && appMembership?.memberId) {
+          data = await membershipService.getUserMembership(null, appMembership.memberId);
+        }
+
+        // Fallback: use context membership if remote lookup returned nothing
+        if (!data && appMembership) {
+          data = appMembership;
+        }
+
+        if (isMounted) {
+          setMembership(data);
+        }
+      } catch (err) {
+        console.error('[MembershipDashboardPage] Failed to fetch membership from Supabase:', err);
+        if (isMounted) {
+          setError(err?.message || 'Failed to load membership details. Please try again.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadMembership();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, appMembership?.memberId, retryCount]);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+    if (typeof refreshUserData === 'function') {
+      refreshUserData();
+    }
+  }, [refreshUserData]);
+
+  // Safe defaults with optional chaining everywhere
+  const currentMembership = membership || appMembership || null;
+  const memberId = currentMembership?.memberId || currentMembership?.member_id || 'FRCC-MEMBER';
+  const memberName = currentMembership?.name || currentMembership?.fullName || user?.name || 'Member';
+  const planName = currentMembership?.planName || currentMembership?.plan_name || currentMembership?.plan || 'FRCC Membership';
+  const memberStatus = currentMembership?.status || (appIsMember ? 'Active' : 'Pending');
+  const rawDate = currentMembership?.createdAt || currentMembership?.created_at || currentMembership?.valid_from;
+  const joinDate = rawDate ? formatDMY(rawDate) : formatDMY(new Date().toISOString());
+
+  async function handleDownloadForm() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { downloadApplicationFormPdf } = await import('../lib/applicationForm.js');
+      await downloadApplicationFormPdf(currentMembership || {});
+    } catch (err) {
+      console.error('[MembershipDashboardPage] PDF build error:', err);
+      setPdfError(err?.message || 'Failed to generate application form PDF. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  async function handleSendWhatsApp() {
+    setPdfError(null);
+    setPdfBusy(true);
+    try {
+      const { sendMembershipToWhatsApp } = await import('../lib/applicationForm.js');
+      await sendMembershipToWhatsApp(currentMembership || {});
+    } catch (err) {
+      console.error('[MembershipDashboardPage] WhatsApp PDF send error:', err);
+      setPdfError(err?.message || 'Failed to prepare application form for WhatsApp. Please try again.');
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
+  async function handleDownloadIdCard() {
+    try {
+      const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
+      const idSvg = document.getElementById('frcc-membership-id-card');
+      if (idSvg) {
+        await downloadSvgAsPng(idSvg, `FRCC-ID-${cleanId}.png`);
+      }
+    } catch (err) {
+      console.error('[MembershipDashboardPage] Error downloading ID card:', err);
+    }
+  }
+
+  async function handleDownloadHealthCard() {
+    try {
+      const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
+      const healthSvg = document.getElementById('frcc-health-card');
+      if (healthSvg) {
+        await downloadSvgAsPng(healthSvg, `FRCC-Health-${cleanId}.png`);
+      }
+    } catch (err) {
+      console.error('[MembershipDashboardPage] Error downloading Health card:', err);
+    }
+  }
+
+  // 1. Loading state (skeleton/spinner)
   if (loading) {
     return (
-      <div className="container-x section space-y-6">
-        <LoadingState label="Loading your membership…" rows={2} />
-        <SkeletonGrid count={3} className="sm:grid-cols-2 lg:grid-cols-3" />
+      <div>
+        <header className="bg-navy-950 text-white py-5 sm:py-6 border-b border-navy-900">
+          <div className="container-x flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-white">
+              Membership <span className="text-gold-400">Dashboard</span>
+            </h1>
+            {memberName && (
+              <span className="text-sm sm:text-base font-medium text-slate-300">
+                {memberName}
+              </span>
+            )}
+          </div>
+        </header>
+        <div className="container-x pt-6 pb-14 space-y-6">
+          <LoadingState label="Loading your membership…" rows={2} />
+          <SkeletonGrid count={3} className="sm:grid-cols-2 lg:grid-cols-3" />
+        </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="container-x section max-w-2xl">
-        <ErrorState message={error} onRetry={retry} />
-      </div>
-    );
-  }
-
-  // Locked state — when no membership exists, safely render without crashing
-  if (!isMember || !membership) {
+  // 2. Error state (friendly message with Retry inside dashboard, not ErrorBoundary)
+  if (error && !currentMembership) {
     return (
       <div>
-        <HeroImage slot="hero-profile" />
-        <div className="container-x section-top">
+        <header className="bg-navy-950 text-white py-5 sm:py-6 border-b border-navy-900">
+          <div className="container-x">
+            <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-white">
+              Membership <span className="text-gold-400">Dashboard</span>
+            </h1>
+          </div>
+        </header>
+        <div className="container-x pt-6 pb-14 max-w-2xl">
+          <ErrorState message={error} onRetry={handleRetry} />
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Empty state: when no membership exists, safely render without crashing
+  if (!currentMembership) {
+    return (
+      <div>
+        {/* Compact Header on Navy: Page Title (serif + gold accent) and Member Name */}
+        <header className="bg-navy-950 text-white py-5 sm:py-6 border-b border-navy-900">
+          <div className="container-x flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-white">
+              Membership <span className="text-gold-400">Dashboard</span>
+            </h1>
+            {user?.name && (
+              <span className="text-sm sm:text-base font-medium text-slate-300">
+                {user.name}
+              </span>
+            )}
+          </div>
+        </header>
+
+        <div className="container-x pt-5 pb-14 sm:pt-6 sm:pb-16">
           <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
-          <h1 className="h-section mt-3">You don&apos;t have a membership yet</h1>
+          <h2 className="h-section mt-3">You don&apos;t have a membership yet</h2>
           <p className="mt-1 text-slate-600">Join once, belong for life — Member ID card and Health Card issued instantly on enrollment.</p>
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             <Reveal>
@@ -84,9 +254,12 @@ export function MembershipDashboardPage() {
                     </li>
                   ))}
                 </ul>
-                <a href={MEMBERSHIP_URL} className="btn-base mt-6 w-full px-5 py-3 bg-gold-500 text-navy-950 hover:bg-gold-400">
-                  Get Membership <ArrowRightIcon className="h-4 w-4" />
-                </a>
+                <Link
+                  to="/membership/join"
+                  className="btn-base mt-6 w-full px-5 py-3 bg-gold-500 text-navy-950 hover:bg-gold-400 font-semibold"
+                >
+                  Join Membership <ArrowRightIcon className="h-4 w-4" />
+                </Link>
               </Card>
             </Reveal>
             <Reveal delay={100}>
@@ -94,6 +267,14 @@ export function MembershipDashboardPage() {
                 title="No active membership found"
                 body="Your Membership ID card, Health card, validity, and club privileges will appear here once you join FRCC."
                 icon={AwardIcon}
+                action={
+                  <Link
+                    to="/membership/join"
+                    className="btn-base inline-flex items-center gap-2 px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800 text-sm font-semibold rounded-xl"
+                  >
+                    Join Membership <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
+                }
               />
             </Reveal>
           </div>
@@ -102,47 +283,56 @@ export function MembershipDashboardPage() {
     );
   }
 
-  // Active state — shows both cards for the stored membership
-  const memberId = membership?.memberId || 'FRCC-MEMBER';
-  const [pdfError, setPdfError] = useState(null);
-  const [pdfBusy, setPdfBusy] = useState(false);
-
-  async function handleDownloadForm() {
-    setPdfError(null);
-    setPdfBusy(true);
-    try {
-      const { downloadApplicationFormPdf } = await import('../lib/applicationForm.js');
-      await downloadApplicationFormPdf(membership);
-    } catch (err) {
-      console.error('[MembershipDashboardPage] PDF build error:', err);
-      setPdfError(err?.message || 'Failed to generate application form PDF. Please try again.');
-    } finally {
-      setPdfBusy(false);
-    }
-  }
-
-  async function handleSendWhatsApp() {
-    setPdfError(null);
-    setPdfBusy(true);
-    try {
-      const { sendMembershipToWhatsApp } = await import('../lib/applicationForm.js');
-      await sendMembershipToWhatsApp(membership);
-    } catch (err) {
-      console.error('[MembershipDashboardPage] WhatsApp PDF send error:', err);
-      setPdfError(err?.message || 'Failed to prepare application form for WhatsApp. Please try again.');
-    } finally {
-      setPdfBusy(false);
-    }
-  }
-
+  // 4. Active state — starts right below compact navy header with minimal top spacing
   return (
     <div>
-      <HeroImage slot="hero-profile" />
-      <div className="container-x section-top">
+      {/* Compact Header on Navy: Page Title (serif, gold accent) and Member Name */}
+      <header className="bg-navy-950 text-white py-5 sm:py-6 border-b border-navy-900">
+        <div className="container-x flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-white">
+            Membership <span className="text-gold-400">Dashboard</span>
+          </h1>
+          {memberName && (
+            <span className="text-sm sm:text-base font-medium text-slate-300">
+              {memberName}
+            </span>
+          )}
+        </div>
+      </header>
+
+      {/* Dashboard Content — begins right below header with compact top spacing */}
+      <div className="container-x pt-5 pb-14 sm:pt-6 sm:pb-16">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Membership Dashboard' }]} />
-        <h1 className="h-section mt-3">{`${membership?.planName || 'FRCC Membership'} · ${memberId}`}</h1>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-600 text-sm">
+
+        {/* Member Summary Strip */}
+        <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm grid grid-cols-2 sm:grid-cols-5 gap-4 text-left">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Membership ID</p>
+            <p className="mt-1 font-mono font-bold text-navy-950 text-sm sm:text-base">{memberId}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Member Name</p>
+            <p className="mt-1 font-bold text-navy-950 text-sm sm:text-base truncate">{memberName}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Plan</p>
+            <p className="mt-1 font-bold text-navy-950 text-sm sm:text-base truncate">{planName}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</p>
+            <div className="mt-1">
+              <StatusTag status={memberStatus} className="!text-[11px] font-semibold" />
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Join Date</p>
+            <p className="mt-1 font-semibold text-slate-700 text-sm sm:text-base">{joinDate}</p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500 text-xs sm:text-sm">
           <span>Lifetime Active Membership · Film Recreation &amp; Cultural Centre</span>
+          <span>·</span>
           <LocationTrigger
             locationId="vja-membership"
             className="text-slate-600 hover:text-navy-950 font-medium"
@@ -151,7 +341,7 @@ export function MembershipDashboardPage() {
           </LocationTrigger>
         </div>
 
-        {/* Digital Privilege Cards Section: shows both cards */}
+        {/* Digital Privilege Cards Section */}
         <section aria-label="Official FRCC Cards" className="mt-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <div>
@@ -161,16 +351,33 @@ export function MembershipDashboardPage() {
             <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
               <button
                 type="button"
-                onClick={() => downloadBothCards(memberId)}
-                className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                onClick={handleDownloadIdCard}
+                className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-3.5 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                title="Download Membership ID Card PNG"
               >
-                Download cards
+                Download ID Card
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadHealthCard}
+                className="btn-base border-2 border-navy-900 bg-white text-navy-900 hover:bg-navy-50 px-3.5 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                title="Download Health Card PNG"
+              >
+                Download Health Card
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadBothCards(memberId)}
+                className="btn-base border-2 border-navy-900 bg-navy-50 text-navy-950 hover:bg-navy-100 px-3.5 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                title="Download both cards as PNG"
+              >
+                Download both cards
               </button>
               <button
                 type="button"
                 disabled={pdfBusy}
                 onClick={handleDownloadForm}
-                className="btn-base bg-navy-900 text-white hover:bg-navy-800 disabled:opacity-60 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                className="btn-base bg-navy-900 text-white hover:bg-navy-800 disabled:opacity-60 px-3.5 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
               >
                 {pdfBusy ? 'Generating PDF…' : 'Download application form'}
               </button>
@@ -178,7 +385,7 @@ export function MembershipDashboardPage() {
                 type="button"
                 disabled={pdfBusy}
                 onClick={handleSendWhatsApp}
-                className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-4 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
+                className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-3.5 py-2 font-semibold text-xs sm:text-sm rounded-xl transition shadow-sm inline-flex items-center gap-1.5"
               >
                 Send to WhatsApp
               </button>
@@ -207,7 +414,7 @@ export function MembershipDashboardPage() {
                   </span>
                   <span className="tag tag-green !text-[11px]">Verified Active</span>
                 </div>
-                <MembershipIdCard id="frcc-membership-id-card" member={membership} />
+                <MembershipIdCard id="frcc-membership-id-card" member={currentMembership} />
               </div>
             </Reveal>
 
@@ -219,7 +426,7 @@ export function MembershipDashboardPage() {
                   </span>
                   <span className="tag tag-gold !text-[11px]">{healthCardDiscountPercent}% Diagnostics Pass</span>
                 </div>
-                <HealthCard id="frcc-health-card" member={membership} />
+                <HealthCard id="frcc-health-card" member={currentMembership} />
               </div>
             </Reveal>
           </div>
@@ -255,12 +462,12 @@ export function MembershipDashboardPage() {
                 <p className="eyebrow">Member Support</p>
                 <h2 className="h-sub mt-1">Need help with your cards?</h2>
                 <p className="mt-3 text-sm text-slate-600 leading-relaxed">
-                  Present your digital Membership ID Card or FRCC Health Card at the club reception or collaborating diagnostic centres. You can download crisp PNG copies anytime using the button above.
+                  Present your digital Membership ID Card or FRCC Health Card at the club reception or collaborating diagnostic centres. You can download crisp PNG copies anytime using the buttons above.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Member ID: {memberId}</span>
-                <span className="font-medium text-emerald-600">Status: Active Lifetime</span>
+                <span className="font-medium text-emerald-600">Status: {memberStatus}</span>
               </div>
             </Card>
           </Reveal>

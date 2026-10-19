@@ -24,11 +24,12 @@ export function MembershipIdCard({
   const gradId = useId();
   const patternId = useId();
 
-  const name = member?.name || 'Member Name';
-  const memberId = member?.memberId || 'FRCC-2026-000000';
-  const planName = member?.planName || PLANS_DATA[0]?.name || 'FRCC Membership';
-  const issueDate = member?.createdAt ? formatDMY(member.createdAt) : formatDMY(new Date().toISOString());
-  const qrValue = `FRCC:MEMBER:${memberId}`;
+  const name = member?.name || member?.fullName || 'Member Name';
+  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
+  const planName = member?.planName || member?.plan_name || member?.plan || PLANS_DATA[0]?.name || 'FRCC Membership';
+  const rawDate = member?.createdAt || member?.created_at || member?.valid_from;
+  const issueDate = rawDate ? formatDMY(rawDate) : formatDMY(new Date().toISOString());
+  const qrValue = member?.qr_code || member?.qrValue || `FRCC:MEMBER:${memberId}`;
   const tagline = siteTagline || 'Reel stories... real connections...';
 
   return (
@@ -412,8 +413,8 @@ export function HealthCard({
   const gradId = useId();
   const patternId = useId();
 
-  const name = member?.name || 'Member Name';
-  const memberId = member?.memberId || 'FRCC-2026-000000';
+  const name = member?.name || member?.fullName || 'Member Name';
+  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
   const plan = PLANS_DATA[0] || {};
   const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 30;
   const healthCardNote = plan.healthCardNote || 'Discount valid only at diagnostic centres collaborating with FRCC.';
