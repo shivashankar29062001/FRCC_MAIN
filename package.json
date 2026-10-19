@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "node scripts/dev.mjs",
+    "server": "node server/index.js",
+    "seed": "node server/seed.js",
+    "check:images": "node server/scripts/check-images.js",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -12,6 +16,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
     "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",
