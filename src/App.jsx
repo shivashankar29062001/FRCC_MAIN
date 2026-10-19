@@ -11,6 +11,7 @@ import { HomeHubPage } from './pages/HomeHubPage.jsx';
 import { HotelPage } from './features/hotel/HotelPage.jsx';
 import { HallPage } from './features/hall/HallPage.jsx';
 import { ParkingPage } from './features/parking/ParkingPage.jsx';
+import ParkingBookingPage from './features/parking/slot/ParkingBookingPage.jsx';
 import { ActivitiesPage } from './features/activities/ActivitiesPage.jsx';
 import { ActivitiesProcessPage } from './features/activities/ActivitiesProcessPage.jsx';
 import { MembershipLandingPage } from './features/membership/MembershipPage.jsx';
@@ -43,7 +44,9 @@ export default function App() {
               <Route path="/book/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
               <Route path="/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
               <Route path="/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/book/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
+              {/* /book/parking — the Parking Slot team's booking flow (merged). */}
+              <Route path="/book/parking" element={<ProtectedRoute><ParkingBookingPage /></ProtectedRoute>} />
+              {/* /parking — FRCC_MAIN's parking landing (zones & offers). */}
               <Route path="/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
               <Route path="/book/activities" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />
               <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
