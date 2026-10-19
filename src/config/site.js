@@ -8,7 +8,7 @@ export const name = 'Film Recreation & Cultural Centre';
 export const shortName = 'FRCC';
 export const tagline = 'Reel stories... real connections...';
 
-export const phone = '+91 98663 33787';
+export const phone = '+91 78936 16262';
 export const vijayawadaPhone = '+91 98663 33787';
 export const hyderabadPhone = '+91 73967 44556';
 export const whatsappNumber = '919866333787';
