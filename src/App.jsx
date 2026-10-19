@@ -60,7 +60,7 @@ export default function App() {
                     <Route path="/home" element={<RequireAuth><HomeHubPage /></RequireAuth>} />
 
                     {/* Stay */}
-                    <Route path="/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
+                    <Route path="/stay" element={<HotelPage />} />
                     <Route path="/book/hotel" element={<RequireAuth forceGated><HotelPage /></RequireAuth>} />
                     <Route path="/book/stay" element={<RequireAuth forceGated><HotelPage /></RequireAuth>} />
                     <Route path="/stay/book" element={<RequireAuth forceGated><HotelPage /></RequireAuth>} />
@@ -73,32 +73,34 @@ export default function App() {
 
                     {/* Convention Hall — all hall entry routes open the Hall team's
                         booking flow, hosted in src/features/hall/convention/. */}
-                    <Route element={<ProtectedRoute><ConventionScope /></ProtectedRoute>}>
-                      <Route path="/book/hall" element={<ConventionBook />} />
-                      <Route path="/book/halls" element={<ConventionBook />} />
-                      <Route path="/halls/book" element={<ConventionBook />} />
+                    <Route element={<ConventionScope />}>
                       <Route path="/halls" element={<ConventionLanding />} />
                       <Route path="/hall" element={<ConventionLanding />} />
-                      <Route path="/convention/book" element={<ConventionBook />} />
-                      <Route path="/convention/date" element={<ConventionDate />} />
-                      <Route path="/convention/details" element={<ConventionDetails />} />
-                      <Route path="/convention/payment" element={<ConventionPayment />} />
-                      <Route path="/convention/confirmation" element={<ConventionConfirmation />} />
                       <Route path="/hall/:id" element={<ConventionHallDetail />} />
                       <Route path="/venue/:id" element={<ConventionVenuePage />} />
-                      <Route path="/my-bookings" element={<ConventionMyBookings />} />
                       <Route path="/reviews" element={<ConventionReviews />} />
-                      <Route path="/notifications" element={<ConventionNotifications />} />
                       <Route path="/contact" element={<ConventionContact />} />
+                      <Route path="/notifications" element={<ConventionNotifications />} />
+
+                      {/* Gated Convention Booking Flow */}
+                      <Route path="/book/hall" element={<RequireAuth forceGated><ConventionBook /></RequireAuth>} />
+                      <Route path="/book/halls" element={<RequireAuth forceGated><ConventionBook /></RequireAuth>} />
+                      <Route path="/halls/book" element={<RequireAuth forceGated><ConventionBook /></RequireAuth>} />
+                      <Route path="/convention/book" element={<RequireAuth forceGated><ConventionBook /></RequireAuth>} />
+                      <Route path="/convention/date" element={<RequireAuth forceGated><ConventionDate /></RequireAuth>} />
+                      <Route path="/convention/details" element={<RequireAuth forceGated><ConventionDetails /></RequireAuth>} />
+                      <Route path="/convention/payment" element={<RequireAuth forceGated><ConventionPayment /></RequireAuth>} />
+                      <Route path="/convention/confirmation" element={<RequireAuth forceGated><ConventionConfirmation /></RequireAuth>} />
+                      <Route path="/my-bookings" element={<RequireAuth forceGated><ConventionMyBookings /></RequireAuth>} />
                     </Route>
 
                     {/* Parking */}
-                    <Route path="/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
+                    <Route path="/parking" element={<ParkingPage />} />
                     <Route path="/parking/book" element={<RequireAuth forceGated><ParkingBookingPage /></RequireAuth>} />
                     <Route path="/book/parking" element={<RequireAuth forceGated><ParkingBookingPage /></RequireAuth>} />
 
                     {/* Activities */}
-                    <Route path="/activities" element={<ProtectedRoute><ActivitiesPage /></ProtectedRoute>} />
+                    <Route path="/activities" element={<ActivitiesPage />} />
                     <Route path="/book/activities" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
                     <Route path="/book/activities/process" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
 
