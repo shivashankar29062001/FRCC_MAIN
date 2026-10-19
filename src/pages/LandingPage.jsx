@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
+import { HeroSlider } from '../components/HeroSlider.jsx';
 import { PhotoTile, FilterRow, SectionLink, ExperienceSection } from '../components/ui/explore.jsx';
 import { Lightbox } from '../components/ui/lightbox.jsx';
-import { IMAGES } from '../config/images.js';
+import { IMAGES, gameSlot } from '../config/images.js';
 import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
@@ -39,10 +41,8 @@ const ACTIVITY_TABS = [
   { value: 'water', label: GAME_CATEGORIES.water },
 ];
 
-const GAMES_URL = getRedirect('activities');
 function gameHref(gameId) {
-  if (isPlaceholder(GAMES_URL)) return '/book/activities';
-  return `${GAMES_URL}?game=${encodeURIComponent(gameId)}`;
+  return `/activities?game=${encodeURIComponent(gameId)}`;
 }
 
 // 3d · Campus life gallery — 8 photos
@@ -77,7 +77,13 @@ export function LandingPage() {
 
   // ProtectedRoute lands logged-out visitors here with state.from
   const pendingFrom = typeof state?.from === 'string' ? state.from : null;
-  // signinState forwarded via navbar; kept here only if a local sign-in link is added.
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (state?.authPrompt && pendingFrom) {
+      openAuthPrompt(pendingFrom);
+    }
+  }, [state?.authPrompt, pendingFrom, openAuthPrompt]);
 
   // Deep links jump straight to section — instant, no smooth scroll
   useEffect(() => {
@@ -100,7 +106,7 @@ export function LandingPage() {
     <div>
       {/* 1 · HERO */}
       <div className="landing-hero-wrap">
-        <HeroImage slot="hero-home">
+        <HeroSlider slotsKey="home">
           <div className="landing-hero-overlay" aria-hidden="true" />
           <div className="container-x relative z-10 h-full flex items-center">
             <div className="landing-hero-text max-w-[520px] text-white">
@@ -164,7 +170,7 @@ export function LandingPage() {
 
             </div>
           </div>
-        </HeroImage>
+        </HeroSlider>
 
         {/* 1b · BOOKING CARD */}
         <div id="booking" className="landing-hero-card-wrap scroll-mt-24">
@@ -247,7 +253,7 @@ export function LandingPage() {
               <PhotoTile
                 key={g.id}
                 to={gameHref(g.id)}
-                image={IMAGES[g.imageKey]}
+                image={gameSlot(g.imageKey)}
                 label={g.name}
                 aspect="4 / 3"
                 sizes="(min-width: 1024px) 23vw, (min-width: 640px) 46vw, 92vw"

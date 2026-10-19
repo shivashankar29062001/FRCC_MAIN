@@ -1,15 +1,10 @@
 // ---------------------------------------------------------------------------
-// Activities/Games mock booking store — state + localStorage under ONE key,
-// so a refresh keeps bookings and Profile reads the same data.
-// Shape per booking:
-//   { bookingId, userId, game, date, slot, players, extras, amount, status,
-//     createdAt }   status: 'Confirmed' | 'Pending' | 'Cancelled'
-// Payments: { id, bookingId, method, amount, date, status }.
-// TODO(Phase 2): replace with POST/GET /api/activities/bookings and
-//   GET /api/payments (server-issued IDs, receipts, cancellation).
+// Activities/Games booking store — state + localStorage + Supabase sync.
+// Persists bookings and payments to Supabase while keeping local state responsive.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useState } from 'react';
+import { createBooking as createBookingInSupabase, getUserBookings, getUserPayments } from '../../services/bookingsService.js';
 
 export const BOOKINGS_STORAGE_KEY = 'frcc.activities.bookings.v1';
 const CHANGED_EVENT = 'frcc:activity-bookings-changed';
@@ -45,36 +40,98 @@ function writeStore(next) {
 let paySeq = 5000;
 
 /**
- * Persist a completed booking + its payment line.
+ * Persist a completed booking + its payment line to both localStorage and Supabase.
  * @returns {{ booking, payment }}
  */
 export function saveActivityBooking({ booking, payment }) {
   const store = readStore();
-  const record = { ...booking, createdAt: booking.createdAt || new Date().toISOString() };
+  const record = {
+    ...booking,
+    category: booking.category || 'activity',
+    createdAt: booking.createdAt || new Date().toISOString(),
+  };
   paySeq += 1;
-  // `date` is stored as an ISO timestamp; the UI formats it as DD/MM/YYYY, HH:MM.
   const payRecord = payment
     ? { id: `PAY-${paySeq}`, bookingId: record.bookingId, ...payment, date: new Date().toISOString() }
     : null;
+
   writeStore({
-    bookings: [record, ...store.bookings],
-    payments: payRecord ? [payRecord, ...store.payments] : store.payments,
+    bookings: [record, ...store.bookings.filter((b) => b.bookingId !== record.bookingId)],
+    payments: payRecord ? [payRecord, ...store.payments.filter((p) => p.id !== payRecord.id)] : store.payments,
   });
+
+  // Sync to Supabase in the background
+  createBookingInSupabase(record, payRecord)
+    .then(() => {
+      // Dispatch reload to fetch any server-side generated fields
+      window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
+    })
+    .catch((err) => {
+      console.warn('Background Supabase booking sync error:', err);
+    });
+
   return { booking: record, payment: payRecord };
 }
 
 /** Reactive reader — Profile and any other page stay in sync. */
 export function useActivityBookings() {
   const [store, setStore] = useState(readStore);
+
+  const fetchRemote = useCallback(async () => {
+    try {
+      const [remoteBookings, remotePayments] = await Promise.all([
+        getUserBookings(),
+        getUserPayments(),
+      ]);
+
+      if (remoteBookings.length > 0 || remotePayments.length > 0) {
+        const local = readStore();
+        // Merge without duplicating
+        const bookingMap = new Map();
+        [...local.bookings, ...remoteBookings].forEach((b) => {
+          const key = b.bookingId || b.id;
+          if (key && !bookingMap.has(key)) bookingMap.set(key, b);
+        });
+
+        const paymentMap = new Map();
+        [...local.payments, ...remotePayments].forEach((p) => {
+          const key = p.id || p.payment_id;
+          if (key && !paymentMap.has(key)) paymentMap.set(key, p);
+        });
+
+        const merged = {
+          bookings: Array.from(bookingMap.values()),
+          payments: Array.from(paymentMap.values()),
+        };
+
+        try {
+          window.localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(merged));
+        } catch {
+          /* ignore */
+        }
+        setStore(merged);
+      }
+    } catch (err) {
+      console.warn('Could not sync remote bookings:', err);
+    }
+  }, []);
+
   useEffect(() => {
     const reload = () => setStore(readStore());
     window.addEventListener(CHANGED_EVENT, reload);
     window.addEventListener('storage', reload);
+    fetchRemote();
+
     return () => {
       window.removeEventListener(CHANGED_EVENT, reload);
       window.removeEventListener('storage', reload);
     };
-  }, []);
-  const refresh = useCallback(() => setStore(readStore()), []);
+  }, [fetchRemote]);
+
+  const refresh = useCallback(() => {
+    setStore(readStore());
+    fetchRemote();
+  }, [fetchRemote]);
+
   return { bookings: store.bookings, payments: store.payments, refresh };
 }

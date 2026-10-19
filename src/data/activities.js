@@ -330,6 +330,55 @@ export const games = [
     cancellationNote: 'Free cancellation up to 24 hours before the slot.',
   },
   {
+    id: 'squash',
+    name: 'Squash',
+    category: 'indoor',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00', // SAMPLE
+    openTo: '22:00', // SAMPLE
+    maxPlayers: 4,
+    imageKey: 'squash',
+    blurb: 'Two international-standard glass-back squash courts with wooden flooring.', // SAMPLE
+    level: 'All levels', // SAMPLE
+    hours: { open: 6, close: 22 }, // SAMPLE
+    playerLabel: 'Players', // SAMPLE
+    rentalPrice: 50, // SAMPLE
+    extraFields: [
+      { id: 'court', label: 'Court number', type: 'select', required: true, options: ['Court 1', 'Court 2'] }, // SAMPLE
+    ],
+    rules: ['Non-marking indoor court shoes mandatory.', 'Report 10 minutes prior to your slot time.'], // SAMPLE
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
+  },
+  {
+    id: 'basketball',
+    name: 'Basketball',
+    category: 'outdoor',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00', // SAMPLE
+    openTo: '21:00', // SAMPLE
+    maxPlayers: 10,
+    imageKey: 'basketball',
+    blurb: 'Full-size outdoor floodlit basketball court with tournament hoops.', // SAMPLE
+    level: 'All levels', // SAMPLE
+    hours: { open: 6, close: 21 }, // SAMPLE
+    playerLabel: 'Players (both teams)', // SAMPLE
+    rentalPrice: 50, // SAMPLE
+    extraFields: [
+      { id: 'court', label: 'Court format', type: 'select', required: true, options: ['Full court', 'Half court'] }, // SAMPLE
+      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 1, max: 5, placeholder: 'e.g. 5' }, // SAMPLE
+    ],
+    rules: ['Proper athletic basketball footwear required.', 'Balls issued at the sports reception against deposit.'], // SAMPLE
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
+  },
+  {
     id: 'luxury-gym',
     name: 'Luxury Gym',
     category: 'fitness', // Client: category "fitness"

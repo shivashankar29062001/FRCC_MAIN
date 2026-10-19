@@ -294,6 +294,7 @@ function targetFor(tabId, v) {
     if (checkout) params.set('checkout', checkout);
     if (v.adults) params.set('adults', v.adults);
     if (v.rooms) params.set('rooms', v.rooms);
+    params.set('item', v.item || v.room || 'standard');
   }
   if (tabId === 'hall') {
     const date = parseDMY(v.date);
@@ -315,10 +316,9 @@ function targetFor(tabId, v) {
   }
 
   const qs = params.toString();
-  const url = getRedirect(t.redirectKey);
-  // A service whose URL is still a placeholder ("#") falls back to its own page
-  // in the app, so the bar always lands somewhere useful.
-  const base = isPlaceholder(url) ? t.showcase : url;
+  // In Hyatt-style browsing, search always navigates to the public showcase page with query parameters
+  // so results are displayed on the public page without requiring sign-in.
+  const base = t.showcase;
   return `${base}${qs ? `?${qs}` : ''}`;
 }
 
@@ -413,19 +413,7 @@ function useBookingForm(defaultTab, preselect) {
     // Brief beat so the button's loading state is perceptible, then redirect.
     setTimeout(() => {
       setBusy(false);
-      if (!user) {
-        // Logged out → the protected target redirects to "/" with state.from,
-        // and the Sign in link forwards the visitor back after signing in.
-        navigate(target);
-        return;
-      }
-      if (target.startsWith('/')) {
-        navigate(target);
-      } else if (OPEN_IN_NEW_TAB) {
-        window.open(target, '_blank', 'noopener,noreferrer');
-      } else {
-        window.location.assign(target);
-      }
+      navigate(target);
     }, 450);
   }
 

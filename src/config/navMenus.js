@@ -54,11 +54,11 @@ export const NAV_MENUS = {
   hall: {
     label: 'Halls',
     cards: halls.map((h) => ({
-      to: '/book/hall#booking',
+      to: '/halls',
       label: shortName(h.name, area.name),
       image: { ...IMAGES[h.id], name: shortName(h.name, area.name) },
     })),
-    viewAll: { to: '/book/hall', label: 'View all halls' },
+    viewAll: { to: '/halls', label: 'View all halls' },
   },
   activities: {
     label: 'Activities',
@@ -72,11 +72,11 @@ export const NAV_MENUS = {
   parking: {
     label: 'Parking',
     cards: zones.map((z) => ({
-      to: '/book/parking#booking',
+      to: '/parking',
       label: shortName(z.name, area.name),
       image: { ...IMAGES[z.id], name: shortName(z.name, area.name) },
     })),
-    viewAll: { to: '/book/parking', label: 'View all zones' },
+    viewAll: { to: '/parking', label: 'View all zones' },
   },
 };
 

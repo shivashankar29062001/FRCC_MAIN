@@ -6,9 +6,11 @@
 // real routes/URLs those teams ship (e.g. "https://booking.frcc.club/hotel").
 // ---------------------------------------------------------------------------
 
-export const HOTEL_BOOKING_URL = '#';
-export const HALL_BOOKING_URL = '#';
-export const PARKING_BOOKING_URL = '#';
+export const HOTEL_BOOKING_URL = '/book/hotel';
+// Phase 2: the Convention Hall flow is merged INTO this app (src/features/hall/convention),
+// so the Hall links now point at the in-app booking route instead of an external URL.
+export const HALL_BOOKING_URL = '/book/hall';
+export const PARKING_BOOKING_URL = '/parking/book';
 export const ACTIVITIES_BOOKING_URL = '/book/activities/process';
 export const MEMBERSHIP_URL = '/membership';
 

@@ -1,8 +1,17 @@
-import { localFor, REMOTE, getObjectPosition } from "../config/images.js";
+import { localFor, REMOTE, FALLBACK, getObjectPosition } from "../config/images.js";
 import { SmartImage } from "./ui/media.jsx";
+import { HeroSlider } from "./HeroSlider.jsx";
 
 export function HeroImage({ slot, size = "large", children }) {
-  const src = localFor(slot) || REMOTE[slot] || null;
+  if (slot === 'hero-home' || slot === 'hero-hub') {
+    return (
+      <HeroSlider slotsKey={slot === 'hero-home' ? 'home' : 'hub'}>
+        {children}
+      </HeroSlider>
+    );
+  }
+
+  const src = localFor(slot) || REMOTE[slot] || FALLBACK[slot] || null;
   const objectPosition = getObjectPosition(slot);
   return (
     <section className="hero">

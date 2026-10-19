@@ -127,7 +127,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 a:not(.btn-base):not(.tag):not([class*="tag-"]):not([class*="icon"]) {
   @apply transition-colors duration-150;
 }
-a:not(.btn-base):not(.tag):not([class*="tag-"]):hover {
+a:not(.btn-base):not(.tag):not([class*="tag-"]):not(.bg-gold):hover {
   color: #C9A227; /* gold-500 */
 }
 
@@ -743,5 +743,17 @@ select.booking-field {
     width: 100% !important;
     max-width: 100% !important;
   }
+}
+
+/* ======================================================================== */
+/* Convention Hall module (merged from the Hall team's app).                 */
+/* Scoped to .convention-scope so the hall screens keep their own heading    */
+/* style (Playfair on navy) without touching any other page in the app.      */
+/* ======================================================================== */
+.convention-scope h1:not(.convention-hero-quote),
+.convention-scope h2,
+.convention-scope h3,
+.convention-scope h4 {
+  @apply font-serif text-navy;
 }
 

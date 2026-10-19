@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Clean FRCC receipt emblem: round navy and gold emblem with film reel, temple dome and waves, NO text or tagline -->
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle (navy) -->
+  <circle cx="128" cy="128" r="120" fill="#1A1A5E"/>
+  <!-- Gold outer ring -->
+  <circle cx="128" cy="128" r="112" fill="none" stroke="#C9A227" stroke-width="8" stroke-linecap="round"/>
+  <!-- Film reel central axis -->
+  <path d="M128 44 L128 112" stroke="#C9A227" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="124" cy="76" r="4" fill="#C9A227"/>
+  <circle cx="132" cy="76" r="4" fill="#C9A227"/>
+  <circle cx="120" cy="92" r="4" fill="#C9A227"/>
+  <circle cx="136" cy="92" r="4" fill="#C9A227"/>
+  <!-- Temple dome (top) -->
+  <path d="M128 24 L100 15 L156 15 Z" fill="#C9A227"/>
+  <path d="M128 18 L95 2 L161 2 Z" fill="#1A1A5E"/>
+  <!-- Waves at bottom -->
+  <path d="M32 170 Q64 180 96 170 T128 180 T160 170 T192 180 Q224 180 256 170 V150 H32 Z" fill="#1A1A5E"/>
+</svg>

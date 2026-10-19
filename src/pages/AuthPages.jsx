@@ -110,13 +110,16 @@ export function SignupPage() {
       return;
     }
     setBusy(true);
-    // TODO: POST /api/auth/signup + email/OTP verification; handle API errors below.
-    setTimeout(() => {
-      setBusy(false);
-      signup(form);
-      pushToast('Account created. Please sign in.');
-      navigate('/signin');
-    }, 600);
+    signup(form)
+      .then(() => {
+        setBusy(false);
+        pushToast('Account created successfully! Please sign in.');
+        navigate('/signin');
+      })
+      .catch((err) => {
+        setBusy(false);
+        pushToast(err?.message || 'Failed to create account. Please check your details.', 'error');
+      });
   }
 
   return (
@@ -241,18 +244,35 @@ export function SigninPage() {
       return;
     }
     setBusy(true);
-    // TODO: POST /api/auth/login, handle invalid credentials + lockout.
-    setTimeout(() => {
-      setBusy(false);
-      login({ name: form.emailOrPhone.split('@')[0] || 'Member', emailOrPhone: form.emailOrPhone });
-      pushToast('Signed in');
-      try {
-        window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
-      } catch {
-        /* ignore */
-      }
-      navigate(resolvedFrom, { replace: true });
-    }, 600);
+    login({ emailOrPhone: form.emailOrPhone, password: form.password })
+      .then(() => {
+        setBusy(false);
+        pushToast('Welcome back to FRCC!');
+        try {
+          window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
+        } catch {
+          /* ignore */
+        }
+        navigate(resolvedFrom, { replace: true });
+      })
+      .catch((err) => {
+        setBusy(false);
+        pushToast(err?.message || 'Invalid email or password. Please try again.', 'error');
+      });
+  }
+
+  async function handleForgotPassword() {
+    if (!form.emailOrPhone.trim()) {
+      pushToast('Please enter your email or mobile number above first.', 'error');
+      return;
+    }
+    try {
+      const { resetPassword } = await import('../services/authService.js');
+      await resetPassword(form.emailOrPhone);
+      pushToast('Password reset instructions sent to your email.');
+    } catch (err) {
+      pushToast(err?.message || 'Failed to send reset link.', 'error');
+    }
   }
 
   return (
@@ -305,7 +325,7 @@ export function SigninPage() {
           <button
             type="button"
             className="text-slate-500 underline underline-offset-4 hover:text-navy-900"
-            onClick={() => pushToast('Forgot password flow coming soon', 'error')}
+            onClick={handleForgotPassword}
           >
             Forgot Password?
           </button>

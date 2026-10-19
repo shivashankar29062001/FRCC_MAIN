@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
+import { isAdmin } from '../../api/events.js';
 import { Toasts } from '../ui/feedback.jsx';
 import { PhotoCard } from '../ui/explore.jsx';
 import { cx, initialsOf } from '../../utils/helpers.js';
 import { SITE_INFO, getAddressLines, getActiveSocialLinks } from '../../config/siteInfo.js';
 import { MEMBER_PROMO_NOTE } from '../../config/pricing.js';
+import { diningLabel } from '../../config/site.js';
 import { NAV_MENUS } from '../../config/navMenus.js';
 import {
   UserIcon,
@@ -89,19 +91,24 @@ function OutlineCta({ to, size = 'sm', className, onClick, state, children }) {
 // Footer service list (label + link only).
 const SERVICES = [
   { to: '/stay', label: 'Stay' },
+  { to: '/dining', label: diningLabel },
   { to: '/halls', label: 'Halls' },
   { to: '/activities', label: 'Activities' },
   { to: '/parking', label: 'Parking' },
   { to: '/membership', label: 'Membership' },
+  { to: '/events', label: 'Events' },
   { to: '/gallery', label: 'Gallery' },
 ];
 
 // Primary service links (plain links, no mega-menus)
 const MENU_LINKS = [
   { key: 'stay', label: 'Stay', to: '/stay' },
+  { key: 'dining', label: diningLabel, to: '/dining' },
   { key: 'hall', label: 'Halls', to: '/halls' },
   { key: 'activities', label: 'Activities', to: '/activities' },
   { key: 'parking', label: 'Parking', to: '/parking' },
+  { key: 'membership', label: 'Membership', to: '/membership' },
+  { key: 'events', label: 'Events', to: '/events' },
 ];
 
 export function Navbar() {
@@ -113,6 +120,25 @@ export function Navbar() {
   const [menu, setMenu] = useState(null); // open mega-menu key (desktop)
   const [mMenu, setMMenu] = useState(null); // open accordion key (mobile)
   const [avatar, setAvatar] = useState(false); // account menu
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (user) {
+      isAdmin()
+        .then((res) => {
+          if (active) setIsAdminUser(Boolean(res));
+        })
+        .catch(() => {
+          if (active) setIsAdminUser(false);
+        });
+    } else {
+      setIsAdminUser(false);
+    }
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   function closeAll() {
     setOpen(false);
@@ -260,6 +286,13 @@ export function Navbar() {
               </Link>
             </li>
           )}
+          {isAdminUser && (
+            <li>
+              <Link role="menuitem" to="/admin/events" onClick={onNavigate} className={rowLink}>
+                <span className="flex h-4 w-4 items-center justify-center rounded text-[11px] font-bold text-gold-600">★</span> Admin
+              </Link>
+            </li>
+          )}
         </ul>
         <div className="border-t border-slate-100 p-2">
           <button
@@ -326,7 +359,13 @@ export function Navbar() {
           </div>
           {/* Member offer — read from /config/pricing.js, so the % is never
               restated here and always matches the real discount. */}
-          {MEMBER_PROMO_NOTE && <p className="text-gold-400">{MEMBER_PROMO_NOTE}</p>}
+          <div className="flex items-center gap-4">
+            {MEMBER_PROMO_NOTE && <p className="text-gold-400">{MEMBER_PROMO_NOTE}</p>}
+            <div className="flex items-center gap-3 border-l border-white/20 pl-3">
+              <NavLink to="/gallery" className="transition-colors duration-150 hover:text-gold-400">Gallery</NavLink>
+              <NavLink to="/leadership" className="transition-colors duration-150 hover:text-gold-400">Leadership</NavLink>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -338,20 +377,23 @@ export function Navbar() {
           {/* Centre · the primary links */}
           <nav className="hidden items-center justify-center gap-0.5 text-[13px] font-medium min-[1200px]:flex" aria-label="Primary">
             <NavLink to="/stay" className={navLink}>Stay</NavLink>
+            <NavLink to="/dining" className={navLink}>{diningLabel}</NavLink>
             <NavLink to="/halls" className={navLink}>Halls</NavLink>
             <NavLink to="/activities" className={navLink}>Activities</NavLink>
             <NavLink to="/parking" className={navLink}>Parking</NavLink>
             <NavLink to="/membership" className={navLink}>Membership</NavLink>
-            <NavLink to="/gallery" className={navLink}>Gallery</NavLink>
-            <NavLink to="/leadership" className={navLink}>Leadership</NavLink>
+            <NavLink to="/events" className={navLink}>Events</NavLink>
           </nav>
 
           {/* Right · account + the gold booking CTA */}
           <div className="flex items-center justify-end gap-2">
             <div className="hidden items-center gap-2 min-[1200px]:flex">
               {!user && <NavLink to="/signin" state={signinState} className={navLink}>Sign in</NavLink>}
-              <GoldCta to="/book" onClick={onBookNow}>Book now</GoldCta>
-              {!user && <OutlineCta to="/signup" onClick={closeAll}>Join now</OutlineCta>}
+              {isMember ? (
+                <GoldCta to="/book" onClick={onBookNow}>Book now</GoldCta>
+              ) : (
+                <GoldCta to="/membership" onClick={closeAll}>Become a member</GoldCta>
+              )}
               {user && <AccountMenu />}
             </div>
 
@@ -405,6 +447,11 @@ export function Navbar() {
                   </NavLink>
                 </li>
                 <li>
+                  <NavLink to="/dining" onClick={closeAll} className={mobileRowActive}>
+                    {diningLabel}
+                  </NavLink>
+                </li>
+                <li>
                   <NavLink to="/halls" onClick={closeAll} className={mobileRowActive}>
                     Halls
                   </NavLink>
@@ -422,6 +469,11 @@ export function Navbar() {
                 <li>
                   <NavLink to="/membership" onClick={closeAll} className={mobileRowActive}>
                     Membership
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/events" onClick={closeAll} className={mobileRowActive}>
+                    Events
                   </NavLink>
                 </li>
                 <li>
@@ -447,14 +499,15 @@ export function Navbar() {
                     </div>
                   </>
                 ) : (
-                  <>
-                    <NavLink to="/signin" state={signinState} onClick={closeAll} className={mobileRow}>
-                      Sign in
-                    </NavLink>
-                    <OutlineCta to="/signup" size="md" className="mt-2 w-full" onClick={closeAll}>Join now</OutlineCta>
-                  </>
+                  <NavLink to="/signin" state={signinState} onClick={closeAll} className={mobileRow}>
+                    Sign in
+                  </NavLink>
                 )}
-                <GoldCta to="/book" size="md" className="mt-2 w-full" onClick={onBookNow}>Book now</GoldCta>
+                {isMember ? (
+                  <GoldCta to="/book" size="md" className="mt-2 w-full" onClick={onBookNow}>Book now</GoldCta>
+                ) : (
+                  <GoldCta to="/membership" size="md" className="mt-2 w-full" onClick={closeAll}>Become a member</GoldCta>
+                )}
                 {MEMBER_PROMO_NOTE && (
                   <p className="mt-3 rounded-xl border border-gold-500/40 bg-gold-50 px-3 py-2 text-xs font-semibold text-navy-900">
                     {MEMBER_PROMO_NOTE}

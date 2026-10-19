@@ -24,11 +24,12 @@ export function MembershipIdCard({
   const gradId = useId();
   const patternId = useId();
 
-  const name = member?.name || 'Member Name';
-  const memberId = member?.memberId || 'FRCC-2026-000000';
-  const planName = member?.planName || PLANS_DATA[0]?.name || 'FRCC Membership';
-  const issueDate = member?.createdAt ? formatDMY(member.createdAt) : formatDMY(new Date().toISOString());
-  const qrValue = `FRCC:MEMBER:${memberId}`;
+  const name = member?.name || member?.fullName || 'Member Name';
+  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
+  const planName = member?.planName || member?.plan_name || member?.plan || PLANS_DATA[0]?.name || 'FRCC Membership';
+  const rawDate = member?.createdAt || member?.created_at || member?.valid_from;
+  const issueDate = rawDate ? formatDMY(rawDate) : formatDMY(new Date().toISOString());
+  const qrValue = member?.qr_code || member?.qrValue || `FRCC:MEMBER:${memberId}`;
   const tagline = siteTagline || 'Reel stories... real connections...';
 
   return (
@@ -399,7 +400,7 @@ export function MembershipIdCard({
 /**
  * 2. <HealthCard />
  * Title "FRCC Health Card", name, member ID, "Lifetime",
- * line "20% discount at collaborating diagnostic centres" (percent from site config),
+ * line "30% discount at collaborating diagnostic centres" (percent from site config),
  * and the healthCardNote from the data ("Discount valid only at diagnostic centres collaborating with FRCC.").
  * Show the centre list only when diagnosticCentres in the data is not empty.
  * 856x540 viewBox, Navy (#0b1a33) and Gold (#d4af55), FRCC emblem, no animations.
@@ -412,10 +413,10 @@ export function HealthCard({
   const gradId = useId();
   const patternId = useId();
 
-  const name = member?.name || 'Member Name';
-  const memberId = member?.memberId || 'FRCC-2026-000000';
+  const name = member?.name || member?.fullName || 'Member Name';
+  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
   const plan = PLANS_DATA[0] || {};
-  const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 20;
+  const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 30;
   const healthCardNote = plan.healthCardNote || 'Discount valid only at diagnostic centres collaborating with FRCC.';
   const diagnosticCentres = Array.isArray(plan.diagnosticCentres) ? plan.diagnosticCentres : [];
 
@@ -763,14 +764,13 @@ export function HealthCard({
 }
 
 /**
- * Downloads an SVG DOM element as a high-resolution PNG file using pure HTML5 Canvas (no external libraries).
+ * Converts an SVG DOM element to a high-resolution PNG Blob using pure HTML5 Canvas.
  *
  * @param {SVGElement} svgElement
- * @param {string} filename
- * @returns {Promise<void>}
+ * @returns {Promise<Blob|null>}
  */
-export async function downloadSvgAsPng(svgElement, filename) {
-  if (!svgElement) return;
+export async function getSvgAsPngBlob(svgElement) {
+  if (!svgElement) return null;
 
   const svgXml = new XMLSerializer().serializeToString(svgElement);
   const svgBlob = new Blob([svgXml], { type: 'image/svg+xml;charset=utf-8' });
@@ -791,26 +791,35 @@ export async function downloadSvgAsPng(svgElement, filename) {
       URL.revokeObjectURL(blobUrl);
 
       canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve();
-          return;
-        }
-        const a = document.createElement('a');
-        a.download = filename;
-        a.href = URL.createObjectURL(blob);
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        resolve();
+        resolve(blob);
       }, 'image/png');
     };
     img.onerror = () => {
       URL.revokeObjectURL(blobUrl);
-      resolve();
+      resolve(null);
     };
     img.src = blobUrl;
   });
+}
+
+/**
+ * Downloads an SVG DOM element as a high-resolution PNG file using pure HTML5 Canvas (no external libraries).
+ *
+ * @param {SVGElement} svgElement
+ * @param {string} filename
+ * @returns {Promise<void>}
+ */
+export async function downloadSvgAsPng(svgElement, filename) {
+  const blob = await getSvgAsPngBlob(svgElement);
+  if (!blob) return;
+  const URL = window.URL || window.webkitURL;
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /**
@@ -840,6 +849,7 @@ export async function downloadBothCards(memberId = 'FRCC-MEMBER') {
 export default {
   MembershipIdCard,
   HealthCard,
+  getSvgAsPngBlob,
   downloadSvgAsPng,
   downloadBothCards,
 };

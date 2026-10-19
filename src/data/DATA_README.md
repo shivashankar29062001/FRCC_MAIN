@@ -31,7 +31,7 @@ The following 4 items require official client confirmation and details:
    - *Status*: GST not confirmed by client.
 
 4. **Collaborating Diagnostic Centres List (`src/data/membership.js`)**:
-   - Directory of diagnostic centres collaborating with FRCC to offer the **20% Health Card discount** to members (centre name, address, contact, and qualifying tests).
+   - Directory of diagnostic centres collaborating with FRCC to offer the **30% Health Card discount** to members (centre name, address, contact, and qualifying tests).
    - *Status*: Initialized as an empty array `diagnosticCentres: []` (list not provided yet).
 
 ---
@@ -57,7 +57,7 @@ FRCC operates a single flagship destination in **Vijayawada, Andhra Pradesh**:
 - **WhatsApp Desk**: `917893616262` (footer/contact plain link: `https://wa.me/917893616262`)
 - **Member Discounts**:
   - `memberDiscountPercent`: **30%** on bookings across club facilities
-  - `healthCardDiscountPercent`: **20%** at collaborating diagnostic centres
+  - `healthCardDiscountPercent`: **30%** at collaborating diagnostic centres
 - **Support Email**: `hello@frcc.example` *(SAMPLE)*
 - **Hours**: `Front desk open 6 AM – 11 PM daily` *(SAMPLE)*
 
@@ -135,7 +135,7 @@ Single plan shown as a centred card:
 - **Validity**: `"lifetime"`
 - **Benefits**:
   1. 30% discount on every booking
-  2. Health card: 20% discount at collaborating diagnostic centres
+  2. Health card: 30% discount at collaborating diagnostic centres
   3. Membership ID card and Health card
 - **Diagnostic Centres**: `[]` *(empty, list not provided yet)*
 - **Health Card Note**: *"Discount valid only at diagnostic centres collaborating with FRCC."*
