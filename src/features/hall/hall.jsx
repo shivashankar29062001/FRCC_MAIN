@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
-// Phase 1: intentionally EMPTY — the Convention/Function Hall has NO booking
-// steps here. The Hall booking flow lives on the other team's page; link to it
-// via HALL_BOOKING_URL in /config/redirects.js (see ../hall/HallPage.jsx).
-// TODO(Phase 2): after the merge, host the Hall team's steps in this folder.
+// Phase 2 DONE — the Hall team's booking steps are merged into this folder.
+// The full Convention Hall flow now lives in ./convention/ (pages, components,
+// services, context) and is wired to /book/hall, /halls, /convention/* in
+// src/App.jsx. The Express API it talks to lives in /server (proxied via
+// /api in vite.config.js).
 // ---------------------------------------------------------------------------

@@ -9,7 +9,21 @@ import { LandingPage } from './pages/LandingPage.jsx';
 import { SignupPage, SigninPage } from './pages/AuthPages.jsx';
 import { HomeHubPage } from './pages/HomeHubPage.jsx';
 import { HotelPage } from './features/hotel/HotelPage.jsx';
-import { HallPage } from './features/hall/HallPage.jsx';
+// Convention Hall module — merged from the Hall team's app (FRCC CONVENTION).
+// Clicking "Convention Hall" / "Halls" anywhere in the app opens these screens.
+import ConventionScope from './features/hall/convention/ConventionScope.jsx';
+import ConventionLanding from './features/hall/convention/pages/Landing.jsx';
+import ConventionBook from './features/hall/convention/pages/ConventionBook.jsx';
+import ConventionDate from './features/hall/convention/pages/ConventionDate.jsx';
+import ConventionDetails from './features/hall/convention/pages/ConventionDetails.jsx';
+import ConventionPayment from './features/hall/convention/pages/ConventionPayment.jsx';
+import ConventionConfirmation from './features/hall/convention/pages/ConventionConfirmation.jsx';
+import ConventionHallDetail from './features/hall/convention/pages/HallDetail.jsx';
+import ConventionVenuePage from './features/hall/convention/pages/VenuePage.jsx';
+import ConventionMyBookings from './features/hall/convention/pages/MyBookings.jsx';
+import ConventionReviews from './features/hall/convention/pages/Reviews.jsx';
+import ConventionNotifications from './features/hall/convention/pages/Notifications.jsx';
+import ConventionContact from './features/hall/convention/pages/Contact.jsx';
 import { ParkingPage } from './features/parking/ParkingPage.jsx';
 import { ActivitiesPage } from './features/activities/ActivitiesPage.jsx';
 import { ActivitiesProcessPage } from './features/activities/ActivitiesProcessPage.jsx';
@@ -39,10 +53,25 @@ export default function App() {
               <Route path="/book/hotel" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
               <Route path="/book/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
               <Route path="/stay" element={<ProtectedRoute><HotelPage /></ProtectedRoute>} />
-              <Route path="/book/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/book/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/halls" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
-              <Route path="/hall" element={<ProtectedRoute><HallPage /></ProtectedRoute>} />
+              {/* Convention Hall — all hall entry routes open the Hall team's
+                  booking flow, hosted in src/features/hall/convention/. */}
+              <Route element={<ProtectedRoute><ConventionScope /></ProtectedRoute>}>
+                <Route path="/book/hall" element={<ConventionBook />} />
+                <Route path="/book/halls" element={<ConventionBook />} />
+                <Route path="/halls" element={<ConventionLanding />} />
+                <Route path="/hall" element={<ConventionLanding />} />
+                <Route path="/convention/book" element={<ConventionBook />} />
+                <Route path="/convention/date" element={<ConventionDate />} />
+                <Route path="/convention/details" element={<ConventionDetails />} />
+                <Route path="/convention/payment" element={<ConventionPayment />} />
+                <Route path="/convention/confirmation" element={<ConventionConfirmation />} />
+                <Route path="/hall/:id" element={<ConventionHallDetail />} />
+                <Route path="/venue/:id" element={<ConventionVenuePage />} />
+                <Route path="/my-bookings" element={<ConventionMyBookings />} />
+                <Route path="/reviews" element={<ConventionReviews />} />
+                <Route path="/notifications" element={<ConventionNotifications />} />
+                <Route path="/contact" element={<ConventionContact />} />
+              </Route>
               <Route path="/book/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
               <Route path="/parking" element={<ProtectedRoute><ParkingPage /></ProtectedRoute>} />
               <Route path="/book/activities" element={<ProtectedRoute><ActivitiesProcessPage /></ProtectedRoute>} />

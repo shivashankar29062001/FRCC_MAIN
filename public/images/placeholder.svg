@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#1e243b"/>
+  <g fill="none" stroke="#c9a227" stroke-width="6" opacity="0.6">
+    <rect x="600" y="280" width="400" height="280" rx="8"/>
+    <path d="M560 280 L800 160 L1040 280"/>
+    <path d="M760 560 v-120 h80 v120"/>
+  </g>
+  <text x="800" y="640" font-family="Georgia, serif" font-size="42" fill="#c9a227" text-anchor="middle">FRCC CONVENTIONS</text>
+  <text x="800" y="690" font-family="Arial, sans-serif" font-size="26" fill="#8b93b0" text-anchor="middle">Photo unavailable</text>
+</svg>
