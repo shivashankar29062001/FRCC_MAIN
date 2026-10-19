@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - completed
-      - features/payment
   workflow_dispatch:
 
 permissions:
