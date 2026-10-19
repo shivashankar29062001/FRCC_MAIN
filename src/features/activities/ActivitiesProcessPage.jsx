@@ -7,7 +7,7 @@ import { Button, Input, Select, LoadingButton } from '../../components/ui/contro
 import { Card, EmptyState, SectionHeading } from '../../components/ui/feedback.jsx';
 import { FlowShell } from '../../components/FlowShell.jsx';
 import { Reveal } from '../../components/ui/motion.jsx';
-import { IMAGES } from '../../config/images.js';
+import { IMAGES, gameSlot } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
 import { getSlots } from './availability.service.js';
@@ -503,7 +503,7 @@ export function ActivitiesProcessPage() {
 
     return {
       name: game?.name || 'Activity',
-      image: game ? IMAGES[game.imageKey] : undefined,
+      image: game ? gameSlot(game.imageKey) : undefined,
       detail: detailText,
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
@@ -563,7 +563,7 @@ export function ActivitiesProcessPage() {
                       }`}
                     >
                       <span aria-hidden className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
-                        <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="56px" />
+                        <SmartImage image={gameSlot(g.imageKey)} aspect="1 / 1" sizes="56px" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
@@ -940,7 +940,7 @@ export function ActivitiesProcessPage() {
                     className="card card-hover flex items-center gap-3 p-3 text-left"
                   >
                     <span aria-hidden className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
-                      <SmartImage image={IMAGES[g.imageKey]} aspect="1 / 1" sizes="48px" />
+                      <SmartImage image={gameSlot(g.imageKey)} aspect="1 / 1" sizes="48px" />
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-navy-900">{g.name}</span>

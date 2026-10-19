@@ -53,12 +53,17 @@ export function SupportPage() {
       return;
     }
     setBusy((b) => ({ ...b, contact: true }));
-    // TODO(Phase 2): POST /api/support/contact — surface API errors in contactErr.
-    setTimeout(() => {
-      setBusy((b) => ({ ...b, contact: false }));
-      pushToast('Message sent');
-      setContact({ name: '', email: '', message: '' });
-    }, 600);
+    import('../services/supportService.js')
+      .then(({ sendContactMessage }) => sendContactMessage(contact))
+      .then(() => {
+        setBusy((b) => ({ ...b, contact: false }));
+        pushToast('Thank you! Your message has been sent to the front desk.');
+        setContact({ name: '', email: '', message: '' });
+      })
+      .catch((err) => {
+        setBusy((b) => ({ ...b, contact: false }));
+        pushToast(err?.message || 'Failed to send message. Please try again.', 'error');
+      });
   }
 
   function raiseTicket(e) {
@@ -72,12 +77,17 @@ export function SupportPage() {
       return;
     }
     setBusy((b) => ({ ...b, ticket: true }));
-    // TODO(Phase 2): POST /api/support/tickets + attachment upload.
-    setTimeout(() => {
-      setBusy((b) => ({ ...b, ticket: false }));
-      pushToast(`Ticket raised: ${ticket.category}`);
-      setTicket({ category: '', priority: 'Normal', subject: '', details: '' });
-    }, 600);
+    import('../services/supportService.js')
+      .then(({ createTicket }) => createTicket(ticket))
+      .then((created) => {
+        setBusy((b) => ({ ...b, ticket: false }));
+        pushToast(`Ticket raised: #${created.ticket_id} (${ticket.category})`);
+        setTicket({ category: '', priority: 'Normal', subject: '', details: '' });
+      })
+      .catch((err) => {
+        setBusy((b) => ({ ...b, ticket: false }));
+        pushToast(err?.message || 'Failed to raise ticket. Please try again.', 'error');
+      });
   }
 
   return (

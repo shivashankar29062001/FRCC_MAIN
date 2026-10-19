@@ -3,16 +3,20 @@
 // Powering Stay, Halls, Parking, Activities, and Membership landing pages.
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
-import { IMAGES, roomSlot } from '../config/images.js';
+import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
 import { areas as hotelAreas, rooms as hotelRooms } from '../data/hotel.js';
 import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
 import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
 import { games as activityGames } from '../data/activities.js';
 import { formatInr } from '../utils/pricing.js';
+import { HALL_BOOKING_URL, PARKING_BOOKING_URL } from '../config/redirects.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 import {
   plans as membershipPlans,
   BENEFITS_DATA,
@@ -45,6 +49,24 @@ const ALL_EXPLORE_LINKS = [
 ];
 
 export function ServiceLanding({ service = 'stay', hero }) {
+  const { user } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (location.state?.authPrompt && location.state?.from && !user) {
+      openAuthPrompt(location.state.from);
+    }
+  }, [location.state, user, openAuthPrompt]);
+
+  function handleActionClick(e, to) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(to);
+    }
+  }
+
   // Normalize service key ('hotel' -> 'stay', 'hall' -> 'halls')
   const normService = service === 'hotel' ? 'stay' : service === 'hall' ? 'halls' : service;
   const heroService = normService === 'halls' ? 'hall' : normService;
@@ -110,8 +132,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
           locationId: 'vja-halls',
           locationName: 'Vijayawada Campus · Convention Block',
-          buttonLabel: 'Select hall',
-          to: `/book/hall?item=${encodeURIComponent(h.id)}`,
+          buttonLabel: 'Book Hall',
+          to: HALL_BOOKING_URL,
         };
       });
     }
@@ -131,8 +153,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
         locationId: 'vja-parking',
         locationName: 'Vijayawada Campus · Automated Parking',
-        buttonLabel: 'Reserve parking',
-        to: `/book/parking?item=${encodeURIComponent(z.id)}`,
+        buttonLabel: 'Book Parking',
+        to: PARKING_BOOKING_URL,
       }));
     }
 
@@ -157,7 +179,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         return {
           id: g.id,
           name: g.name,
-          image: IMAGES[g.imageKey] || IMAGES.badminton,
+          image: gameSlot(g.imageKey),
           facts: [
             `${g.slotMinutes} min session duration`,
             `Capacity: Up to ${g.maxPlayers} players`,
@@ -180,7 +202,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         image: IMAGES[p.imageSlot] || IMAGES.serviceMembership,
         facts: p.benefits || [
           '30% discount on every booking',
-          'Health card: 20% discount at collaborating diagnostic centres',
+          `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
           'Membership ID card and Health card',
         ],
         priceDisplay: formatInr(p.price || p.amount),
@@ -403,6 +425,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
                   <div className="mt-5 pt-1">
                     <Link
                       to={item.to}
+                      onClick={(e) => handleActionClick(e, item.to)}
                       className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
                     >
                       {item.buttonLabel}
@@ -496,6 +519,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
               <div className="mt-8 flex justify-center">
                 <Link
                   to={FINAL_STRIP.buttonLink}
+                  onClick={(e) => handleActionClick(e, FINAL_STRIP.buttonLink)}
                   className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-3.5 text-base font-semibold inline-flex items-center gap-2"
                 >
                   {FINAL_STRIP.buttonText}

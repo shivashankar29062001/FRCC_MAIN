@@ -34,9 +34,13 @@ export class ErrorBoundary extends Component {
             {this.state.error && (
               <details className="mt-4 text-left p-3 rounded-xl bg-slate-100 text-xs text-slate-600">
                 <summary className="font-semibold cursor-pointer">Error details</summary>
-                <pre className="mt-2 overflow-auto max-h-40">{this.state.error?.message || this.state.error}</pre>
+                <pre className="mt-2 overflow-auto max-h-40 font-mono text-red-700 whitespace-pre-wrap">
+                  {this.state.error?.stack || this.state.error?.message || String(this.state.error)}
+                </pre>
                 {this.state.errorInfo?.componentStack && (
-                  <pre className="mt-2 overflow-auto max-h-40">{this.state.errorInfo.componentStack}</pre>
+                  <pre className="mt-2 overflow-auto max-h-40 font-mono text-slate-600 whitespace-pre-wrap">
+                    {this.state.errorInfo.componentStack}
+                  </pre>
                 )}
               </details>
             )}

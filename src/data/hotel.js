@@ -3,12 +3,17 @@
 // Single Location: Vijayawada
 // ---------------------------------------------------------------------------
 
-import { roomSlot } from '../config/images.js';
+import { roomImage, roomSlot } from '../config/images.js';
 
 // The club has ONE location, Vijayawada. (Array kept so it can grow later)
 export const areas = [
-  { id: 'vja', name: 'Vijayawada' },
+  { id: 'vijayawada', name: 'Vijayawada' },
 ];
+
+export const checkInTime = '12:00 PM'; // SAMPLE
+export const checkOutTime = '11:00 AM'; // SAMPLE
+export const maxNights = 30; // Maximum duration for stay bookings
+export const cancellationPolicy = 'Free cancellation up to 48 hours before check-in. Cancellations within 48 hours are subject to a 1-night retention fee.'; // SAMPLE
 
 /**
  * Price per night.
@@ -23,7 +28,7 @@ export const rooms = [
   // --- Category: Normal (Range ₹2,500 – ₹4,500) ---
   {
     id: 'vja-standard-room',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Standard Room',
     type: 'Standard Room',
     category: 'normal',
@@ -33,15 +38,15 @@ export const rooms = [
     sizeSqft: 280, // SAMPLE
     maxGuests: 2, // SAMPLE
     maxOccupancy: 2, // SAMPLE
-    roomsTotal: 10, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 10, // SAMPLE (10 for normal)
     amenities: ['Free WiFi', 'AC', 'Queen Bed', 'Breakfast Included', 'Room Service'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Comfortable and well-appointed standard room with modern amenities and courtyard view.', // SAMPLE
-    image: roomSlot('Standard Room'),
+    image: roomImage('standard-room'),
   },
   {
     id: 'vja-deluxe-room',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Deluxe Room',
     type: 'Deluxe Room',
     category: 'normal',
@@ -51,15 +56,15 @@ export const rooms = [
     sizeSqft: 380, // SAMPLE
     maxGuests: 2, // SAMPLE
     maxOccupancy: 2, // SAMPLE
-    roomsTotal: 12, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 10, // SAMPLE (10 for normal)
     amenities: ['Free WiFi', 'River View Balcony', 'King Bed', 'AC', 'Breakfast Included', 'Pool Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Spacious deluxe room with private balcony, scenic views, and club pool access.', // SAMPLE
-    image: roomSlot('Deluxe Room'),
+    image: roomImage('deluxe-room'),
   },
   {
     id: 'vja-premium-room',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Premium Room',
     type: 'Premium Room',
     category: 'normal',
@@ -69,17 +74,17 @@ export const rooms = [
     sizeSqft: 450, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 8, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 10, // SAMPLE (10 for normal)
     amenities: ['Free WiFi', 'Floor-to-Ceiling Windows', 'King Bed', 'AC', 'Breakfast Included', 'Pool & Gym Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Premium room with floor-to-ceiling windows, luxury bath fittings, and full campus privileges.', // SAMPLE
-    image: roomSlot('Premium Room'),
+    image: roomImage('premium-room'),
   },
 
   // --- Category: Suite (Range ₹4,500 – ₹10,000) ---
   {
     id: 'vja-junior-suite',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Junior Suite',
     type: 'Junior Suite',
     category: 'suite',
@@ -89,15 +94,15 @@ export const rooms = [
     sizeSqft: 600, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 6, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 4, // SAMPLE (4 for suites)
     amenities: ['Free WiFi', 'Living Area', 'King Bed', 'AC', 'Jacuzzi', 'Breakfast Included', 'Club Lounge Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Generously proportioned junior suite featuring a separate sitting lounge and riverfront vistas.', // SAMPLE
-    image: roomSlot('Junior Suite'),
+    image: roomImage('junior-suite'),
   },
   {
     id: 'vja-executive-suite',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Executive Suite',
     type: 'Executive Suite',
     category: 'suite',
@@ -107,15 +112,15 @@ export const rooms = [
     sizeSqft: 750, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 4, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 4, // SAMPLE (4 for suites)
     amenities: ['Free WiFi', 'Separate Living Room', 'Ergonomic Desk', 'Jacuzzi', 'Breakfast Included', 'VIP Concierge'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Executive suite with private meeting lounge, ergonomic work alcove, and bespoke butler service.', // SAMPLE
-    image: roomSlot('Executive Suite'),
+    image: roomImage('executive-suite'),
   },
   {
     id: 'vja-royal-suite',
-    areaId: 'vja',
+    areaId: 'vijayawada',
     name: 'Royal Suite',
     type: 'Royal Suite',
     category: 'suite',
@@ -125,11 +130,11 @@ export const rooms = [
     sizeSqft: 1100, // SAMPLE
     maxGuests: 4, // SAMPLE
     maxOccupancy: 4, // SAMPLE
-    roomsTotal: 2, // SAMPLE (client to confirm exact inventory)
+    roomsTotal: 4, // SAMPLE (4 for suites)
     amenities: ['Private Terrace', 'Dedicated Butler Service', 'Living & Dining Room', 'Jacuzzi', 'Breakfast Included', 'Valet Parking'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Palatial royal suite with expansive private terrace, dining room, jacuzzi, and 24-hour butler concierge.', // SAMPLE
-    image: roomSlot('Royal Suite'),
+    image: roomImage('royal-suite'),
   },
 ];
 
