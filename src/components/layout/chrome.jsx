@@ -610,6 +610,12 @@ export function Footer() {
                   >
                     <address className="not-italic">{loc.fullAddress}</address>
                   </LocationTrigger>
+                  {loc.phone && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+                      <PhoneIcon className="h-3 w-3 shrink-0 text-gold-400" />
+                      <a href={`tel:${loc.phone.replace(/\s/g, '')}`} className="transition hover:text-gold-300">{loc.phone}</a>
+                    </div>
+                  )}
                 </li>
               ))
             ) : addressLines.length > 0 && (

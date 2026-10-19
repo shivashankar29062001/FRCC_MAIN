@@ -159,6 +159,14 @@ export function SupportPage() {
                         >
                           <address className="not-italic inline">{loc.fullAddress}</address>
                         </LocationTrigger>
+                        {loc.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-navy-900 mt-1">
+                            <PhoneIcon className="h-3 w-3 shrink-0 text-gold-600" />
+                            <a href={`tel:${loc.phone.replace(/\s/g, '')}`} className="font-semibold underline-offset-4 hover:underline">
+                              {loc.phone}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))

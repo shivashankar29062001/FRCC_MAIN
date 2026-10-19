@@ -7,6 +7,7 @@ export const LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062,
     lng: 80.6480,
+    phone: '+91 98663 33787',
     isDefault: true,
   },
   {
@@ -16,6 +17,7 @@ export const LOCATIONS = [
     address: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
     lat: 17.4483,
     lng: 78.3915,
+    phone: '+91 73967 44556',
     isDefault: false,
   },
 ];

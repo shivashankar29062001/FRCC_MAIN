@@ -13,7 +13,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: '6:00 AM – 11:00 PM daily',
     landmark: 'Gulabithota Road, Near Riverfront Promenade',
     parkingInfo: 'Multi-level parking with 500+ bays, EV fast charging, and complimentary valet for members',
@@ -26,7 +26,7 @@ export const FACILITY_LOCATIONS = [
     address: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
     lat: 17.4483, // TODO: replace with real coordinates
     lng: 78.3915, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 73967 44556',
     openingHours: '9:00 AM – 7:00 PM (Monday – Saturday)',
     landmark: 'Above Axis Bank, Image Gardens Road, Jaihind Enclave, Madhapur',
     parkingInfo: 'Dedicated basement parking and reserved visitor parking slots',
@@ -39,7 +39,7 @@ export const FACILITY_LOCATIONS = [
     address: 'Rayapudi, Capital City Region, Amaravati, Guntur District, Andhra Pradesh – 522237',
     lat: 16.5108, // TODO: replace with real coordinates
     lng: 80.5061, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: 'Upcoming facility · Preview desk 10:00 AM – 5:00 PM',
     landmark: 'Near Government Secretariat Complex, Rayapudi',
     parkingInfo: 'Surface parking available on site',
@@ -52,7 +52,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: '24 Hours Front Desk & Check-in',
     landmark: 'FRCC Campus, North Wing overlooking Krishna River',
     parkingInfo: 'Dedicated hotel guest porch, luggage valet, and covered basement parking',
@@ -65,7 +65,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: '6:00 AM – 11:30 PM (Event dependent)',
     landmark: 'FRCC Grand Convention Block, Main Portico Entry',
     parkingInfo: 'Large capacity banquet parking, direct VIP drop-off ramp, and valet reception',
@@ -78,7 +78,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: 'Open 24x7 for all club members and guests',
     landmark: 'Gate 2 Entrance, Gulabithota Road',
     parkingInfo: '4-level automated parking with 340 bays, 20 EV charging stations, CCTV, and ANPR fast access',
@@ -91,7 +91,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: '6:00 AM – 10:00 PM daily (Courts lit till late)',
     landmark: 'Sports Pavilion & Poolside, FRCC Campus',
     parkingInfo: 'Direct sports pavilion parking and bike bays',
@@ -104,7 +104,7 @@ export const FACILITY_LOCATIONS = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     lat: 16.5062, // TODO: replace with real coordinates
     lng: 80.6480, // TODO: replace with real coordinates
-    phone: '+91 78936 16262',
+    phone: '+91 98663 33787',
     openingHours: '9:00 AM – 8:00 PM daily',
     landmark: 'Central Clubhouse Lobby, Ground Floor',
     parkingInfo: 'Complimentary member valet and priority club portico parking',

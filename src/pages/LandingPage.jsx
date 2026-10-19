@@ -357,6 +357,14 @@ export function LandingPage() {
                       <div>
                         <span className="block font-semibold text-navy-900">{loc.title}</span>
                         <address className="not-italic text-slate-600 text-xs sm:text-sm">{loc.fullAddress}</address>
+                        {loc.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1">
+                            <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
+                            <a href={`tel:${loc.phone.replace(/\s/g, '')}`} className="transition-colors hover:text-gold-600 font-medium">
+                              {loc.phone}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </LocationTrigger>
                   </li>
