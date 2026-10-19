@@ -124,6 +124,9 @@ export async function saveUserMembership(membershipData) {
     amount_paid: Number(membershipData.amountPaid ?? membershipData.planPrice ?? 0), // TODO-REMOVE-TEST-COUPON
     coupon_code: membershipData.couponCode || null, // TODO-REMOVE-TEST-COUPON
     is_test: Boolean(membershipData.isTest), // TODO-REMOVE-TEST-COUPON
+    payment_id: membershipData.paymentId || null,
+    order_id: membershipData.orderId || null,
+    signature: membershipData.signature || null,
     date_of_birth: membershipData.dateOfBirth || membershipData.dob || null,
     gender: membershipData.gender || null,
     address_line: membershipData.addressLine || membershipData.address || null,

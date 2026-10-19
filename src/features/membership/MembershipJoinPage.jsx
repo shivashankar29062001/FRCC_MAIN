@@ -9,6 +9,7 @@ import { parseDMY } from '../../utils/dates.js';
 import { IMAGES } from '../../config/images.js';
 import { PLANS_DATA } from '../../data/membership.js';
 import { formatInr } from '../../utils/pricing.js';
+import { initiateRazorpayPayment } from '../../services/razorpayService.js';
 
 // TODO-REMOVE-TEST-COUPON
 const COUPON_ENABLED = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_TEST_COUPON !== 'false';
@@ -504,48 +505,88 @@ export function MembershipJoinPage() {
         ? `XXXX XXXX ${formData.aadhaarLast4}`
         : '';
 
-      const record = {
-        userId: user?.id || user?.userId || null,
-        memberId,
-        name: formData.fullName || user?.name || 'Member',
-        mobile: formData.mobile || '',
-        email: formData.email || '',
-        planName: selectedPlan?.name || 'FRCC Membership',
-        planPrice: planBasePrice,
-        amountPaid: finalPrice, // TODO-REMOVE-TEST-COUPON
-        paymentMethod: finalPrice === 0 ? 'coupon' : (formData.paymentMethod || 'upi'), // TODO-REMOVE-TEST-COUPON
-        couponCode: (COUPON_ENABLED && appliedCoupon) ? appliedCoupon.code : null, // TODO-REMOVE-TEST-COUPON
-        isTest: Boolean(appliedCoupon?.is_test), // TODO-REMOVE-TEST-COUPON
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        dateOfBirth: formData.dob || '',
-        gender: formData.gender || '',
-        address: formData.address || '',
-        addressLine: formData.address || '',
-        city: formData.city || '',
-        state: formData.state || '',
-        pincode: formData.pincode || '',
-        emergencyContact,
-        aadhaarMasked,
+      const finalizeEnrollment = async (paymentDetails = {}) => {
+        const record = {
+          userId: user?.id || user?.userId || null,
+          memberId,
+          name: formData.fullName || user?.name || 'Member',
+          mobile: formData.mobile || '',
+          email: formData.email || '',
+          planName: selectedPlan?.name || 'FRCC Membership',
+          planPrice: planBasePrice,
+          amountPaid: finalPrice,
+          paymentMethod: finalPrice === 0 ? 'coupon' : (formData.paymentMethod || 'razorpay'),
+          couponCode: (COUPON_ENABLED && appliedCoupon) ? appliedCoupon.code : null,
+          isTest: Boolean(appliedCoupon?.is_test),
+          paymentId: paymentDetails.paymentId || null,
+          orderId: paymentDetails.orderId || null,
+          signature: paymentDetails.signature || null,
+          status: 'Active',
+          createdAt: new Date().toISOString(),
+          dateOfBirth: formData.dob || '',
+          gender: formData.gender || '',
+          address: formData.address || '',
+          addressLine: formData.address || '',
+          city: formData.city || '',
+          state: formData.state || '',
+          pincode: formData.pincode || '',
+          emergencyContact,
+          aadhaarMasked,
+        };
+
+        const saved = await saveMembership(record);
+        const insertedId = saved?.id || saved?.memberId || memberId;
+        console.info('[membership] inserted row id:', insertedId);
+
+        updateForm({ memberId });
+        pushToast(
+          finalPrice === 0
+            ? `Welcome to ${selectedPlan?.name || 'FRCC'}! Test coupon membership activated.`
+            : `Payment verified! Welcome to ${selectedPlan?.name || 'FRCC'} Membership.`
+        );
+        setStep(5);
+        setPaying(false);
       };
 
-      const saved = await saveMembership(record);
-      const insertedId = saved?.id || saved?.memberId || memberId;
-      console.info('[membership] inserted row id:', insertedId);
+      // If price is 0 (100% coupon), finalize immediately without gateway
+      if (finalPrice === 0) {
+        await finalizeEnrollment();
+        return;
+      }
 
-      updateForm({ memberId });
-      pushToast(
-        finalPrice === 0
-          ? `Welcome to ${selectedPlan?.name || 'FRCC'}! Test coupon membership activated.`
-          : `Payment verified! Welcome to ${selectedPlan?.name || 'FRCC'} Membership.`
-      );
-      setStep(5);
+      // Launch Razorpay Payment Gateway modal
+      await initiateRazorpayPayment({
+        amount: finalPrice,
+        planName: selectedPlan?.name || 'FRCC Membership',
+        description: `${selectedPlan?.period || '1 Year'} Membership Subscription`,
+        receiptId: memberId,
+        prefill: {
+          name: formData.fullName || user?.name || '',
+          email: formData.email || user?.email || '',
+          mobile: formData.mobile || user?.phone || '',
+        },
+        notes: {
+          memberId,
+          planId: selectedPlan?.id || '',
+        },
+        onSuccess: async (paymentDetails) => {
+          await finalizeEnrollment(paymentDetails);
+        },
+        onDismiss: () => {
+          submittedRef.current = false;
+          setPaying(false);
+        },
+        onError: (err) => {
+          submittedRef.current = false;
+          setPaying(false);
+          setSubmitError(err?.message || 'Payment processing failed. Please try again.');
+        },
+      });
     } catch (err) {
-      console.error('Failed to save membership:', err);
+      console.error('Failed to process membership payment:', err);
       submittedRef.current = false;
-      setSubmitError(err?.message || 'Failed to save membership to database. Please try again.');
-    } finally {
       setPaying(false);
+      setSubmitError(err?.message || 'Failed to process payment. Please try again.');
     }
   }
 
