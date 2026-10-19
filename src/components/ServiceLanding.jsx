@@ -179,6 +179,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         return {
           id: g.id,
           name: g.name,
+          subtitle: g.subtitle,
           image: gameSlot(g.imageKey),
           facts: [
             `${g.slotMinutes} min session duration`,
@@ -382,6 +383,10 @@ export function ServiceLanding({ service = 'stay', hero }) {
                 </div>
                 <div className="flex flex-1 flex-col p-5 sm:p-6">
                   <h3 className="font-display text-xl font-bold text-navy-900">{item.name}</h3>
+
+                  {item.subtitle && (
+                    <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
+                  )}
 
                   {item.locationName && (
                     <div className="mt-1">

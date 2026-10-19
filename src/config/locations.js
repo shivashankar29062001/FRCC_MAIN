@@ -138,6 +138,7 @@ const ALIASES = {
   tennis: 'vja-activities',
   'swimming-pool': 'vja-activities',
   football: 'vja-activities',
+  'card-room': 'vja-activities',
   membership: 'vja-membership',
   hyd: 'hyd-office',
   hyderabad: 'hyd-office',
