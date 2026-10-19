@@ -1,2 +1,2 @@
 export { ParkingPage } from './ParkingPage.jsx';
-export { ParkingBookingPage } from './ParkingBookingPage.jsx';
+export { default as ParkingBookingPage } from './slot/ParkingBookingPage.jsx';
