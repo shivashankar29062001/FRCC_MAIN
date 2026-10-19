@@ -3,7 +3,7 @@
 // Single Location: Vijayawada
 // ---------------------------------------------------------------------------
 
-import { roomSlot } from '../config/images.js';
+import { roomImage, roomSlot } from '../config/images.js';
 
 // The club has ONE location, Vijayawada. (Array kept so it can grow later)
 export const areas = [
@@ -42,7 +42,7 @@ export const rooms = [
     amenities: ['Free WiFi', 'AC', 'Queen Bed', 'Breakfast Included', 'Room Service'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Comfortable and well-appointed standard room with modern amenities and courtyard view.', // SAMPLE
-    image: roomSlot('Standard Room'),
+    image: roomImage('standard-room'),
   },
   {
     id: 'vja-deluxe-room',
@@ -60,7 +60,7 @@ export const rooms = [
     amenities: ['Free WiFi', 'River View Balcony', 'King Bed', 'AC', 'Breakfast Included', 'Pool Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Spacious deluxe room with private balcony, scenic views, and club pool access.', // SAMPLE
-    image: roomSlot('Deluxe Room'),
+    image: roomImage('deluxe-room'),
   },
   {
     id: 'vja-premium-room',
@@ -78,7 +78,7 @@ export const rooms = [
     amenities: ['Free WiFi', 'Floor-to-Ceiling Windows', 'King Bed', 'AC', 'Breakfast Included', 'Pool & Gym Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Premium room with floor-to-ceiling windows, luxury bath fittings, and full campus privileges.', // SAMPLE
-    image: roomSlot('Premium Room'),
+    image: roomImage('premium-room'),
   },
 
   // --- Category: Suite (Range ₹4,500 – ₹10,000) ---
@@ -98,7 +98,7 @@ export const rooms = [
     amenities: ['Free WiFi', 'Living Area', 'King Bed', 'AC', 'Jacuzzi', 'Breakfast Included', 'Club Lounge Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Generously proportioned junior suite featuring a separate sitting lounge and riverfront vistas.', // SAMPLE
-    image: roomSlot('Junior Suite'),
+    image: roomImage('junior-suite'),
   },
   {
     id: 'vja-executive-suite',
@@ -116,7 +116,7 @@ export const rooms = [
     amenities: ['Free WiFi', 'Separate Living Room', 'Ergonomic Desk', 'Jacuzzi', 'Breakfast Included', 'VIP Concierge'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Executive suite with private meeting lounge, ergonomic work alcove, and bespoke butler service.', // SAMPLE
-    image: roomSlot('Executive Suite'),
+    image: roomImage('executive-suite'),
   },
   {
     id: 'vja-royal-suite',
@@ -134,7 +134,7 @@ export const rooms = [
     amenities: ['Private Terrace', 'Dedicated Butler Service', 'Living & Dining Room', 'Jacuzzi', 'Breakfast Included', 'Valet Parking'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Palatial royal suite with expansive private terrace, dining room, jacuzzi, and 24-hour butler concierge.', // SAMPLE
-    image: roomSlot('Royal Suite'),
+    image: roomImage('royal-suite'),
   },
 ];
 

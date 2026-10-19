@@ -170,25 +170,21 @@ export async function createBooking(payload) {
   }
 
   // Real Database Execution via create_stay_booking RPC
-  const { data: sessionData } = await supabase.auth.getSession();
-  const currentUserId = payload.userId || payload.user_id || sessionData?.session?.user?.id || null;
-
   const { data, error } = await supabase.rpc('create_stay_booking', {
-    p_client_request_id: clientRequestId,
-    p_user_id: currentUserId,
-    p_room_type_id: payload.roomTypeId || payload.room_type_id,
+    p_adults: Number(payload.adults || 1),
     p_check_in: payload.checkIn || payload.check_in,
     p_check_out: payload.checkOut || payload.check_out,
-    p_rooms: Number(payload.rooms || 1),
-    p_adults: Number(payload.adults || 1),
     p_children: Number(payload.children || 0),
-    p_guest_name: payload.guestName || payload.guest_name || '',
-    p_guest_mobile: payload.guestMobile || payload.guest_mobile || '',
-    p_guest_email: payload.guestEmail || payload.guest_email || '',
-    p_special_request: payload.specialRequest || payload.special_request || null,
-    p_payment_method: payload.paymentMethod || payload.payment_method || 'upi',
+    p_client_request_id: clientRequestId,
     p_coupon_code: payload.couponCode || payload.coupon_code || null,
+    p_guest_email: payload.guestEmail || payload.guest_email || '',
+    p_guest_mobile: payload.guestMobile || payload.guest_mobile || '',
+    p_guest_name: payload.guestName || payload.guest_name || '',
     p_is_mock_paid: Boolean(payload.isMockPaid || payload.total === 0),
+    p_payment_method: payload.paymentMethod || payload.payment_method || 'upi',
+    p_room_type_id: payload.roomTypeId || payload.room_type_id,
+    p_rooms: Number(payload.rooms || 1),
+    p_special_request: payload.specialRequest || payload.special_request || null,
   });
 
   if (error) {

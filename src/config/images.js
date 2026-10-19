@@ -539,20 +539,121 @@ export const IMAGES = {
  * Slot for a room type (mega-menu + section pages). Falls back to a null
  * slot carrying the type name when the type has no entry yet.
  */
+/**
+ * Room type alias map to existing verified REMOTE photos.
+ * Ensures one distinct photo per room type.
+ */
 const ROOM_ALIASES = {
-  'room-standard-room': 'room-standard-garden',
-  'room-deluxe-room': 'room-deluxe-lake-view',
-  'room-premium-room': 'room-premium-twin',
-  'room-junior-suite': 'room-family-suite',
-  'room-standard': 'room-standard-garden',
-  'room-deluxe': 'room-deluxe-lake-view',
-  'room-premium': 'room-premium-twin',
+  'standard-room': 'room-standard-garden',
+  'deluxe-room': 'room-deluxe-lake-view',
+  'premium-room': 'room-premium-twin',
+  'junior-suite': 'room-executive-floor',
+  'executive-suite': 'room-executive-suite',
+  'royal-suite': 'room-royal-suite',
+  // Database seed / legacy prefix aliases
+  'vja-standard-room': 'room-standard-garden',
+  'vja-deluxe-room': 'room-deluxe-lake-view',
+  'vja-premium-room': 'room-premium-twin',
+  'vja-junior-suite': 'room-executive-floor',
+  'vja-executive-suite': 'room-executive-suite',
+  'vja-royal-suite': 'room-royal-suite',
+  // Short/fallback aliases
+  'standard': 'room-standard-garden',
+  'deluxe': 'room-deluxe-lake-view',
+  'premium': 'room-premium-twin',
 };
 
+/**
+ * Normalizes any room id or name into a clean canonical slug.
+ */
+function normalizeRoomSlug(id) {
+  return String(id || '')
+    .toLowerCase()
+    .replace(/^room-/, '')
+    .replace(/^vja-/, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Human-readable room title from room id.
+ */
+function formatRoomName(id) {
+  const slug = normalizeRoomSlug(id);
+  return slug
+    .split('-')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ') || 'Hotel Room';
+}
+
+/**
+ * ONE resolver roomImage(id) used everywhere a room photo is shown:
+ * Chain:
+ * 1. Local file in src/assets/images whose name equals room id (standard-room, deluxe-room, etc.)
+ * 2. REMOTE["room-" + id]
+ * 3. ROOM_ALIASES mapping to verified REMOTE photo
+ * 4. Navy SmartImage tile with room name (console.warn when nothing resolves)
+ *
+ * @param {string} id
+ * @returns {object} { slot, name, src, srcSet, alt }
+ */
+export function roomImage(id) {
+  const raw = String(id || '').trim();
+  const slug = normalizeRoomSlug(raw);
+  const roomName = formatRoomName(raw);
+
+  // 1. Local file in src/assets/images
+  const localSrc = localFor(slug) || (raw ? localFor(raw) : null);
+  if (localSrc) {
+    return {
+      slot: slug,
+      name: roomName,
+      src: localSrc,
+      srcSet: '',
+      alt: roomName,
+    };
+  }
+
+  // 2. REMOTE["room-" + id] or direct key in REMOTE
+  const remoteDirectKey = `room-${slug}`;
+  if (REMOTE[remoteDirectKey]) {
+    return {
+      slot: remoteDirectKey,
+      name: roomName,
+      src: REMOTE[remoteDirectKey],
+      srcSet: '',
+      alt: roomName,
+    };
+  }
+
+  // 3. ROOM_ALIASES map to existing verified REMOTE photos
+  const aliasTarget = ROOM_ALIASES[slug] || ROOM_ALIASES[raw];
+  if (aliasTarget && REMOTE[aliasTarget]) {
+    return {
+      slot: aliasTarget,
+      name: roomName,
+      src: REMOTE[aliasTarget],
+      srcSet: '',
+      alt: roomName,
+    };
+  }
+
+  // 4. Fallback: navy SmartImage tile with room name
+  console.warn('[room image] unresolved', id);
+  return {
+    slot: `room-${slug || 'unknown'}`,
+    name: roomName,
+    src: null,
+    srcSet: '',
+    alt: roomName,
+  };
+}
+
+/**
+ * Backward-compatible roomSlot delegating to roomImage.
+ */
 export function roomSlot(type) {
-  const key = `room-${String(type).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
-  const resolvedKey = ROOM_ALIASES[key] || key;
-  return IMAGES[resolvedKey] || IMAGES[key] || { slot: key, name: type, src: null, srcSet: '', alt: '' };
+  return roomImage(type);
 }
 
 /**

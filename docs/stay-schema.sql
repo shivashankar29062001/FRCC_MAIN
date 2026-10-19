@@ -141,23 +141,28 @@ $$ LANGUAGE plpgsql STABLE;
 
 -- 4. FUNCTION create_stay_booking
 CREATE OR REPLACE FUNCTION public.create_stay_booking(
-  p_client_request_id TEXT,
-  p_user_id UUID,
-  p_room_type_id TEXT,
+  p_adults INTEGER,
   p_check_in DATE,
   p_check_out DATE,
-  p_rooms INTEGER DEFAULT 1,
-  p_adults INTEGER DEFAULT 1,
-  p_children INTEGER DEFAULT 0,
-  p_guest_name TEXT DEFAULT '',
-  p_guest_mobile TEXT DEFAULT '',
-  p_guest_email TEXT DEFAULT '',
-  p_special_request TEXT DEFAULT NULL,
-  p_payment_method TEXT DEFAULT 'upi',
+  p_children INTEGER,
+  p_client_request_id TEXT,
   p_coupon_code TEXT DEFAULT NULL,
-  p_is_mock_paid BOOLEAN DEFAULT false
-) RETURNS public.stay_bookings AS $$
+  p_guest_email TEXT DEFAULT '',
+  p_guest_mobile TEXT DEFAULT '',
+  p_guest_name TEXT DEFAULT '',
+  p_is_mock_paid BOOLEAN DEFAULT FALSE,
+  p_payment_method TEXT DEFAULT 'upi',
+  p_room_type_id TEXT DEFAULT NULL,
+  p_rooms INTEGER DEFAULT 1,
+  p_special_request TEXT DEFAULT NULL,
+  p_user_id UUID DEFAULT NULL
+) RETURNS public.stay_bookings
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
+  v_uid UUID;
   v_existing public.stay_bookings;
   v_room public.room_types;
   v_nights INTEGER;
@@ -174,6 +179,16 @@ DECLARE
   v_new_booking public.stay_bookings;
   v_coupon RECORD;
 BEGIN
+  -- Never trust p_user_id: use auth.uid()
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Authentication required to make a stay reservation.';
+  END IF;
+
+  IF p_user_id IS NOT NULL AND p_user_id <> v_uid THEN
+    RAISE EXCEPTION 'Invalid user credentials for reservation.';
+  END IF;
+
   -- 1. Idempotency guard: return existing booking if client_request_id already recorded
   IF p_client_request_id IS NOT NULL THEN
     SELECT * INTO v_existing
@@ -218,7 +233,7 @@ BEGIN
     RAISE EXCEPTION 'Total guests exceed maximum allowed capacity for % room(s)', p_rooms;
   END IF;
 
-  -- 5. Re-check real-time availability
+  -- 5. Re-check real-time availability for overlapping confirmed or still-held bookings
   SELECT COALESCE(SUM(sb.rooms), 0) INTO v_booked_rooms
   FROM public.stay_bookings sb
   WHERE sb.room_type_id = v_room.id
@@ -237,28 +252,34 @@ BEGIN
   -- 6. Recalculate price on the server
   v_subtotal := v_nights * v_room.price_per_night * p_rooms;
 
-  -- 7. Apply member discount (30% discount when user has active membership)
-  IF p_user_id IS NOT NULL THEN
-    SELECT EXISTS (
-      SELECT 1 FROM public.memberships
-      WHERE user_id = p_user_id AND status = 'Active'
-    ) INTO v_is_member;
+  -- 7. Apply member discount only for active membership
+  SELECT EXISTS (
+    SELECT 1 FROM public.memberships
+    WHERE user_id = v_uid 
+      AND status = 'Active'
+      AND (valid_until IS NULL OR valid_until > NOW())
+  ) INTO v_is_member;
 
-    IF v_is_member THEN
-      v_member_discount := ROUND(v_subtotal * 0.30)::INTEGER;
-    END IF;
+  IF v_is_member THEN
+    v_member_discount := ROUND(v_subtotal * 0.30)::INTEGER;
   END IF;
 
-  -- 8. Apply coupon redemption logic
+  -- 8. Apply coupon redemption logic only when applies_to contains 'stay' or 'all'
   IF p_coupon_code IS NOT NULL AND TRIM(p_coupon_code) <> '' THEN
     SELECT * INTO v_coupon
     FROM public.coupons
     WHERE UPPER(TRIM(code)) = UPPER(TRIM(p_coupon_code))
     FOR UPDATE;
 
-    IF FOUND AND v_coupon.active 
+    IF FOUND 
+       AND v_coupon.active 
        AND (v_coupon.expires_at IS NULL OR v_coupon.expires_at > NOW()) 
-       AND (v_coupon.used_count < v_coupon.max_uses) THEN
+       AND (v_coupon.used_count < v_coupon.max_uses)
+       AND (
+         v_coupon.applies_to IS NULL 
+         OR 'all' = ANY(v_coupon.applies_to) 
+         OR 'stay' = ANY(v_coupon.applies_to)
+       ) THEN
       v_coupon_discount := ROUND((v_subtotal - v_member_discount) * (v_coupon.percent_off::NUMERIC / 100))::INTEGER;
       
       UPDATE public.coupons
@@ -270,7 +291,8 @@ BEGIN
   v_total := GREATEST(0, v_subtotal - v_member_discount - v_coupon_discount);
 
   -- 9. Determine status and hold expiration
-  IF v_total = 0 OR p_is_mock_paid OR p_payment_method IN ('free', 'coupon', 'mock') THEN
+  -- TODO-RAZORPAY: before real payments p_is_mock_paid must be removed and the status must be set only after server-side payment verification
+  IF v_total = 0 OR p_is_mock_paid THEN
     v_status := 'confirmed';
     v_hold_expires := NULL;
   ELSE
@@ -311,7 +333,7 @@ BEGIN
   ) VALUES (
     p_client_request_id,
     v_booking_ref,
-    p_user_id,
+    v_uid,
     v_room.id,
     p_check_in,
     p_check_out,
@@ -338,7 +360,7 @@ BEGIN
 
   RETURN v_new_booking;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- 5. ROW LEVEL SECURITY POLICIES
 

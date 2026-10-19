@@ -106,146 +106,186 @@ export async function createTableBooking(payload) {
   const clientRequestId = payload.clientRequestId || payload.client_request_id
     || `tbl_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-  const stored = getStoredBookings();
-
-  // Idempotency: return existing booking if client_request_id matches
-  const existing = stored.find((b) => b.client_request_id === clientRequestId);
-  if (existing) {
-    return existing;
+  // Convert DD/MM/YYYY into YYYY-MM-DD for database DATE column if needed
+  let bookingDate = payload.date;
+  if (bookingDate && /^\d{2}\/\d{2}\/\d{4}$/.test(bookingDate)) {
+    const [dd, mm, yyyy] = bookingDate.split('/');
+    bookingDate = `${yyyy}-${mm}-${dd}`;
   }
 
-  const year = new Date().getFullYear();
-  const random6 = String(Math.floor(100000 + Math.random() * 900000));
-  const bookingRef = `FRCC-TAB-${year}-${random6}`;
+  // 1. Mock mode handling
+  if (isMock) {
+    const stored = getStoredBookings();
+    const existing = stored.find((b) => b.client_request_id === clientRequestId);
+    if (existing) {
+      return existing;
+    }
 
-  const venue = LOCAL_VENUES.find((v) => v.id === (payload.venueId || payload.venue_id)) || LOCAL_VENUES[0];
+    const year = new Date().getFullYear();
+    const random6 = String(Math.floor(100000 + Math.random() * 900000));
+    const bookingRef = `FRCC-T-${year}-${random6}`;
+    const venue = LOCAL_VENUES.find((v) => v.id === (payload.venueId || payload.venue_id)) || LOCAL_VENUES[0];
 
-  const booking = {
-    id: `tab_${Date.now()}`,
-    client_request_id: clientRequestId,
-    booking_ref: bookingRef,
-    bookingRef,
-    bookingId: bookingRef,
-    category: 'dining',
-    service: 'dining',
-    user_id: payload.userId || payload.user_id || null,
-    venue_id: venue.id,
-    venue_name: venue.name,
-    venueName: venue.name,
-    date: payload.date,
-    time: payload.time || payload.slot,
-    slot: payload.time || payload.slot,
-    guests: Number(payload.guests || 2),
-    guest_name: payload.name || payload.guestName || payload.guest_name || 'Guest',
-    guest_mobile: payload.mobile || payload.guestMobile || payload.guest_mobile || '',
-    guest_email: payload.email || payload.guestEmail || payload.guest_email || '',
-    notes: payload.notes || payload.specialRequest || '',
-    status: 'confirmed',
-    is_free: true,
-    total: 0,
-    qrValue: `FRCC:TABLE:${bookingRef}`,
-    created_at: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
+    const mockBooking = {
+      id: `tab_${Date.now()}`,
+      client_request_id: clientRequestId,
+      booking_ref: bookingRef,
+      bookingRef,
+      bookingId: bookingRef,
+      category: 'dining',
+      service: 'dining',
+      user_id: payload.userId || payload.user_id || null,
+      venue_id: venue.id,
+      venue_name: venue.name,
+      venueName: venue.name,
+      date: payload.date,
+      time: payload.time || payload.slot,
+      slot: payload.time || payload.slot,
+      guests: Number(payload.guests || 2),
+      guest_name: payload.name || payload.guestName || payload.guest_name || 'Guest',
+      guest_mobile: payload.mobile || payload.guestMobile || payload.guest_mobile || '',
+      guest_email: payload.email || payload.guestEmail || payload.guest_email || '',
+      notes: payload.notes || payload.specialRequest || '',
+      status: 'confirmed',
+      is_free: true,
+      total: 0,
+      qrValue: `FRCC:TABLE:${bookingRef}`,
+      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    stored.push(mockBooking);
+    saveStoredBookings(stored);
+    return mockBooking;
+  }
+
+  // 2. Real database execution via create_table_booking RPC
+  // NEVER fall back to mock on failure. Throw the error cleanly.
+  const rpcParams = {
+    p_client_request_id: clientRequestId,
+    p_venue_id: payload.venueId || payload.venue_id,
+    p_date: bookingDate,
+    p_time: payload.time || payload.slot,
+    p_guests: Number(payload.guests || 2),
+    p_name: payload.name || payload.guestName || payload.guest_name || '',
+    p_mobile: payload.mobile || payload.guestMobile || payload.guest_mobile || '',
+    p_email: payload.email || payload.guestEmail || payload.guest_email || '',
+    p_notes: payload.notes || payload.specialRequest || null,
+    p_age_confirmed: Boolean(payload.ageConfirmed || payload.age_confirmed),
   };
 
-  // If not mock mode and Supabase is configured, try recording in Supabase
-  if (!isMock && supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUserId = booking.user_id || sessionData?.session?.user?.id || null;
+  const { data, error } = await supabase.rpc('create_table_booking', rpcParams);
 
-      await supabase.from('table_bookings').insert({
-        client_request_id: clientRequestId,
-        booking_ref: bookingRef,
-        user_id: currentUserId,
-        venue_id: booking.venue_id,
-        date: booking.date,
-        time_slot: booking.time,
-        guests: booking.guests,
-        guest_name: booking.guest_name,
-        guest_mobile: booking.guest_mobile,
-        guest_email: booking.guest_email,
-        notes: booking.notes,
-        status: 'confirmed',
-      });
-    } catch (err) {
-      // Table may not exist yet, fallback cleanly to local storage
-      console.warn('Note: Could not persist to remote table_bookings, stored locally:', err);
-    }
+  if (error) {
+    console.error('Database error in create_table_booking RPC:', error);
+    throw new Error(error.message || 'Failed to reserve table in database.');
   }
 
-  stored.push(booking);
+  if (!data) {
+    throw new Error('Database did not return a confirmed reservation.');
+  }
+
+  const venue = LOCAL_VENUES.find((v) => v.id === data.venue_id) || { name: data.venue_id };
+
+  const formattedBooking = {
+    id: data.id,
+    client_request_id: data.client_request_id,
+    booking_ref: data.booking_ref,
+    bookingRef: data.booking_ref,
+    bookingId: data.booking_ref,
+    category: 'dining',
+    service: 'dining',
+    user_id: data.user_id,
+    venue_id: data.venue_id,
+    venue_name: venue.name,
+    venueName: venue.name,
+    date: data.date,
+    time: data.time_slot,
+    slot: data.time_slot,
+    guests: data.guests,
+    guest_name: data.guest_name,
+    guest_mobile: data.guest_mobile,
+    guest_email: data.guest_email,
+    notes: data.notes,
+    status: data.status || 'confirmed',
+    is_free: true,
+    total: 0,
+    qrValue: `FRCC:TABLE:${data.booking_ref}`,
+    created_at: data.created_at,
+    createdAt: data.created_at,
+  };
+
+  // Keep a local cached copy for offline viewing
+  const stored = getStoredBookings();
+  stored.push(formattedBooking);
   saveStoredBookings(stored);
 
-  return booking;
+  return formattedBooking;
 }
 
 /**
  * Fetch table bookings for the given user ID or signed-in user.
  */
 export async function getMyTableBookings(userId = null) {
-  const localList = getStoredBookings();
-
-  if (!isMock && supabase) {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const uid = userId || sessionData?.session?.user?.id;
-      if (uid) {
-        const { data, error } = await supabase
-          .from('table_bookings')
-          .select('*')
-          .eq('user_id', uid)
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          // Merge with any local ones
-          const remoteMapped = data.map((b) => ({
-            id: b.id,
-            booking_ref: b.booking_ref,
-            bookingRef: b.booking_ref,
-            bookingId: b.booking_ref,
-            category: 'dining',
-            service: 'dining',
-            user_id: b.user_id,
-            venue_id: b.venue_id,
-            venue_name: LOCAL_VENUES.find((v) => v.id === b.venue_id)?.name || b.venue_id,
-            venueName: LOCAL_VENUES.find((v) => v.id === b.venue_id)?.name || b.venue_id,
-            date: b.date,
-            time: b.time_slot,
-            slot: b.time_slot,
-            guests: b.guests,
-            guest_name: b.guest_name,
-            guest_mobile: b.guest_mobile,
-            guest_email: b.guest_email,
-            status: b.status || 'confirmed',
-            is_free: true,
-            total: 0,
-            qrValue: `FRCC:TABLE:${b.booking_ref}`,
-            created_at: b.created_at,
-            createdAt: b.created_at,
-          }));
-
-          const combined = [...localList, ...remoteMapped];
-          const seen = new Set();
-          return combined.filter((b) => {
-            const ref = b.booking_ref || b.id;
-            if (seen.has(ref)) return false;
-            seen.add(ref);
-            return true;
-          }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        }
-      }
-    } catch (err) {
-      console.warn('Could not query remote table_bookings:', err);
+  if (isMock) {
+    const localList = getStoredBookings();
+    if (userId) {
+      return localList
+        .filter((b) => !b.user_id || b.user_id === userId)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
+    return [...localList].reverse();
   }
 
-  // Filter local list for this user if userId is provided
-  if (userId) {
-    return localList
-      .filter((b) => !b.user_id || b.user_id === userId)
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  // Real Database read from table_bookings
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = userId || sessionData?.session?.user?.id;
+
+  if (!uid) {
+    return [];
   }
 
-  return [...localList].reverse();
+  const { data, error } = await supabase
+    .from('table_bookings')
+    .select('*, dining_venues(*)')
+    .eq('user_id', uid)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching table_bookings from database:', error);
+    throw error;
+  }
+
+  return (data || []).map((b) => {
+    const venueName = b.dining_venues?.name 
+      || LOCAL_VENUES.find((v) => v.id === b.venue_id)?.name 
+      || b.venue_id;
+
+    return {
+      id: b.id,
+      booking_ref: b.booking_ref,
+      bookingRef: b.booking_ref,
+      bookingId: b.booking_ref,
+      category: 'dining',
+      service: 'dining',
+      user_id: b.user_id,
+      venue_id: b.venue_id,
+      venue_name: venueName,
+      venueName,
+      date: b.date,
+      time: b.time_slot,
+      slot: b.time_slot,
+      guests: b.guests,
+      guest_name: b.guest_name,
+      guest_mobile: b.guest_mobile,
+      guest_email: b.guest_email,
+      notes: b.notes,
+      status: b.status || 'confirmed',
+      is_free: true,
+      total: 0,
+      qrValue: `FRCC:TABLE:${b.booking_ref}`,
+      created_at: b.created_at,
+      createdAt: b.created_at,
+    };
+  });
 }

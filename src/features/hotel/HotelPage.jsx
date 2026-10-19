@@ -11,7 +11,7 @@ import { FlowShell } from '../../components/FlowShell.jsx';
 import { Card } from '../../components/ui/feedback.jsx';
 import { Button, Input, Select, LoadingButton } from '../../components/ui/controls.jsx';
 import { SmartImage } from '../../components/ui/media.jsx';
-import { roomSlot } from '../../config/images.js';
+import { roomImage, roomSlot } from '../../config/images.js';
 import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, cancellationPolicy } from '../../data/hotel.js';
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
@@ -362,7 +362,7 @@ export function HotelPage() {
   const staySummary = useMemo(() => {
     return {
       name: selectedRoom?.name || 'Hotel Room',
-      image: { ...roomSlot(selectedRoom?.id || selectedRoom?.type), slot: `room-${selectedRoom?.id || 'standard'}` },
+      image: roomImage(selectedRoom?.id || selectedRoom?.type),
       detail: `Vijayawada Campus · ${draft.roomsCount} Room${Number(draft.roomsCount) > 1 ? 's' : ''}`,
       date: draft.checkin && draft.checkout ? `${formatDMY(draft.checkin)} – ${formatDMY(draft.checkout)}` : undefined,
       slot: `${nights} Night${nights > 1 ? 's' : ''}`,
@@ -633,12 +633,7 @@ export function HotelPage() {
           {/* Room Cards from getRoomTypes() */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredLandingRooms.map((room) => {
-              const imageConfig = {
-                ...roomSlot(room.id),
-                slot: `room-${room.id}`,
-                name: room.name,
-                alt: room.name,
-              };
+              const imageConfig = roomImage(room.id || room.name);
               const bedType = room.bed_type || room.bedType || 'King Bed';
               const view = room.view || 'Garden View';
               const size = room.size_sqft || room.sizeSqft || 350;
@@ -1000,12 +995,7 @@ export function HotelPage() {
                       <div>
                         <div className="h-40 overflow-hidden rounded-xl bg-slate-100">
                           <SmartImage
-                            image={{
-                              ...roomSlot(room.id),
-                              slot: `room-${room.id}`,
-                              name: room.name,
-                              alt: room.name,
-                            }}
+                            image={roomImage(room.id || room.name)}
                             aspect="16 / 10"
                             sizes="300px"
                           />
@@ -1480,7 +1470,22 @@ export function HotelPage() {
             </div>
 
             {/* Stay Details Summary */}
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2.5">
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-3">
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-200">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                  <SmartImage
+                    image={roomImage(confirmedBooking.roomId || confirmedBooking.roomName)}
+                    aspect="1 / 1"
+                    sizes="56px"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-display text-base font-bold text-navy-900 truncate">
+                    {confirmedBooking.roomName}
+                  </h4>
+                  <p className="text-xs text-slate-500 truncate">Vijayawada Campus · Riverfront Hotel</p>
+                </div>
+              </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Room</span>
                 <span className="font-semibold text-navy-900">{confirmedBooking.roomName}</span>

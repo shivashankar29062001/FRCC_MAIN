@@ -164,7 +164,7 @@ export function TableBookingPage() {
       setStep(3);
     } catch (err) {
       console.error('Failed to create table booking:', err);
-      setErrors({ form: 'Unable to reserve table. Please try again.' });
+      setErrors({ form: err?.message || 'Unable to reserve table. Please try again.' });
     } finally {
       setSubmitting(false);
     }
