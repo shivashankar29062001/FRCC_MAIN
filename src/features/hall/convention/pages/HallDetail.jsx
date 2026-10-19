@@ -16,7 +16,7 @@ export default function HallDetail() {
 
   useEffect(() => {
     api('/halls', { auth: false })
-      .then(d => setHall(d.halls.find(h => h.id === id) || null))
+      .then(d => setHall(Array.isArray(d?.halls) ? (d.halls.find(h => h.id === id) || null) : null))
       .catch(e => setError(e.message));
   }, [id]);
 

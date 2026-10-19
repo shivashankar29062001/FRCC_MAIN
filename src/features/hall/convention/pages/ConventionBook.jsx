@@ -24,14 +24,16 @@ export default function ConventionBook() {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api('/locations', { auth: false }).then(d => d.cities).catch(() => []),
-      api('/halls', { auth: false }).then(d => d.halls).catch(() => []),
+      api('/locations', { auth: false }).then(d => (Array.isArray(d?.cities) ? d.cities : [])).catch(() => []),
+      api('/halls', { auth: false }).then(d => (Array.isArray(d?.halls) ? d.halls : [])).catch(() => []),
     ]).then(([cities, hallsData]) => {
-      setCitiesData(cities);
-      setHalls(hallsData);
+      setCitiesData(Array.isArray(cities) ? cities : []);
+      setHalls(Array.isArray(hallsData) ? hallsData : []);
       setLoading(false);
     }).catch(e => {
-      setError(e.message);
+      setError(e?.message || '');
+      setCitiesData([]);
+      setHalls([]);
       setLoading(false);
     });
   }, []);
@@ -46,15 +48,15 @@ export default function ConventionBook() {
     params.append('cityId', cityId);
     if (areaId && areaId !== 'ALL') params.append('areaId', areaId);
     api(`/venues?${params.toString()}`, { auth: false })
-      .then(d => setVenues(d.venues))
+      .then(d => setVenues(Array.isArray(d?.venues) ? d.venues : []))
       .catch(() => setVenues([]));
   }, [cityId, areaId]);
 
   // Areas for the chosen city (from cities hierarchy)
   const areas = useMemo(() => {
-    if (!cityId) return [];
+    if (!cityId || !Array.isArray(citiesData)) return [];
     const city = citiesData.find(c => c.id === cityId);
-    if (!city) return [];
+    if (!city || !Array.isArray(city.areas)) return [];
     return city.areas.map(a => ({ id: a.id, name: a.name, rating: a.rating }));
   }, [cityId, citiesData]);
 
@@ -78,7 +80,7 @@ export default function ConventionBook() {
 
   // Filtered + sorted hall list (from already-loaded halls)
   const sortedHalls = useMemo(() => {
-    if (!cityId) return [];
+    if (!cityId || !Array.isArray(halls)) return [];
     let list = halls.filter(h => String(h.cityId) === String(cityId));
     if (areaId && areaId !== 'ALL') list = list.filter(h => String(h.areaId) === String(areaId));
     if (venueId) list = list.filter(h => h.venueId === venueId);
@@ -141,12 +143,12 @@ export default function ConventionBook() {
 
   // City and area names for display
   const cityName = useMemo(() => {
-    const c = citiesData.find(c => c.id === cityId);
+    const c = Array.isArray(citiesData) ? citiesData.find(c => c.id === cityId) : null;
     return c ? c.name : '';
   }, [cityId, citiesData]);
 
   const areaName = useMemo(() => {
-    const a = areas.find(a => a.id === areaId);
+    const a = Array.isArray(areas) ? areas.find(a => a.id === areaId) : null;
     return a ? a.name : '';
   }, [areaId, areas]);
 
@@ -164,7 +166,7 @@ export default function ConventionBook() {
             updateBooking({ cityId: val, areaId: '', areaName: '', venueId: '', venueName: '', hallId: null });
           }}>
           <option value="">-- Select City --</option>
-          {citiesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {Array.isArray(citiesData) && citiesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
         {/* Hidden when the city has a single club area — auto-selected instead */}
@@ -173,12 +175,12 @@ export default function ConventionBook() {
             onChange={e => {
               const val = e.target.value;
               setAreaId(val); setVenueId('');
-              const found = areas.find(a => a.id === val);
+              const found = Array.isArray(areas) ? areas.find(a => a.id === val) : null;
               updateBooking({ areaId: val, areaName: found ? found.name : '', venueId: '', venueName: '', hallId: null });
             }}>
             <option value="">-- Select Area --</option>
             <option value="ALL">All areas</option>
-            {areas.map(a => (
+            {Array.isArray(areas) && areas.map(a => (
               <option key={a.id} value={a.id}>{a.name} {a.rating ? `⭐ ${a.rating}` : ''}</option>
             ))}
           </select>
@@ -188,11 +190,11 @@ export default function ConventionBook() {
           onChange={e => {
             const val = e.target.value;
             setVenueId(val);
-            const v = venues.find(x => x.id === val);
+            const v = Array.isArray(venues) ? venues.find(x => x.id === val) : null;
             updateBooking({ venueId: val, venueName: v ? v.name : '', hallId: null });
           }}>
           <option value="">-- Select Venue --</option>
-          {venues.map(v => (
+          {Array.isArray(venues) && venues.map(v => (
             <option key={v.id} value={v.id}>{v.name} — {v.areaName}, {v.cityName}</option>
           ))}
         </select>

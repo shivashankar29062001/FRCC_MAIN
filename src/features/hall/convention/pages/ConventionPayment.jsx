@@ -73,7 +73,9 @@ export default function ConventionPayment() {
 
   useEffect(() => {
     if (!booking.hallId) { navigate('/convention/book'); return; }
-    api('/halls', { auth: false }).then(d => setHall(d.halls.find(h => h.id === booking.hallId) || null)).catch(() => {});
+    api('/halls', { auth: false })
+      .then(d => setHall(Array.isArray(d?.halls) ? (d.halls.find(h => h.id === booking.hallId) || null) : null))
+      .catch(() => {});
   }, [booking.hallId]);
 
   useEffect(() => {
