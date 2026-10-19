@@ -10,6 +10,7 @@ import { LandingPage } from './pages/LandingPage.jsx';
 import { SignupPage, SigninPage } from './pages/AuthPages.jsx';
 import { HomeHubPage } from './pages/HomeHubPage.jsx';
 import { HotelPage } from './features/hotel/HotelPage.jsx';
+import { HallPage } from './features/hall/HallPage.jsx';
 
 // Convention Hall module — merged from the Hall team's app (FRCC CONVENTION).
 // Clicking "Convention Hall" / "Halls" anywhere in the app opens these screens.
@@ -71,11 +72,14 @@ export default function App() {
                     <Route path="/dining/book" element={<RequireAuth forceGated><TableBookingPage /></RequireAuth>} />
                     <Route path="/book/dining" element={<Navigate to="/dining/book" replace />} />
 
-                    {/* Convention Hall — all hall entry routes open the Hall team's
-                        booking flow, hosted in src/features/hall/convention/. */}
+                    {/* Halls — catalog & facility showcase */}
+                    <Route path="/halls" element={<HallPage />} />
+                    <Route path="/hall" element={<HallPage />} />
+
+                    {/* Convention Hall — merged booking flow and detail views */}
                     <Route element={<ConventionScope />}>
-                      <Route path="/halls" element={<ConventionLanding />} />
-                      <Route path="/hall" element={<ConventionLanding />} />
+                      <Route path="/convention" element={<ConventionLanding />} />
+                      <Route path="/convention/landing" element={<ConventionLanding />} />
                       <Route path="/hall/:id" element={<ConventionHallDetail />} />
                       <Route path="/venue/:id" element={<ConventionVenuePage />} />
                       <Route path="/reviews" element={<ConventionReviews />} />
