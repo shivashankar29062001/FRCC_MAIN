@@ -44,6 +44,7 @@ import { VenueMenuPage } from './features/dining/VenueMenuPage.jsx';
 import { TableBookingPage } from './features/dining/TableBookingPage.jsx';
 import { EventsPage, EventDetailPage, AdminEventsPage } from './features/events/index.js';
 import { NotFoundPage, LogoutPage } from './pages/SystemPages.jsx';
+import { ScrollToTop } from './components/ScrollToTop.jsx';
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
           <BrowserRouter basename={import.meta.env.BASE_URL}>
             <AuthModalProvider>
               <ErrorBoundary>
+                <ScrollToTop />
                 <AppLayout>
                   <Routes>
                     <Route path="/" element={<LandingPage />} />
