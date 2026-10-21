@@ -7,7 +7,7 @@ import { PhotoCard } from '../ui/explore.jsx';
 import { cx, initialsOf } from '../../utils/helpers.js';
 import { SITE_INFO, getAddressLines, getActiveSocialLinks } from '../../config/siteInfo.js';
 import { MEMBER_PROMO_NOTE } from '../../config/pricing.js';
-import { diningLabel } from '../../config/site.js';
+import { diningLabel, address as siteRegisteredAddress, registration } from '../../config/site.js';
 import { NAV_MENUS } from '../../config/navMenus.js';
 import {
   UserIcon,
@@ -45,15 +45,214 @@ import { LocationPanel } from '../location/LocationPanel.jsx';
 //                    an accordion list. Same content, no animation.
 // ---------------------------------------------------------------------------
 
-function BrandLogo({ to = '/' }) {
+function InfoIcon({ className = 'h-3.5 w-3.5' }) {
   return (
-    <Link to={to} className="flex items-center gap-2.5" aria-label="FRCC home">
-      <Logo variant="emblem" size={52} />
-      <span className="leading-tight">
-        <span className="block font-display font-bold text-lg text-navy-900">FRCC</span>
-        <span className="block text-[11px] tracking-[0.08em] text-slate-500">Film Recreation &amp; Cultural Centre</span>
-      </span>
-    </Link>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+function RegistrationModal({ isOpen, onClose, triggerRef }) {
+  const modalRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const focusableEls = modalRef.current?.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusableEls && focusableEls.length > 0) {
+      focusableEls[0].focus();
+    } else {
+      modalRef.current?.focus();
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = modalRef.current?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+      triggerRef?.current?.focus?.();
+    };
+  }, [isOpen, onClose, triggerRef]);
+
+  if (!isOpen) return null;
+
+  let certificateUrl = null;
+  if (registration?.certificate) {
+    if (registration.certificate.startsWith('http') || registration.certificate.startsWith('/')) {
+      certificateUrl = registration.certificate;
+    } else {
+      try {
+        certificateUrl = new URL(`../../assets/${registration.certificate}`, import.meta.url).href;
+      } catch {
+        certificateUrl = registration.certificate;
+      }
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reg-dialog-title"
+        className="w-full max-w-[420px] rounded-[16px] bg-white p-6 shadow-xl"
+      >
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h2 id="reg-dialog-title" className="text-base font-semibold text-navy-900">
+            Registration details
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-lg p-1 text-slate-400 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-gold-500"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3.5 text-sm">
+          <div>
+            <span className="block text-xs font-medium text-slate-500">Registration number</span>
+            <span className="font-semibold text-navy-900">{registration?.id}</span>
+          </div>
+
+          {registration?.authority ? (
+            <div>
+              <span className="block text-xs font-medium text-slate-500">Registered under</span>
+              <span className="text-slate-700">{registration.authority}</span>
+            </div>
+          ) : null}
+
+          {registration?.date ? (
+            <div>
+              <span className="block text-xs font-medium text-slate-500">Date of registration</span>
+              <span className="text-slate-700">{registration.date}</span>
+            </div>
+          ) : null}
+
+          <div>
+            <span className="block text-xs font-medium text-slate-500">Registered office</span>
+            <span className="text-xs leading-relaxed text-slate-700">{siteRegisteredAddress}</span>
+          </div>
+
+          {certificateUrl ? (
+            <div className="pt-1">
+              <a
+                href={certificateUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-gold-600 hover:text-gold-700 underline underline-offset-2"
+              >
+                View certificate
+              </a>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gold-500"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BrandLogo({ to = '/' }) {
+  const [showRegModal, setShowRegModal] = useState(false);
+  const triggerRef = useRef(null);
+
+  return (
+    <>
+      <div className="flex items-center gap-2.5">
+        <Link to={to} className="shrink-0" aria-label="FRCC home">
+          <Logo variant="emblem" size={52} />
+        </Link>
+        <div className="leading-tight">
+          <Link to={to} aria-label="FRCC home" className="block">
+            <span className="block font-display font-bold text-lg text-navy-900">FRCC</span>
+            <span className="block text-[11px] tracking-[0.08em] text-slate-500">Film Recreation &amp; Cultural Centre</span>
+          </Link>
+          {registration?.id ? (
+            <button
+              ref={triggerRef}
+              type="button"
+              onClick={() => setShowRegModal(true)}
+              aria-haspopup="dialog"
+              className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-navy-900 transition-colors focus:outline-none focus:ring-1 focus:ring-gold-500 rounded text-left"
+            >
+              <InfoIcon className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="hidden sm:inline">Reg. No: {registration.id}</span>
+              <span className="inline sm:hidden">Reg.</span>
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {registration?.id && showRegModal && (
+        <RegistrationModal
+          isOpen={showRegModal}
+          onClose={() => setShowRegModal(false)}
+          triggerRef={triggerRef}
+        />
+      )}
+    </>
   );
 }
 
@@ -649,7 +848,10 @@ export function Footer() {
 
       <div className="border-t border-white/10">
         <div className="container-x flex flex-col items-center justify-between gap-3 py-4 text-xs text-slate-500 sm:flex-row">
-          <p>{SITE_INFO.copyright}</p>
+          <p>
+            {SITE_INFO.copyright}
+            {registration?.id ? ` · Reg. No: ${registration.id}` : ''}
+          </p>
           <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
             {['Privacy Policy', 'Accessibility', 'Sitemap'].map((label) => (
               <li key={label}>

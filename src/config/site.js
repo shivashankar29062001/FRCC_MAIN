@@ -25,6 +25,15 @@ export const requireSignIn = 'booking'; // 'booking' | 'services'
 // Registered office address
 export const address = 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003';
 
+const previewRegId = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_PREVIEW_REG_ID) || '';
+
+export const registration = {
+  id: previewRegId || '',
+  authority: '',
+  date: '',
+  certificate: '',
+};
+
 // Hyderabad branch office address
 export const hyderabadAddress = 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081';
 
@@ -95,6 +104,7 @@ export const siteConfig = {
   locations,
   email, // SAMPLE
   hours, // SAMPLE
+  registration,
 };
 
 export default siteConfig;

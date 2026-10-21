@@ -12,6 +12,7 @@ import {
   address as siteRegisteredAddress,
   phone as sitePhone,
   email as siteEmail,
+  registration as siteRegistration,
 } from '../config/site.js';
 import { plans } from '../data/membership.js';
 import { membershipTerms } from '../data/membershipTerms.js';
@@ -421,7 +422,8 @@ export async function buildApplicationFormPdf(member = {}) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(TEXT_MUTED[0], TEXT_MUTED[1], TEXT_MUTED[2]);
-    doc.text(`Phone: ${sitePhone}  |  Email: ${siteEmail}`, MARGIN_LEFT, 292);
+    const regText = siteRegistration?.id ? `  |  Reg. No: ${siteRegistration.id}` : '';
+    doc.text(`Phone: ${sitePhone}  |  Email: ${siteEmail}${regText}`, MARGIN_LEFT, 292);
 
     doc.text(
       `Page ${i} of ${totalPages}  |  ${website}`,

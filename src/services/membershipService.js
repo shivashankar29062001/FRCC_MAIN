@@ -219,3 +219,151 @@ export async function saveUserMembership(membershipData) {
     aadhaarMasked: membershipData.aadhaarMasked || '',
   };
 }
+
+/**
+ * Upload passport photo to the private bucket 'member-photos' at `<user_id>/photo.jpg`.
+ * Upsert is true to allow replacing.
+ */
+export async function uploadPassportPhoto(blob) {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true') {
+    return 'mock-user/photo.jpg';
+  }
+
+  const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr) {
+    console.error('[membershipService] Auth session error in uploadPassportPhoto:', sessionErr);
+    throw sessionErr;
+  }
+
+  const currentUserId = sessionData?.session?.user?.id;
+  if (!currentUserId) {
+    const err = new Error('You must be signed in to upload your passport photograph.');
+    console.error('[membershipService]', err);
+    throw err;
+  }
+
+  const photoPath = `${currentUserId}/photo.jpg`;
+  const { error } = await supabase.storage
+    .from('member-photos')
+    .upload(photoPath, blob, {
+      upsert: true,
+      contentType: 'image/jpeg',
+    });
+
+  if (error) {
+    console.error('[membershipService] Supabase storage upload error:', error);
+    throw error;
+  }
+
+  return photoPath;
+}
+
+/**
+ * Rebuild a signed URL for a photo stored in the private 'member-photos' bucket.
+ */
+export async function getPassportPhotoSignedUrl(photoPath) {
+  if (!photoPath) return null;
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true') {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('member-photos')
+      .createSignedUrl(photoPath, 3600);
+
+    if (error) {
+      console.warn('[membershipService] Could not generate signed URL for passport photo:', error);
+      return null;
+    }
+    return data?.signedUrl || null;
+  } catch (err) {
+    console.warn('[membershipService] Error in getPassportPhotoSignedUrl:', err);
+    return null;
+  }
+}
+
+/**
+ * Upsert member_profiles and replace member_children rows (delete then insert in one operation).
+ * user_id is strictly derived from the authenticated session, never from client input.
+ */
+export async function saveMemberProfileAndChildren(profileData = {}, children = []) {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true') {
+    return { success: true, isMock: true };
+  }
+
+  const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr) {
+    console.error('[membershipService] Auth session error in saveMemberProfileAndChildren:', sessionErr);
+    throw sessionErr;
+  }
+
+  const currentUserId = sessionData?.session?.user?.id;
+  if (!currentUserId) {
+    const noUserErr = new Error('You must be signed in to save membership profile details.');
+    console.error('[membershipService]', noUserErr);
+    throw noUserErr;
+  }
+
+  const profilePayload = {
+    user_id: currentUserId,
+    marital_status: profileData.marital_status || null,
+    spouse_name: profileData.spouse_name || null,
+    spouse_dob: profileData.spouse_dob || null,
+    spouse_mobile: profileData.spouse_mobile || null,
+    occupation_type: profileData.occupation_type || null,
+    employer_name: profileData.employer_name || null,
+    designation: profileData.designation || null,
+    work_city: profileData.work_city || null,
+    work_email: profileData.work_email || null,
+    business_name: profileData.business_name || null,
+    business_nature: profileData.business_nature || null,
+    profession: profileData.profession || null,
+    organisation: profileData.organisation || null,
+    photo_path: profileData.photo_path || null,
+  };
+
+  const { error: profileError } = await supabase
+    .from('member_profiles')
+    .upsert(profilePayload, { onConflict: 'user_id' });
+
+  if (profileError) {
+    console.error('[membershipService] Error upserting member_profiles:', profileError);
+    throw profileError;
+  }
+
+  // Replace member_children rows (delete then insert in one operation)
+  const { error: deleteError } = await supabase
+    .from('member_children')
+    .delete()
+    .eq('user_id', currentUserId);
+
+  if (deleteError) {
+    console.error('[membershipService] Error replacing member_children (delete phase):', deleteError);
+    throw deleteError;
+  }
+
+  const validChildren = Array.isArray(children)
+    ? children
+        .filter((c) => c && c.name && c.name.trim())
+        .map((c) => ({
+          user_id: currentUserId,
+          name: c.name.trim(),
+          dob: c.dob ? c.dob.trim() : null,
+          gender: c.gender || null,
+        }))
+    : [];
+
+  if (validChildren.length > 0) {
+    const { error: insertError } = await supabase
+      .from('member_children')
+      .insert(validChildren);
+
+    if (insertError) {
+      console.error('[membershipService] Error replacing member_children (insert phase):', insertError);
+      throw insertError;
+    }
+  }
+
+  return { success: true };
+}

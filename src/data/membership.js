@@ -108,6 +108,47 @@ export function getPlanById(id) {
   return plans.find((p) => p.id === id) || plans[0];
 }
 
+export const WIZARD_STEPS = [
+  { id: 'plan', title: 'Plan' },
+  { id: 'registration', title: 'Registration' },
+  { id: 'personal', title: 'Personal details' },
+  { id: 'family_profession', title: 'Family and profession' },
+  { id: 'documents', title: 'Documents' },
+  { id: 'payment', title: 'Payment' },
+  { id: 'confirmation', title: 'Confirmation' },
+];
+
+export const MARITAL_STATUSES = [
+  { value: 'Single', label: 'Single', hint: 'Not married' },
+  { value: 'Married', label: 'Married', hint: 'Provide spouse details' },
+  { value: 'Divorced', label: 'Divorced', hint: 'Legally divorced' },
+  { value: 'Widowed', label: 'Widowed', hint: 'Surviving spouse' },
+];
+
+export const OCCUPATION_TYPES = [
+  { value: 'Employed', label: 'Employed' },
+  { value: 'Self-employed', label: 'Self-employed' },
+  { value: 'Professional', label: 'Professional' },
+  { value: 'Retired', label: 'Retired' },
+  { value: 'Student', label: 'Student' },
+  { value: 'Homemaker', label: 'Homemaker' },
+  { value: 'Other', label: 'Other' },
+];
+
+export const CHILD_GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
+
+export const MEMBERSHIP_COPY = {
+  familyConsent:
+    'I confirm these details are correct. For children, I confirm I am the parent or legal guardian and consent to FRCC storing this information for membership purposes.',
+  aadhaarConsent: 'I agree to share my Aadhaar for membership verification *',
+  aadhaarConsentNote: 'Your details are used only for membership verification.',
+  passportPhotoNotice: 'Upload recent colour passport photograph (JPG or PNG, max 3 MB, minimum 300 × 400 px).',
+};
+
 export default {
   plans,
   PLANS_DATA,
@@ -116,4 +157,9 @@ export default {
   HOW_IT_WORKS,
   FINAL_STRIP,
   getPlanById,
+  WIZARD_STEPS,
+  MARITAL_STATUSES,
+  OCCUPATION_TYPES,
+  CHILD_GENDER_OPTIONS,
+  MEMBERSHIP_COPY,
 };
