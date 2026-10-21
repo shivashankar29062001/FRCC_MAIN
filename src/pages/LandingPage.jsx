@@ -158,7 +158,7 @@ export function LandingPage() {
                 {/* 6 · Plain text link */}
                 <div className="mt-[18px]">
                   <Link
-                    to="/signup"
+                    to="/membership"
                     className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
                     <span>Become a member</span>

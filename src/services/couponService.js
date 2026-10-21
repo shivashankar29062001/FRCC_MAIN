@@ -17,9 +17,10 @@ export async function validateCoupon(rawCode) {
     return { valid: false, error: 'Please enter a coupon code.' };
   }
 
-  // If mock mode is explicitly requested, use local list directly
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true') {
-    return validateLocalFallbackCoupon(code);
+  // Check built-in test coupons first (e.g. FRCC1 for ₹1 payment testing)
+  const local = validateLocalFallbackCoupon(code);
+  if (local.valid) {
+    return local;
   }
 
   try {
@@ -31,13 +32,10 @@ export async function validateCoupon(rawCode) {
 
     if (error) {
       console.warn('Coupon table lookup error, falling back to local list:', error.message);
-      return validateLocalFallbackCoupon(code);
+      return local;
     }
 
     if (!data) {
-      // Check local list before declaring invalid
-      const fallback = validateLocalFallbackCoupon(code);
-      if (fallback.valid) return fallback;
       return { valid: false, error: 'Invalid coupon code.' };
     }
 
@@ -56,12 +54,13 @@ export async function validateCoupon(rawCode) {
     return {
       valid: true,
       code: data.code,
-      percent_off: Number(data.percent_off ?? 100),
+      percent_off: data.percent_off !== undefined && data.percent_off !== null ? Number(data.percent_off) : 100,
+      fixed_final_price: data.fixed_final_price !== undefined ? Number(data.fixed_final_price) : undefined,
       is_test: Boolean(data.is_test),
     };
   } catch (err) {
     console.warn('Coupon validation error, falling back to local list:', err);
-    return validateLocalFallbackCoupon(code);
+    return local;
   }
 }
 
@@ -93,7 +92,8 @@ function validateLocalFallbackCoupon(code) {
   return {
     valid: true,
     code: item.code,
-    percent_off: Number(item.percent_off ?? 100),
+    percent_off: item.percent_off !== undefined ? Number(item.percent_off) : undefined,
+    fixed_final_price: item.fixed_final_price !== undefined ? Number(item.fixed_final_price) : undefined,
     is_test: Boolean(item.is_test),
   };
 }

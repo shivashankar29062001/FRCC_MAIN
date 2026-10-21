@@ -355,8 +355,14 @@ export function HotelPage() {
   const basePrice = pricePerNight * nights * Number(draft.roomsCount || 1);
   const memberDiscount = isEffectiveMember ? Math.round(basePrice * (memberDiscountPercent / 100)) : 0;
   const afterMember = Math.max(0, basePrice - memberDiscount);
-  const couponDiscount = appliedCoupon ? Math.round(afterMember * ((appliedCoupon.percent_off || 100) / 100)) : 0;
-  const total = Math.max(0, afterMember - couponDiscount);
+  const couponDiscount = appliedCoupon
+    ? (appliedCoupon.fixed_final_price !== undefined
+        ? Math.max(0, afterMember - appliedCoupon.fixed_final_price)
+        : Math.round(afterMember * ((appliedCoupon.percent_off || 100) / 100)))
+    : 0;
+  const total = appliedCoupon?.fixed_final_price !== undefined
+    ? Math.min(afterMember, appliedCoupon.fixed_final_price)
+    : Math.max(0, afterMember - couponDiscount);
 
   // Live Summary Card for FlowShell
   const staySummary = useMemo(() => {
@@ -1257,7 +1263,9 @@ export function HotelPage() {
                           ✓ {appliedCoupon.code}
                         </span>
                         <span className="text-xs text-slate-600">
-                          {appliedCoupon.percent_off}% discount applied (−{formatInr(couponDiscount)})
+                          {appliedCoupon.fixed_final_price !== undefined
+                            ? `Total bill reduced to ₹${appliedCoupon.fixed_final_price} (−${formatInr(couponDiscount)})`
+                            : `${appliedCoupon.percent_off}% discount applied (−${formatInr(couponDiscount)})`}
                         </span>
                       </div>
                       <button

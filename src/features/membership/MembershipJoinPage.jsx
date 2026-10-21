@@ -24,7 +24,7 @@ import {
 } from '../../api/membership.js';
 
 // TODO-REMOVE-TEST-COUPON
-const COUPON_ENABLED = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_TEST_COUPON !== 'false';
+const COUPON_ENABLED = true;
 import {
   MembershipIdCard,
   HealthCard,
@@ -451,11 +451,18 @@ export function MembershipJoinPage() {
   // Pricing and coupon calculations
   const planBasePrice = selectedPlan?.price || selectedPlan?.amount || 0;
   // TODO-REMOVE-TEST-COUPON
-  const discountAmount = (COUPON_ENABLED && appliedCoupon)
-    ? Math.round((planBasePrice * (appliedCoupon.percent_off ?? 100)) / 100)
-    : 0;
-  // TODO-REMOVE-TEST-COUPON
-  const finalPrice = Math.max(0, planBasePrice - discountAmount);
+  let discountAmount = 0;
+  let finalPrice = planBasePrice;
+
+  if (COUPON_ENABLED && appliedCoupon) {
+    if (appliedCoupon.fixed_final_price !== undefined) {
+      finalPrice = Math.min(planBasePrice, appliedCoupon.fixed_final_price);
+      discountAmount = Math.max(0, planBasePrice - finalPrice);
+    } else {
+      discountAmount = Math.round((planBasePrice * (appliedCoupon.percent_off ?? 100)) / 100);
+      finalPrice = Math.max(0, planBasePrice - discountAmount);
+    }
+  }
 
   // Step 6 Validation (Payment)
   const isStep6Valid = Boolean(formData.paymentMethod || finalPrice === 0);
@@ -1889,7 +1896,10 @@ export function MembershipJoinPage() {
                     {appliedCoupon ? (
                       <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 border border-emerald-200 text-sm">
                         <span className="text-emerald-900 font-medium">
-                          Coupon <strong className="font-mono">{appliedCoupon.code}</strong> applied ({appliedCoupon.percent_off}% off)
+                          Coupon <strong className="font-mono">{appliedCoupon.code}</strong> applied{' '}
+                          {appliedCoupon.fixed_final_price !== undefined
+                            ? `(Total bill: ₹${appliedCoupon.fixed_final_price})`
+                            : `(${appliedCoupon.percent_off}% off)`}
                         </span>
                         <button
                           type="button"
@@ -1910,7 +1920,7 @@ export function MembershipJoinPage() {
                               setCouponError('');
                               setSubmitError('');
                             }}
-                            placeholder="Enter coupon code"
+                            placeholder="Enter coupon code (e.g. FRCC1)"
                             className="field text-sm uppercase flex-1"
                             disabled={validatingCoupon}
                             autoFocus
