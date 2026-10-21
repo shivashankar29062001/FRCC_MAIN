@@ -33,11 +33,27 @@ const allImages = {
   ...imagesLeadership,
 };
 
+import presidentImg from '../assets/leadership/president.webp';
+import vicePresidentImg from '../assets/leadership/vice-president.jpg';
+import secretaryImg from '../assets/leadership/secretary.jpg';
+import jointSecretaryImg from '../assets/leadership/joint-secretary.jpg';
+import treasurerImg from '../assets/leadership/treasurer.jpg';
+import executiveMember2Img from '../assets/leadership/executive-member-2.jpg';
+
+const DIRECT_IMAGES = {
+  'president': presidentImg,
+  'vice-president': vicePresidentImg,
+  'secretary': secretaryImg,
+  'joint-secretary': jointSecretaryImg,
+  'treasurer': treasurerImg,
+  'executive-member-2': executiveMember2Img,
+};
+
 const ALIASES = {
   'president': [],
   'vice-president': ['vicepresident', 'vice_president'],
   'secretary': ['secretory'],
-  'joint-secretary': ['joint_secretory', 'joint_secretary', 'jointsecretary', 'joint-secretory'],
+  'joint-secretary': ['joint_secretory', 'joint_secretary', 'jointsecretary', 'joint-secretory', 'vice_secretory', 'vice-secretory', 'vicesecretary', 'vice_secretary', 'vice-secretary'],
   'treasurer': ['treserurer', 'treaserer', 'treasurer'],
   'executive-member-2': ['executive_member', 'executive-member', 'excutive_member', 'excutive-member'],
 };
@@ -141,12 +157,13 @@ export const leadershipMembers = [
     bio: '',
   },
 ].map((item) => {
-  const match = resolveImage(item.image);
+  const directUrl = DIRECT_IMAGES[item.image];
+  const match = directUrl ? { url: directUrl, path: item.image } : resolveImage(item.image);
   return {
     ...item,
     alt: `${item.name}, ${item.role}`,
     matchedPath: match.path,
-    imageSrc: match.url,
+    imageSrc: directUrl || match.url,
   };
 });
 
