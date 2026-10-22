@@ -595,7 +595,7 @@ export function HotelPage() {
       <div className="min-h-screen bg-slate-50 text-slate-800">
         <ServiceHero service="stay" />
 
-        <div id="content" className="container-x py-12 sm:py-16">
+        <div id="content" className="container-x py-12 sm:py-16 scroll-mt-24">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
               <p className="eyebrow">Accommodations</p>

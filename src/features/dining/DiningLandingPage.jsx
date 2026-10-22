@@ -73,7 +73,7 @@ export function DiningLandingPage() {
       {/* 1 · Service Hero */}
       <ServiceHero service="dining" />
 
-      <div id="content" className="container-x py-10 sm:py-14 space-y-10">
+      <div id="content" className="container-x py-10 sm:py-14 space-y-10 scroll-mt-24">
         {/* 2 · Compact "Book a table" search bar */}
         <section
           aria-label="Book a table search"

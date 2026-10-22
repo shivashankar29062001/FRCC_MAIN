@@ -268,7 +268,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       {hero || <ServiceHero service={heroService} />}
 
       {/* 2 · Main Section */}
-      <section className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
+      <section id="content" className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
         <div className="container-x section">
           {/* Header */}
           <div className="max-w-2xl">
