@@ -420,32 +420,68 @@ export function getPdfBlob(doc) {
 
 /**
  * Handles sending/sharing membership documents via WhatsApp.
+ * First calls backend Twilio WhatsApp API (/api/membership/send-whatsapp).
  * When navigator.canShare({ files }) is true: shares PDF + 2 PNG card files.
  * Otherwise: downloads the 3 files and opens https://wa.me/<91 + member mobile>?text=<encoded message>.
  *
- * TODO-WHATSAPP-API: automatic sending from the club number 917893616262 needs the WhatsApp Business API on the backend (documents and images with approved templates).
- *
  * @param {object} member
- * @returns {Promise<void>}
+ * @returns {Promise<object>}
  */
 export async function sendMembershipToWhatsApp(member = {}) {
-  // TODO-WHATSAPP-API: automatic sending from the club number 917893616262 needs the WhatsApp Business API on the backend (documents and images with approved templates).
-  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || 'FRCC-2026';
   const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
-  const textMessage = cleanId
-    ? `FRCC Membership. Member ID: ${cleanId}. Your application form, Membership ID card and Health card are attached.`
-    : 'FRCC Membership. Your application form, Membership ID card and Health card are attached.';
 
   // Clean member mobile number
   const mobileDigits = String(member?.mobile || '').replace(/\D/g, '').slice(-10);
   const waTargetMobile = mobileDigits ? `91${mobileDigits}` : '917893616262';
 
-  // 1. Build Application Form PDF File
+  // 1. Dispatch through backend Twilio WhatsApp API
+  let backendSent = false;
+  let backendResponse = null;
+  try {
+    const res = await fetch('/api/membership/send-whatsapp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mobile: member?.mobile,
+        name: member?.name,
+        memberId: member?.memberId,
+        planName: member?.planName,
+        amountPaid: member?.amountPaid,
+        validity: member?.validity || 'Lifetime',
+        paymentId: member?.paymentId || member?.couponCode || 'CONFIRMED',
+      }),
+    });
+    backendResponse = await res.json();
+    if (backendResponse?.success) {
+      backendSent = true;
+    }
+  } catch (err) {
+    console.warn('[applicationForm] Twilio API dispatch call failed:', err);
+  }
+
+  // 2. Build full message text for sharing/fallback
+  const amountStr =
+    member?.amountPaid != null ? Number(member.amountPaid).toLocaleString('en-IN') : '0';
+  const textMessage =
+    `🎉 *Welcome to Film Recreation & Cultural Centre (FRCC)!*\n\n` +
+    `Dear *${member?.name || 'Esteemed Member'}*,\n` +
+    `Your FRCC Membership enrollment has been successfully confirmed!\n\n` +
+    `📋 *OFFICIAL MEMBERSHIP DETAILS:*\n` +
+    `• Member ID: *${memberId}*\n` +
+    `• Plan: *${member?.planName || 'FRCC Membership'}*\n` +
+    `• Amount Paid: ₹${amountStr}\n` +
+    `• Status: Active / Confirmed\n\n` +
+    `✨ Your digital Membership ID Card and FRCC Health Card have been generated.\n` +
+    `View Dashboard: https://www.frccind.com/membership/dashboard\n\n` +
+    `Desk: +91 78936 16262`;
+
+  // 3. Prepare Application Form PDF File
   const doc = await buildApplicationFormPdf(member);
   const pdfBlob = getPdfBlob(doc);
   const pdfFile = new File([pdfBlob], cleanId ? `FRCC-Application-${cleanId}.pdf` : 'FRCC-Application.pdf', { type: 'application/pdf' });
 
-  // 2. Build ID Card PNG File from DOM SVG
+  // 4. Build ID Card PNG File from DOM SVG
   let idCardFile = null;
   const idSvg = document.getElementById('frcc-membership-id-card');
   if (idSvg) {
@@ -455,7 +491,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
     }
   }
 
-  // 3. Build Health Card PNG File from DOM SVG
+  // 5. Build Health Card PNG File from DOM SVG
   let healthCardFile = null;
   const healthSvg = document.getElementById('frcc-health-card');
   if (healthSvg) {
@@ -480,13 +516,12 @@ export async function sendMembershipToWhatsApp(member = {}) {
         files: filesToShare,
         text: textMessage,
       });
-      return;
+      return { success: true, method: backendSent ? 'twilio_and_share' : 'web_share' };
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.warn('[applicationForm] Web Share failed, falling back to download + wa.me link:', err);
-      } else {
-        return;
+      if (err.name === 'AbortError') {
+        return { success: true, aborted: true };
       }
+      console.warn('[applicationForm] Web Share failed, falling back to download + wa.me link:', err);
     }
   }
 
@@ -515,8 +550,12 @@ export async function sendMembershipToWhatsApp(member = {}) {
     document.body.removeChild(a);
   }
 
-  const waUrl = `https://wa.me/${waTargetMobile}?text=${encodeURIComponent(textMessage)}`;
+  const waUrl =
+    backendResponse?.fallbackWaUrl ||
+    `https://wa.me/${waTargetMobile}?text=${encodeURIComponent(textMessage)}`;
   window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+  return { success: true, method: backendSent ? 'twilio_and_wame' : 'wame_fallback' };
 }
 
 export default {

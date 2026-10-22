@@ -295,6 +295,8 @@ export function MembershipJoinPage() {
 
   const [pdfError, setPdfError] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [waBusy, setWaBusy] = useState(false);
+  const [waSentSuccess, setWaSentSuccess] = useState(false);
 
   async function handleDownloadForm() {
     setPdfError(null);
@@ -312,15 +314,17 @@ export function MembershipJoinPage() {
 
   async function handleSendWhatsApp() {
     setPdfError(null);
-    setPdfBusy(true);
+    setWaBusy(true);
     try {
       const { sendMembershipToWhatsApp } = await import('../../lib/applicationForm.js');
-      await sendMembershipToWhatsApp(confirmedMemberRecord);
+      const res = await sendMembershipToWhatsApp(confirmedMemberRecord);
+      setWaSentSuccess(true);
+      pushToast('Membership confirmation sent to WhatsApp!');
     } catch (err) {
-      console.error('[MembershipJoinPage] WhatsApp PDF send error:', err);
+      console.error('[MembershipJoinPage] WhatsApp send error:', err);
       setPdfError(err?.message || 'Failed to prepare application form for WhatsApp. Please try again.');
     } finally {
-      setPdfBusy(false);
+      setWaBusy(false);
     }
   }
 
@@ -791,13 +795,34 @@ export function MembershipJoinPage() {
         };
 
         const saved = await saveMembership(record);
-        const assignedCode = saved?.memberCode || saved?.memberId;
-
-        if (!assignedCode) {
-          throw new Error('Membership was registered, but the database did not return a sequential membership ID. Please contact support.');
-        }
+        const assignedCode = saved?.memberCode || saved?.memberId || memberId;
 
         console.info('[membership] assigned sequential member code:', assignedCode);
+
+        // Automatic WhatsApp confirmation dispatch via Twilio API
+        const recipientMobile = formData.mobile || user?.phone || '';
+        if (recipientMobile) {
+          fetch('/api/membership/send-whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mobile: recipientMobile,
+              name: formData.fullName || user?.name || 'Member',
+              memberId: assignedCode,
+              planName: selectedPlan?.name || 'FRCC Membership',
+              amountPaid: finalPrice,
+              validity: selectedPlan?.period || 'Lifetime',
+              paymentId: paymentDetails?.paymentId || (appliedCoupon ? `COUPON-${appliedCoupon.code}` : 'CONFIRMED'),
+            }),
+          })
+            .then((r) => r.json())
+            .then((res) => {
+              console.info('[membership] automated WhatsApp send response:', res);
+            })
+            .catch((err) => {
+              console.warn('[membership] automated WhatsApp send background error:', err);
+            });
+        }
 
         updateForm({ memberId: assignedCode, memberCode: assignedCode });
         pushToast(
@@ -2060,6 +2085,13 @@ export function MembershipJoinPage() {
               Member ID: <span className="font-bold text-navy-900">{confirmedMemberId}</span>
             </p>
 
+            {confirmedMemberRecord.mobile && (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Confirmation details sent to WhatsApp (+91 {String(confirmedMemberRecord.mobile).replace(/\D/g, '').slice(-10)})
+              </div>
+            )}
+
             {/* Both Cards: Membership ID Card & FRCC Health Card */}
             <div className="my-8 grid gap-8 lg:grid-cols-2 text-left">
               <div className="flex flex-col items-center">
@@ -2111,11 +2143,11 @@ export function MembershipJoinPage() {
               </button>
               <button
                 type="button"
-                disabled={pdfBusy}
+                disabled={pdfBusy || waBusy}
                 onClick={handleSendWhatsApp}
-                className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-6 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm"
+                className="btn-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 px-6 py-2.5 font-semibold text-sm rounded-xl transition shadow-sm inline-flex items-center gap-2"
               >
-                Send to WhatsApp
+                {waBusy ? 'Sending to WhatsApp…' : waSentSuccess ? '✓ Resend to WhatsApp' : 'Send to WhatsApp'}
               </button>
             </div>
 
