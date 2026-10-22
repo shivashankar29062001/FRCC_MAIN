@@ -218,10 +218,21 @@ export function AppProvider({ children }) {
 
   const saveMembership = useCallback(async (m) => {
     if (m) {
-      const memberId = m.memberId || membershipService.generateMemberId();
+      // Save to database first so sequential member_code is assigned by DB sequence
+      const saved = await membershipService.saveUserMembership({
+        userId: m.userId || user?.id || null,
+        ...m,
+      });
+
+      if (!saved || (!saved.memberId && !saved.memberCode)) {
+        throw new Error('No sequential membership ID returned by the database.');
+      }
+
+      const assignedCode = saved.memberCode || saved.memberId;
       const sanitized = {
         userId: m.userId || user?.id || null,
-        memberId,
+        memberId: assignedCode,
+        memberCode: assignedCode,
         name: m.name || m.fullName || '',
         mobile: m.mobile || '',
         email: m.email || '',
@@ -243,7 +254,11 @@ export function AppProvider({ children }) {
         pincode: m.pincode || '',
         emergencyContact: m.emergencyContact || '',
         aadhaarMasked: m.aadhaarMasked || '',
+        ...saved,
+        memberId: assignedCode,
+        memberCode: assignedCode,
       };
+
       setMembership(sanitized);
       setIsMemberState(true);
       setUser((curr) => {
@@ -260,18 +275,7 @@ export function AppProvider({ children }) {
         /* ignore */
       }
 
-      // Save to database and return result; do not swallow errors so callers can display feedback
-      const saved = await membershipService.saveUserMembership(sanitized);
-      if (saved) {
-        const merged = { ...sanitized, ...saved };
-        setMembership(merged);
-        try {
-          window.localStorage.setItem(MEMBERSHIP_STORAGE_KEY, JSON.stringify(merged));
-        } catch {
-          /* ignore */
-        }
-      }
-      return saved;
+      return sanitized;
     } else {
       setMembership(null);
       setIsMemberState(false);

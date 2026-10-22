@@ -25,11 +25,11 @@ export function MembershipIdCard({
   const patternId = useId();
 
   const name = member?.name || member?.fullName || 'Member Name';
-  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
   const planName = member?.planName || member?.plan_name || member?.plan || PLANS_DATA[0]?.name || 'FRCC Membership';
   const rawDate = member?.createdAt || member?.created_at || member?.valid_from;
   const issueDate = rawDate ? formatDMY(rawDate) : formatDMY(new Date().toISOString());
-  const qrValue = member?.qr_code || member?.qrValue || `FRCC:MEMBER:${memberId}`;
+  const qrValue = member?.qr_code || member?.qrValue || (memberId ? `FRCC:MEMBER:${memberId}` : '');
   const tagline = siteTagline || 'Reel stories... real connections...';
 
   return (
@@ -414,7 +414,7 @@ export function HealthCard({
   const patternId = useId();
 
   const name = member?.name || member?.fullName || 'Member Name';
-  const memberId = member?.memberId || member?.member_id || 'FRCC-2026-000000';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
   const plan = PLANS_DATA[0] || {};
   const discountPercent = healthCardDiscountPercent || plan.healthCardDiscountPercent || 30;
   const healthCardNote = plan.healthCardNote || 'Discount valid only at diagnostic centres collaborating with FRCC.';
@@ -830,19 +830,19 @@ export async function downloadSvgAsPng(svgElement, filename) {
  * @param {string} memberId
  * @returns {Promise<void>}
  */
-export async function downloadBothCards(memberId = 'FRCC-MEMBER') {
-  const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
+export async function downloadBothCards(memberId = '') {
+  const cleanId = String(memberId || '').replace(/[^a-zA-Z0-9_-]/g, '');
   const idSvg = document.getElementById('frcc-membership-id-card');
   const healthSvg = document.getElementById('frcc-health-card');
 
   if (idSvg) {
-    await downloadSvgAsPng(idSvg, `FRCC-ID-${cleanId}.png`);
+    await downloadSvgAsPng(idSvg, cleanId ? `FRCC-ID-${cleanId}.png` : 'FRCC-ID.png');
   }
   // Brief delay to ensure browser sequential download trigger
   await new Promise((r) => setTimeout(r, 200));
 
   if (healthSvg) {
-    await downloadSvgAsPng(healthSvg, `FRCC-Health-${cleanId}.png`);
+    await downloadSvgAsPng(healthSvg, cleanId ? `FRCC-Health-${cleanId}.png` : 'FRCC-Health.png');
   }
 }
 

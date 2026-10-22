@@ -74,11 +74,11 @@ export async function buildApplicationFormPdf(member = {}) {
     format: 'a4',
   });
 
-  const memberId = member?.memberId || 'FRCC-2026-000000';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
   const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
   const planName = member?.planName || plans[0]?.name || 'FRCC Membership';
   const issueDate = member?.createdAt ? formatDMY(member.createdAt) : formatDMY(new Date().toISOString());
-  const qrValue = `FRCC:MEMBER:${cleanId}`;
+  const qrValue = cleanId ? `FRCC:MEMBER:${cleanId}` : '';
 
   // Safe Applicant details — never print full Aadhaar or file
   const applicantName = member?.name || 'Member';
@@ -402,10 +402,10 @@ export async function buildApplicationFormPdf(member = {}) {
  * @returns {Promise<void>}
  */
 export async function downloadApplicationFormPdf(member = {}) {
-  const memberId = member?.memberId || 'FRCC-2026-000000';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
   const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
   const doc = await buildApplicationFormPdf(member);
-  doc.save(`FRCC-Application-${cleanId}.pdf`);
+  doc.save(cleanId ? `FRCC-Application-${cleanId}.pdf` : 'FRCC-Application.pdf');
 }
 
 /**
@@ -430,9 +430,11 @@ export function getPdfBlob(doc) {
  */
 export async function sendMembershipToWhatsApp(member = {}) {
   // TODO-WHATSAPP-API: automatic sending from the club number 917893616262 needs the WhatsApp Business API on the backend (documents and images with approved templates).
-  const memberId = member?.memberId || 'FRCC-2026-000000';
+  const memberId = member?.memberCode || member?.member_code || member?.memberId || member?.member_id || '';
   const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
-  const textMessage = `FRCC Membership. Member ID: ${cleanId}. Your application form, Membership ID card and Health card are attached.`;
+  const textMessage = cleanId
+    ? `FRCC Membership. Member ID: ${cleanId}. Your application form, Membership ID card and Health card are attached.`
+    : 'FRCC Membership. Your application form, Membership ID card and Health card are attached.';
 
   // Clean member mobile number
   const mobileDigits = String(member?.mobile || '').replace(/\D/g, '').slice(-10);
@@ -441,7 +443,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
   // 1. Build Application Form PDF File
   const doc = await buildApplicationFormPdf(member);
   const pdfBlob = getPdfBlob(doc);
-  const pdfFile = new File([pdfBlob], `FRCC-Application-${cleanId}.pdf`, { type: 'application/pdf' });
+  const pdfFile = new File([pdfBlob], cleanId ? `FRCC-Application-${cleanId}.pdf` : 'FRCC-Application.pdf', { type: 'application/pdf' });
 
   // 2. Build ID Card PNG File from DOM SVG
   let idCardFile = null;
@@ -449,7 +451,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
   if (idSvg) {
     const blob = await getSvgAsPngBlob(idSvg);
     if (blob) {
-      idCardFile = new File([blob], `FRCC-ID-${cleanId}.png`, { type: 'image/png' });
+      idCardFile = new File([blob], cleanId ? `FRCC-ID-${cleanId}.png` : 'FRCC-ID.png', { type: 'image/png' });
     }
   }
 
@@ -459,7 +461,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
   if (healthSvg) {
     const blob = await getSvgAsPngBlob(healthSvg);
     if (blob) {
-      healthCardFile = new File([blob], `FRCC-Health-${cleanId}.png`, { type: 'image/png' });
+      healthCardFile = new File([blob], cleanId ? `FRCC-Health-${cleanId}.png` : 'FRCC-Health.png', { type: 'image/png' });
     }
   }
 
@@ -489,7 +491,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
   }
 
   // Fallback: Download the 3 files and open wa.me link
-  doc.save(`FRCC-Application-${cleanId}.pdf`);
+  doc.save(cleanId ? `FRCC-Application-${cleanId}.pdf` : 'FRCC-Application.pdf');
 
   if (idCardFile) {
     const URL = window.URL || window.webkitURL;

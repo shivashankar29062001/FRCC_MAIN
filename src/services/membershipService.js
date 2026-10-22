@@ -1,13 +1,19 @@
 import { supabase } from './supabase.js';
 
-export function generateMemberId() {
-  const year = new Date().getFullYear();
-  const random6 = String(Math.floor(100000 + Math.random() * 900000));
-  return `FRCC-${year}-${random6}`;
+/**
+ * Membership ID validation regex:
+ * Accepts both the new sequential format (FRCCIND0001, FRCCIND0002, ...)
+ * and legacy test records (FRCC-YYYY-XXXXXX).
+ */
+export const MEMBER_CODE_REGEX = /^(FRCCIND\d{4,}|FRCC-\d{4}-\d{6})$/i;
+
+export function isValidMemberCode(code) {
+  if (!code || typeof code !== 'string') return false;
+  return MEMBER_CODE_REGEX.test(code.trim());
 }
 
 /**
- * Fetch membership for a given user or member ID.
+ * Fetch membership for a given user or member ID/code.
  */
 export async function getUserMembership(userId = null, memberId = null) {
   try {
@@ -16,7 +22,7 @@ export async function getUserMembership(userId = null, memberId = null) {
     if (userId) {
       query = query.eq('user_id', userId);
     } else if (memberId) {
-      query = query.eq('member_id', memberId);
+      query = query.or(`member_id.eq.${memberId},member_code.eq.${memberId}`);
     } else {
       const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) {
@@ -36,10 +42,13 @@ export async function getUserMembership(userId = null, memberId = null) {
 
     if (!data) return null;
 
+    const assignedCode = data.member_code || data.member_id || '';
+
     return {
       id: data.id,
       userId: data.user_id,
-      memberId: data.member_id,
+      memberId: assignedCode,
+      memberCode: assignedCode,
       name: data.name,
       mobile: data.mobile,
       email: data.email,
@@ -70,17 +79,18 @@ export async function getUserMembership(userId = null, memberId = null) {
 
 /**
  * Save / enroll a membership into Supabase and update user's profile.
+ * Membership ID is strictly assigned by database sequence trigger.
  */
 export async function saveUserMembership(membershipData) {
-  const memberId = membershipData.memberId || generateMemberId();
-
   // Support VITE_USE_MOCK mode
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true') {
     const mockId = `mock-mem-${Date.now()}`;
+    const assignedCode = membershipData.memberCode || membershipData.memberId || 'FRCCIND0001';
     return {
       id: mockId,
       userId: membershipData.userId || null,
-      memberId,
+      memberId: assignedCode,
+      memberCode: assignedCode,
       name: membershipData.name || 'Member',
       mobile: membershipData.mobile || '',
       email: membershipData.email || '',
@@ -109,11 +119,14 @@ export async function saveUserMembership(membershipData) {
   if (sessionErr) {
     console.error('[membershipService] Auth session error in saveUserMembership:', sessionErr);
   }
-  const currentUserId = membershipData.userId || sessionData?.session?.user?.id || null;
+  const rawUserId = membershipData.userId || sessionData?.session?.user?.id || null;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const currentUserId = (rawUserId && isUuid.test(rawUserId)) ? rawUserId : (sessionData?.session?.user?.id || null);
 
+  // Insert payload WITHOUT member_id or member_code so DB trigger assigns sequential code.
+  // Note: Personal documents and details (aadhaar, spouse, children) are stored in member_profiles.
   const payload = {
     user_id: currentUserId,
-    member_id: memberId,
     name: membershipData.name || 'Member',
     mobile: membershipData.mobile || '',
     email: membershipData.email || '',
@@ -121,36 +134,27 @@ export async function saveUserMembership(membershipData) {
     plan_price: Number(membershipData.planPrice || 0),
     payment_method: membershipData.paymentMethod || 'upi',
     status: 'Active',
-    amount_paid: Number(membershipData.amountPaid ?? membershipData.planPrice ?? 0), // TODO-REMOVE-TEST-COUPON
-    coupon_code: membershipData.couponCode || null, // TODO-REMOVE-TEST-COUPON
-    is_test: Boolean(membershipData.isTest), // TODO-REMOVE-TEST-COUPON
+    amount_paid: Number(membershipData.amountPaid ?? membershipData.planPrice ?? 0),
+    coupon_code: membershipData.couponCode || null,
+    is_test: Boolean(membershipData.isTest),
     payment_id: membershipData.paymentId || null,
     order_id: membershipData.orderId || null,
     signature: membershipData.signature || null,
-    date_of_birth: membershipData.dateOfBirth || membershipData.dob || null,
-    gender: membershipData.gender || null,
-    address_line: membershipData.addressLine || membershipData.address || null,
-    city: membershipData.city || null,
-    state: membershipData.state || null,
-    pincode: membershipData.pincode || null,
-    emergency_contact: membershipData.emergencyContact || null,
-    aadhaar_masked: membershipData.aadhaarMasked || null,
     created_at: membershipData.createdAt || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
   let { data, error } = await supabase
     .from('memberships')
-    .upsert(payload, { onConflict: 'member_id' })
+    .insert(payload)
     .select()
-    .maybeSingle();
+    .single();
 
   // If table exists but some new columns haven't been migrated yet, retry with base columns
   if (error && error.message && error.message.includes('column')) {
-    console.warn('[membershipService] Retrying membership upsert with base columns:', error.message);
+    console.warn('[membershipService] Retrying membership insert with base columns:', error.message);
     const fallbackPayload = {
       user_id: currentUserId,
-      member_id: memberId,
       name: membershipData.name || 'Member',
       mobile: membershipData.mobile || '',
       email: membershipData.email || '',
@@ -163,18 +167,30 @@ export async function saveUserMembership(membershipData) {
     };
     const retry = await supabase
       .from('memberships')
-      .upsert(fallbackPayload, { onConflict: 'member_id' })
+      .insert(fallbackPayload)
       .select()
-      .maybeSingle();
+      .single();
     if (!retry.error) {
       data = retry.data;
       error = null;
+    } else {
+      console.error('[membershipService] Fallback insert also failed:', retry.error);
+      error = retry.error;
     }
   }
 
   if (error) {
     console.error('[membershipService] Error saving membership to Supabase:', error);
     throw error;
+  }
+
+  const assignedCode = data?.member_code || data?.member_id;
+  if (!assignedCode) {
+    const missingErr = new Error(
+      'Membership record created, but no sequential membership code was returned by the database. Please contact support.'
+    );
+    console.error('[membershipService]', missingErr, data);
+    throw missingErr;
   }
 
   // TODO-REMOVE-TEST-COUPON
@@ -193,9 +209,10 @@ export async function saveUserMembership(membershipData) {
   }
 
   return {
-    id: data?.id || memberId,
+    id: data.id,
     userId: currentUserId,
-    memberId: data?.member_id || memberId,
+    memberId: assignedCode,
+    memberCode: assignedCode,
     name: data?.name || membershipData.name || 'Member',
     mobile: data?.mobile || membershipData.mobile || '',
     email: data?.email || membershipData.email || '',

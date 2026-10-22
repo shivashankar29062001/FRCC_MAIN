@@ -44,7 +44,7 @@ const TABS = [
   { id: 'payments', label: 'Payment History', icon: MembershipIcon },
 ];
 
-function PersonalDetails({ user, pushToast }) {
+function PersonalDetails({ user, membership, pushToast }) {
   const [name, setName] = useState(user?.name || '');
   const [contact, setContact] = useState(user?.emailOrPhone || '');
   const [saving, setSaving] = useState(false);
@@ -82,7 +82,14 @@ function PersonalDetails({ user, pushToast }) {
   return (
     <Card>
       <h3 className="h-card">Personal Details</h3>
-      <p className="caption mt-1">User ID {user?.userId || '—'}</p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+        <p className="caption">User ID {user?.userId || '—'}</p>
+        {(membership?.memberCode || membership?.memberId) && (
+          <p className="caption font-mono font-semibold text-gold-700">
+            Member ID: {membership.memberCode || membership.memberId}
+          </p>
+        )}
+      </div>
       <form onSubmit={save} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
         <div>
           <label className="label" htmlFor="profile-name">Full name</label>
@@ -208,7 +215,7 @@ function NotificationPrefs({ pushToast }) {
 }
 
 export function ProfilePage({ initialTab = 'details' }) {
-  const { user, pushToast, bookings: appBookings, payments: appPayments } = useApp();
+  const { user, membership, pushToast, bookings: appBookings, payments: appPayments } = useApp();
   // Bookings and payments from activity store and global app store
   const { bookings: activityBookings, payments: activityPayments } = useActivityBookings();
   const [params] = useSearchParams();
@@ -362,7 +369,14 @@ export function ProfilePage({ initialTab = 'details' }) {
       <div className="container-x section-top">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: isBookingsTab ? 'My bookings' : 'Profile' }]} />
         <h1 className="h-section mt-3">{isBookingsTab ? 'My bookings' : `Hi, ${(user?.name || 'Member').split(' ')[0]}`}</h1>
-        <p className="mt-1 text-slate-600">{isBookingsTab ? 'Your activity and sports bookings, time slots and QR codes.' : `${user?.emailOrPhone || ''} · ${user?.userId || ''}`}</p>
+        <p className="mt-1 text-slate-600">
+          {isBookingsTab
+            ? 'Your activity and sports bookings, time slots and QR codes.'
+            : [
+                user?.emailOrPhone,
+                (membership?.memberCode || membership?.memberId) ? `Member ID: ${membership?.memberCode || membership?.memberId}` : user?.userId,
+              ].filter(Boolean).join(' · ')}
+        </p>
 
         <div role="tablist" aria-label="Profile sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           {tabs.map((t) => {
@@ -397,7 +411,7 @@ export function ProfilePage({ initialTab = 'details' }) {
         <div className="pt-6">
           {tab === 'details' && (
             <div id="panel-details" role="tabpanel" aria-labelledby="tab-details">
-              <Reveal><PersonalDetails user={user} pushToast={pushToast} /></Reveal>
+              <Reveal><PersonalDetails user={user} membership={membership} pushToast={pushToast} /></Reveal>
             </div>
           )}
           {tab === 'password' && (

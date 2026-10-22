@@ -116,7 +116,7 @@ export function MembershipDashboardPage() {
 
   // Safe defaults with optional chaining everywhere
   const currentMembership = membership || appMembership || null;
-  const memberId = currentMembership?.memberId || currentMembership?.member_id || 'FRCC-MEMBER';
+  const memberId = currentMembership?.memberCode || currentMembership?.member_code || currentMembership?.memberId || currentMembership?.member_id || '';
   const memberName = currentMembership?.name || currentMembership?.fullName || user?.name || 'Member';
   const planName = currentMembership?.planName || currentMembership?.plan_name || currentMembership?.plan || 'FRCC Membership';
   const memberStatus = currentMembership?.status || (appIsMember ? 'Active' : 'Pending');
@@ -156,7 +156,7 @@ export function MembershipDashboardPage() {
       const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
       const idSvg = document.getElementById('frcc-membership-id-card');
       if (idSvg) {
-        await downloadSvgAsPng(idSvg, `FRCC-ID-${cleanId}.png`);
+        await downloadSvgAsPng(idSvg, cleanId ? `FRCC-ID-${cleanId}.png` : 'FRCC-ID.png');
       }
     } catch (err) {
       console.error('[MembershipDashboardPage] Error downloading ID card:', err);
@@ -168,7 +168,7 @@ export function MembershipDashboardPage() {
       const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
       const healthSvg = document.getElementById('frcc-health-card');
       if (healthSvg) {
-        await downloadSvgAsPng(healthSvg, `FRCC-Health-${cleanId}.png`);
+        await downloadSvgAsPng(healthSvg, cleanId ? `FRCC-Health-${cleanId}.png` : 'FRCC-Health.png');
       }
     } catch (err) {
       console.error('[MembershipDashboardPage] Error downloading Health card:', err);
@@ -308,7 +308,7 @@ export function MembershipDashboardPage() {
         <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm grid grid-cols-2 sm:grid-cols-5 gap-4 text-left">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Membership ID</p>
-            <p className="mt-1 font-mono font-bold text-navy-950 text-sm sm:text-base">{memberId}</p>
+            <p className="mt-1 font-mono font-bold text-navy-950 text-sm sm:text-base">{memberId || '—'}</p>
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Member Name</p>
@@ -466,7 +466,7 @@ export function MembershipDashboardPage() {
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Member ID: {memberId}</span>
+                <span>{memberId ? `Member ID: ${memberId}` : ''}</span>
                 <span className="font-medium text-emerald-600">Status: {memberStatus}</span>
               </div>
             </Card>

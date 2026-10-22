@@ -3,7 +3,8 @@
 // ---------------------------------------------------------------------------
 
 export {
-  generateMemberId,
+  MEMBER_CODE_REGEX,
+  isValidMemberCode,
   getUserMembership,
   saveUserMembership,
   uploadPassportPhoto,

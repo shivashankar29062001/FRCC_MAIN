@@ -639,7 +639,7 @@ export function MembershipJoinPage() {
     updateForm({ children: next });
   }
 
-  const confirmedMemberId = formData.memberId || membership?.memberId || '';
+  const confirmedMemberId = formData.memberCode || formData.memberId || membership?.memberCode || membership?.memberId || '';
   const confirmedPlanName = selectedPlan?.name || membership?.planName || 'FRCC Membership';
 
   const confirmedMemberRecord = useMemo(() => {
@@ -653,6 +653,7 @@ export function MembershipJoinPage() {
 
     return {
       memberId: confirmedMemberId,
+      memberCode: confirmedMemberId,
       name: formData.fullName || user?.name || membership?.name || 'Member',
       mobile: formData.mobile || user?.phone || membership?.mobile || '',
       email: formData.email || user?.email || membership?.email || '',
@@ -723,10 +724,6 @@ export function MembershipJoinPage() {
     setSubmitError('');
 
     try {
-      const year = new Date().getFullYear();
-      const random6 = String(Math.floor(100000 + Math.random() * 900000));
-      const memberId = formData.memberId || membership?.memberId || `FRCC-${year}-${random6}`;
-
       const emergencyContact =
         formData.emergencyName && formData.emergencyMobile
           ? `${formData.emergencyName} (${formData.emergencyMobile})`
@@ -758,10 +755,9 @@ export function MembershipJoinPage() {
           formData.hasNoChildren ? [] : formData.children
         );
 
-        // 2. Save membership record (memberships table)
+        // 2. Save membership record (memberships table) without frontend-generated ID
         const record = {
           userId: user?.id || user?.userId || null,
-          memberId,
           name: formData.fullName || user?.name || 'Member',
           mobile: formData.mobile || '',
           email: formData.email || '',
@@ -788,10 +784,15 @@ export function MembershipJoinPage() {
         };
 
         const saved = await saveMembership(record);
-        const insertedId = saved?.id || saved?.memberId || memberId;
-        console.info('[membership] inserted row id:', insertedId);
+        const assignedCode = saved?.memberCode || saved?.memberId;
 
-        updateForm({ memberId });
+        if (!assignedCode) {
+          throw new Error('Membership was registered, but the database did not return a sequential membership ID. Please contact support.');
+        }
+
+        console.info('[membership] assigned sequential member code:', assignedCode);
+
+        updateForm({ memberId: assignedCode, memberCode: assignedCode });
         pushToast(
           finalPrice === 0
             ? `Welcome to ${selectedPlan?.name || 'FRCC'}! Test coupon membership activated.`
@@ -807,19 +808,18 @@ export function MembershipJoinPage() {
         return;
       }
 
-      // Launch Razorpay Payment Gateway
+      // Launch Razorpay Payment Gateway (receiptId uses timestamp to not waste sequential member code)
       await initiateRazorpayPayment({
         amount: finalPrice,
         planName: selectedPlan?.name || 'FRCC Membership',
         description: `${selectedPlan?.period || '1 Year'} Membership Subscription`,
-        receiptId: memberId,
+        receiptId: `rcpt_mem_${Date.now()}`,
         prefill: {
           name: formData.fullName || user?.name || '',
           email: formData.email || user?.email || '',
           mobile: formData.mobile || user?.phone || '',
         },
         notes: {
-          memberId,
           planId: selectedPlan?.id || '',
         },
         onSuccess: async (paymentDetails) => {
