@@ -17,6 +17,7 @@ import { HALLS } from '../data/demo/halls.js';
 import { PARKING_ZONES } from '../data/demo/parking.js';
 import { getDefaultLocation } from '../data/demo/locations.js';
 import { GAMES } from '../features/activities/games.config.js';
+import { ROUTES } from './routes.js';
 
 const area = getDefaultLocation();
 
@@ -45,20 +46,20 @@ export const NAV_MENUS = {
   stay: {
     label: 'Stay',
     cards: rooms.map((r) => ({
-      to: '/book/hotel#booking',
+      to: `${ROUTES.stay}#booking`,
       label: r.type,
       image: { ...roomSlot(r.type), name: r.type },
     })),
-    viewAll: { to: '/book/hotel', label: 'View all rooms' },
+    viewAll: { to: ROUTES.stay, label: 'View all rooms' },
   },
   hall: {
     label: 'Halls',
     cards: halls.map((h) => ({
-      to: '/halls',
+      to: ROUTES.halls,
       label: shortName(h.name, area.name),
       image: { ...IMAGES[h.id], name: shortName(h.name, area.name) },
     })),
-    viewAll: { to: '/halls', label: 'View all halls' },
+    viewAll: { to: ROUTES.halls, label: 'View all halls' },
   },
   activities: {
     label: 'Activities',
@@ -67,16 +68,16 @@ export const NAV_MENUS = {
       label: g.name,
       image: IMAGES[g.imageKey],
     })),
-    viewAll: { to: '/book/activities', label: 'View all games' },
+    viewAll: { to: ROUTES.activities, label: 'View all games' },
   },
   parking: {
     label: 'Parking',
     cards: zones.map((z) => ({
-      to: '/parking',
+      to: ROUTES.parking,
       label: shortName(z.name, area.name),
       image: { ...IMAGES[z.id], name: shortName(z.name, area.name) },
     })),
-    viewAll: { to: '/parking', label: 'View all zones' },
+    viewAll: { to: ROUTES.parking, label: 'View all zones' },
   },
 };
 

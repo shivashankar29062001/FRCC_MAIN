@@ -243,6 +243,7 @@ export function ServiceHero({ service = 'stay' }) {
                       <div className="mt-4 pt-1">
                         <Link
                           to={offer.link}
+                          onClick={() => { if (import.meta.env.DEV) console.info("[tile]", offer.title, offer.link); }}
                           className="inline-flex items-center gap-1 text-sm font-semibold text-navy-900 transition-colors duration-150 hover:text-gold-600"
                         >
                           <span>View</span>

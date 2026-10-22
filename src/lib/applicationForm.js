@@ -13,9 +13,9 @@ import {
   phone as sitePhone,
   email as siteEmail,
   registration as siteRegistration,
+  url as siteUrl,
 } from '../config/site.js';
-import { plans } from '../data/membership.js';
-import { membershipTerms } from '../data/membershipTerms.js';
+import { plans, formBenefits } from '../data/membership.js';
 import { formatDMY } from '../utils/dates.js';
 import { getSvgAsPngBlob } from '../features/membership/MembershipCards.jsx';
 
@@ -287,22 +287,18 @@ export async function buildApplicationFormPdf(member = {}) {
   currentY = s2BoxY + s2BoxH + 4;
 
   // -------------------------------------------------------------------------
-  // Section 3: Your Membership Benefits (Read from membership.js benefits)
+  // Section 3: Your Membership Benefits (Read from formBenefits in membership.js)
   // -------------------------------------------------------------------------
   drawSectionBar('3. Your Membership Benefits');
 
-  const benefitsList = plans[0]?.benefits || [
+  const benefitsList = formBenefits || [
     '30% discount on every booking',
     'Health card: 30% discount at collaborating diagnostic centres',
     'Membership ID card and Health card',
-    'Connect with film lovers',
-    'Build industry relationships',
-    'Experience the world of cinema',
-    'Be part of exclusive film and cultural activities',
   ];
 
   const s3BoxY = currentY;
-  const s3BoxH = Math.max(30, benefitsList.length * 4.4 + 4);
+  const s3BoxH = Math.max(18, benefitsList.length * 4.4 + 4);
 
   doc.setFillColor(BOX_BG[0], BOX_BG[1], BOX_BG[2]);
   doc.setDrawColor(BORDER_COLOR[0], BORDER_COLOR[1], BORDER_COLOR[2]);
@@ -326,50 +322,9 @@ export async function buildApplicationFormPdf(member = {}) {
   currentY = s3BoxY + s3BoxH + 4;
 
   // -------------------------------------------------------------------------
-  // Section 4: Terms and Conditions (Numbered list from membershipTerms.js)
+  // Section 4: Declaration & Signatures (Renumbered from 5)
   // -------------------------------------------------------------------------
-  drawSectionBar('4. Terms and Conditions');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
-
-  membershipTerms.forEach((term, idx) => {
-    const termNum = `${idx + 1}. `;
-    const termTextLines = doc.splitTextToSize(term, CONTENT_WIDTH - 8);
-    const itemHeight = termTextLines.length * 3.3 + 1.2;
-
-    // Auto-overflow to page 2 when needed
-    if (currentY + itemHeight > BOTTOM_LIMIT) {
-      doc.addPage();
-      currentY = 16;
-      drawSectionBar('4. Terms and Conditions (Continued)');
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.text(termNum, MARGIN_LEFT + 2, currentY);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text(termTextLines, MARGIN_LEFT + 7, currentY);
-
-    currentY += itemHeight;
-  });
-
-  currentY += 3;
-
-  // -------------------------------------------------------------------------
-  // Section 5: Declaration & Two Signature Lines
-  // -------------------------------------------------------------------------
-  const declBlockHeight = 32;
-  if (currentY + declBlockHeight > BOTTOM_LIMIT) {
-    doc.addPage();
-    currentY = 16;
-  }
-
-  drawSectionBar('5. Declaration & Signatures');
+  drawSectionBar('4. Declaration & Signatures');
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7);
@@ -409,7 +364,7 @@ export async function buildApplicationFormPdf(member = {}) {
   // Global Footers & Page Numbers across all pages
   // -------------------------------------------------------------------------
   const totalPages = doc.getNumberOfPages();
-  const website = typeof window !== 'undefined' ? window.location.origin.replace(/^https?:\/\//, '') : 'frcc.in';
+  const cleanWebsite = (siteUrl || '').replace(/^https?:\/\//, '').replace(/\/+$/, '').trim();
 
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -425,8 +380,12 @@ export async function buildApplicationFormPdf(member = {}) {
     const regText = siteRegistration?.id ? `  |  Reg. No: ${siteRegistration.id}` : '';
     doc.text(`Phone: ${sitePhone}  |  Email: ${siteEmail}${regText}`, MARGIN_LEFT, 292);
 
+    const pageText = cleanWebsite
+      ? `Page ${i} of ${totalPages}  |  ${cleanWebsite}`
+      : `Page ${i} of ${totalPages}`;
+
     doc.text(
-      `Page ${i} of ${totalPages}  |  ${website}`,
+      pageText,
       MARGIN_LEFT + CONTENT_WIDTH,
       292,
       { align: 'right' }

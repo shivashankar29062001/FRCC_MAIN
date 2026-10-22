@@ -50,6 +50,12 @@ export const plans = [
 
 export const PLANS_DATA = plans;
 
+export const formBenefits = [
+  `${memberDiscountPercent}% discount on every booking`,
+  `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
+  'Membership ID card and Health card',
+];
+
 export const BENEFITS_DATA = [
   {
     id: 'booking-discount',
@@ -156,6 +162,7 @@ export default {
   BENEFITS_DATA,
   HOW_IT_WORKS,
   FINAL_STRIP,
+  formBenefits,
   getPlanById,
   WIZARD_STEPS,
   MARITAL_STATUSES,

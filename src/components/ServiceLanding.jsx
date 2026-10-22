@@ -10,6 +10,7 @@ import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
 import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
+import { ROUTES } from '../config/routes.js';
 import { areas as hotelAreas, rooms as hotelRooms } from '../data/hotel.js';
 import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
 import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
@@ -41,11 +42,11 @@ const BENEFIT_ICONS = {
 };
 
 const ALL_EXPLORE_LINKS = [
-  { key: 'stay', to: '/stay', label: 'Stay', detail: 'Rooms and suites across campus', image: IMAGES.exploreMoreHotel },
-  { key: 'halls', to: '/halls', label: 'Halls', detail: 'Weddings, conventions and private dining', image: IMAGES.exploreMoreHall },
-  { key: 'parking', to: '/parking', label: 'Parking', detail: 'Secure zoned parking with EV charging', image: IMAGES.exploreMoreParking },
-  { key: 'activities', to: '/activities', label: 'Activities', detail: 'Eleven sports, courts, and pool sessions', image: IMAGES.exploreMoreActivities },
-  { key: 'membership', to: '/membership', label: 'Membership', detail: 'Lifetime enrollment and club privileges', image: IMAGES.exploreMoreMembership },
+  { key: 'stay', to: ROUTES.stay, label: 'Stay', detail: 'Rooms and suites across campus', image: IMAGES.exploreMoreHotel },
+  { key: 'halls', to: ROUTES.halls, label: 'Halls', detail: 'Weddings, conventions and private dining', image: IMAGES.exploreMoreHall },
+  { key: 'parking', to: ROUTES.parking, label: 'Parking', detail: 'Secure zoned parking with EV charging', image: IMAGES.exploreMoreParking },
+  { key: 'activities', to: ROUTES.activities, label: 'Activities', detail: 'Eleven sports, courts, and pool sessions', image: IMAGES.exploreMoreActivities },
+  { key: 'membership', to: ROUTES.membership, label: 'Membership', detail: 'Lifetime enrollment and club privileges', image: IMAGES.exploreMoreMembership },
 ];
 
 export function ServiceLanding({ service = 'stay', hero }) {
@@ -546,6 +547,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
               <Link
                 key={item.to}
                 to={item.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", item.label, item.to); }}
                 className="group relative block overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm"
               >
                 <div className="h-44 overflow-hidden">

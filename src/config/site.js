@@ -7,6 +7,7 @@ import { MEMBER_DISCOUNT_PERCENT, MEMBER_PROMO_NOTE } from './pricing.js';
 export const name = 'Film Recreation & Cultural Centre';
 export const shortName = 'FRCC';
 export const tagline = 'Reel stories... real connections...';
+export const url = '';
 
 export const phone = '+91 78936 16262';
 export const vijayawadaPhone = '+91 98663 33787';
@@ -87,6 +88,7 @@ export const siteConfig = {
   name,
   shortName,
   tagline,
+  url,
   phone,
   whatsappNumber,
   whatsappLink,

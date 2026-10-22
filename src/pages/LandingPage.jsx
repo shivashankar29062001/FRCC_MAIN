@@ -16,10 +16,11 @@ import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { TypeWriter } from '../components/TypeWriter.jsx';
 import { name as siteName, shortName as siteShortName, tagline as siteTagline } from '../config/site.js';
+import { ROUTES } from '../config/routes.js';
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
-  to: '/stay',
+  to: ROUTES.stay,
   heading: 'Stay',
   line: '36 rooms across two wings — member rates every night.',
   image: IMAGES.staySuite,
@@ -27,7 +28,7 @@ const STAY_FEATURE = {
 
 // 3b · Halls and events feature section
 const HALLS_FEATURE = {
-  to: '/halls',
+  to: ROUTES.halls,
   heading: 'Halls and events',
   line: 'Seats 40 to 400 — weddings, conferences, celebrations.',
   image: IMAGES.hallFunction,
@@ -42,7 +43,7 @@ const ACTIVITY_TABS = [
 ];
 
 function gameHref(gameId) {
-  return `/activities?game=${encodeURIComponent(gameId)}`;
+  return `${ROUTES.activities}?game=${encodeURIComponent(gameId)}`;
 }
 
 // 3d · Campus life gallery — 8 photos
@@ -158,7 +159,7 @@ export function LandingPage() {
                 {/* 6 · Plain text link */}
                 <div className="mt-[18px]">
                   <Link
-                    to="/signup"
+                    to={ROUTES.signup}
                     className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
                     <span>Become a member</span>
@@ -193,7 +194,11 @@ export function LandingPage() {
             <h2 className="h-section">{STAY_FEATURE.heading}</h2>
             <span className="mt-3 block text-slate-600">{STAY_FEATURE.line}</span>
             <div className="mt-6">
-              <Link to={STAY_FEATURE.to} className="btn-base bg-gold-500 text-navy-950 px-6 py-3 hover:bg-gold-400 inline-flex items-center gap-2">
+              <Link
+                to={STAY_FEATURE.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Stay", STAY_FEATURE.to); }}
+                className="btn-base bg-gold-500 text-navy-950 px-6 py-3 hover:bg-gold-400 inline-flex items-center gap-2"
+              >
                 Explore stays <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
@@ -224,7 +229,11 @@ export function LandingPage() {
             <h2 className="h-section">{HALLS_FEATURE.heading}</h2>
             <span className="mt-3 block text-slate-600">{HALLS_FEATURE.line}</span>
             <div className="mt-6">
-              <Link to={HALLS_FEATURE.to} className="btn-base bg-navy-900 text-white px-6 py-3 hover:bg-navy-800 inline-flex items-center gap-2">
+              <Link
+                to={HALLS_FEATURE.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Halls and events", HALLS_FEATURE.to); }}
+                className="btn-base bg-navy-900 text-white px-6 py-3 hover:bg-navy-800 inline-flex items-center gap-2"
+              >
                 View halls <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
@@ -260,7 +269,7 @@ export function LandingPage() {
               />
             ))}
           </div>
-          <SectionLink to="/activities" light>View all activities</SectionLink>
+          <SectionLink to={ROUTES.activities} light>View all activities</SectionLink>
         </div>
       </section>
 
@@ -287,7 +296,7 @@ export function LandingPage() {
                   sizes="(min-width: 1024px) 23vw, 46vw"
                   overlay
                 >
-                  <span aria-hidden className="absolute inset-x-0 bottom-0 p-3">
+                  <span aria-hidden className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
                     <span className="block text-xs font-semibold text-white transition-colors duration-150 group-hover:text-gold-400">
                       {photo.label}
                     </span>
@@ -296,7 +305,7 @@ export function LandingPage() {
               </button>
             ))}
           </div>
-          <SectionLink to="/book" light>View all booking options</SectionLink>
+          <SectionLink to={ROUTES.book} light>View all booking options</SectionLink>
         </div>
       </section>
 
@@ -318,7 +327,8 @@ export function LandingPage() {
             <span className="mt-3 block text-slate-300">One lifetime fee — member rates across the whole campus.</span>
             <div className="mt-8">
               <Link
-                to="/membership"
+                to={ROUTES.membership}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Membership", ROUTES.membership); }}
                 className="btn-base bg-gold-500 text-navy-950 px-7 py-3.5 text-lg hover:bg-gold-400 inline-flex items-center gap-2"
               >
                 Become a member

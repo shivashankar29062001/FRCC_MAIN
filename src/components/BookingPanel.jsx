@@ -23,6 +23,7 @@ import {
 } from './ui/icons.jsx';
 import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
 import { SITE_INFO } from '../config/siteInfo.js';
+import { ROUTES } from '../config/routes.js';
 
 // ---------------------------------------------------------------------------
 // THE booking bar — the one booking widget in the site. It is used
@@ -46,11 +47,11 @@ import { SITE_INFO } from '../config/siteInfo.js';
 const STORAGE_KEY = 'frcc.bookingBar.v2';
 
 const TABS = [
-  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: '/stay' },
-  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: '/halls' },
-  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: '/parking' },
-  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: '/activities' },
-  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: '/membership' },
+  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: ROUTES.stay },
+  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: ROUTES.halls },
+  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: ROUTES.parking },
+  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: ROUTES.activities },
+  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership },
 ];
 
 // Game list comes from the activities team's config — the single source of truth.
@@ -380,7 +381,7 @@ function useBookingForm(defaultTab, preselect) {
 
   function selectTab(id) {
     if (id === 'membership') {
-      navigate('/membership');
+      navigate(ROUTES.membership);
       return;
     }
     setTab(id);
@@ -514,7 +515,7 @@ function ServiceTabs({ tab, onTabKey, tabRefs, selectTab }) {
           return (
             <Link
               key={t.id}
-              to="/membership"
+              to={ROUTES.membership}
               id={`booking-tab-${t.id}`}
               className="relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-semibold transition-colors duration-150 sm:px-4 text-slate-500 hover:text-navy-900"
             >
@@ -595,7 +596,7 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
           return (
             <Link
               key={t.id}
-              to="/membership"
+              to={ROUTES.membership}
               id={`booking-card-tab-${t.id}`}
               className="booking-tab"
             >
