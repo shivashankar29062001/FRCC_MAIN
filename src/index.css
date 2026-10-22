@@ -400,29 +400,34 @@ select.booking-field {
 /* ======================================================================== */
 /* Landing Page (/) Hero: Overlays + Typography + Compact Booking Card      */
 /* ======================================================================== */
-.landing-hero-wrap {
+.landing-hero-wrap,
+.service-hero-wrap {
   position: relative;
 }
 
-.landing-hero-wrap .hero {
+.landing-hero-wrap .hero,
+.service-hero-wrap .hero {
   position: relative;
   width: 100%;
   overflow: hidden;
 }
 
-.landing-hero-wrap .hero__shade {
+.landing-hero-wrap .hero__shade,
+.service-hero-wrap .hero__shade {
   display: none !important;
 }
 
 @media (min-width: 900px) {
-  .landing-hero-wrap .hero {
+  .landing-hero-wrap .hero,
+  .service-hero-wrap .hero {
     height: min(56.25vw, 88vh);
     min-height: 560px;
   }
 }
 
 @media (max-width: 899.98px) {
-  .landing-hero-wrap .hero {
+  .landing-hero-wrap .hero,
+  .service-hero-wrap .hero {
     height: auto;
     min-height: 480px;
     padding-top: 3.5rem;

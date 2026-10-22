@@ -2,7 +2,7 @@
 // /src/features/dining/DiningLandingPage.jsx — Public Dining Landing Page
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
@@ -39,6 +39,33 @@ export function DiningLandingPage() {
   const [barVenue, setBarVenue] = useState('restaurant');
   const [barDate, setBarDate] = useState(() => formatDMY(todayISO()));
   const [barGuests, setBarGuests] = useState('2');
+  const barPickerRef = useRef(null);
+
+  const barIsoValue = useMemo(() => {
+    if (!barDate) return '';
+    const parts = barDate.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+  }, [barDate]);
+
+  function handleBarPickerChange(e) {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    setBarDate(`${d}/${m}/${y}`);
+  }
+
+  function openBarPicker() {
+    if (barPickerRef.current) {
+      try {
+        barPickerRef.current.showPicker();
+      } catch {
+        barPickerRef.current.focus();
+      }
+    }
+  }
 
   function handleFindTable(e) {
     e.preventDefault();
@@ -111,9 +138,31 @@ export function DiningLandingPage() {
                   type="text"
                   placeholder="DD/MM/YYYY"
                   value={barDate}
+                  onClick={openBarPicker}
                   onChange={(e) => setBarDate(e.target.value)}
-                  className="field h-11 w-full !pl-10 text-sm"
+                  className="field h-11 w-full !pl-10 !pr-10 text-sm cursor-pointer"
                 />
+                <input
+                  ref={barPickerRef}
+                  type="date"
+                  value={barIsoValue}
+                  min={todayISO()}
+                  onChange={handleBarPickerChange}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openBarPicker();
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
+                  aria-label="Select date"
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                </button>
               </div>
             </div>
 

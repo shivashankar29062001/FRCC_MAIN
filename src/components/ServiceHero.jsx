@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { HeroImage } from './HeroImage.jsx';
 import { HeroSlider } from './HeroSlider.jsx';
@@ -19,9 +19,38 @@ import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 
 function DiningHeroCard() {
   const navigate = useNavigate();
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const [venue, setVenue] = useState('restaurant');
   const [date, setDate] = useState(() => formatDMY(todayISO()));
   const [guests, setGuests] = useState('2');
+  const pickerRef = useRef(null);
+
+  const isoValue = useMemo(() => {
+    if (!date) return '';
+    const parts = date.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+  }, [date]);
+
+  function handlePickerChange(e) {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    setDate(`${d}/${m}/${y}`);
+  }
+
+  function openPicker() {
+    if (pickerRef.current) {
+      try {
+        pickerRef.current.showPicker();
+      } catch {
+        pickerRef.current.focus();
+      }
+    }
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -29,7 +58,12 @@ function DiningHeroCard() {
     if (venue) params.set('venue', venue);
     if (date) params.set('date', date);
     if (guests) params.set('guests', guests);
-    navigate(`/dining/book?${params.toString()}`);
+    const targetUrl = `/dining/book?${params.toString()}`;
+    if (!user) {
+      openAuthPrompt(targetUrl);
+      return;
+    }
+    navigate(targetUrl);
   }
 
   return (
@@ -56,29 +90,61 @@ function DiningHeroCard() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="hero-dining-date" className="booking-label">Date (DD/MM/YYYY)</label>
-            <input
-              id="hero-dining-date"
-              type="text"
-              placeholder="DD/MM/YYYY"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="booking-field w-full text-sm"
-            />
+            <div className="relative">
+              <span aria-hidden className="booking-field-icon">
+                <CalendarIcon className="h-4 w-4" />
+              </span>
+              <input
+                id="hero-dining-date"
+                type="text"
+                placeholder="DD/MM/YYYY"
+                value={date}
+                onClick={openPicker}
+                onChange={(e) => setDate(e.target.value)}
+                className="booking-field w-full text-sm cursor-pointer pr-8"
+              />
+              <input
+                ref={pickerRef}
+                type="date"
+                value={isoValue}
+                min={todayISO()}
+                onChange={handlePickerChange}
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openPicker();
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
+                aria-label="Select date"
+              >
+                <CalendarIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <div>
             <label htmlFor="hero-dining-guests" className="booking-label">Guests</label>
-            <select
-              id="hero-dining-guests"
-              value={guests}
-              onChange={(e) => setGuests(e.target.value)}
-              className="booking-field w-full text-sm"
-            >
-              {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((g) => (
-                <option key={g} value={String(g)} className="text-navy-950 bg-white">
-                  {g} {g === 1 ? 'Guest' : 'Guests'}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <span aria-hidden className="booking-field-icon">
+                <UsersIcon className="h-4 w-4" />
+              </span>
+              <select
+                id="hero-dining-guests"
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+                className="booking-field w-full text-sm"
+              >
+                {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((g) => (
+                  <option key={g} value={String(g)} className="text-navy-950 bg-white">
+                    {g} {g === 1 ? 'Guest' : 'Guests'}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         <button

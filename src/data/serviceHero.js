@@ -119,6 +119,20 @@ export const SERVICE_HERO_DATA = {
     to: '/home#explore',
     statSuffix: 'on every booking',
   },
+  support: {
+    eyebrow: '24/7 MEMBER CONCIERGE & DESK',
+    headline: 'Here for you, always',
+    phrases: [
+      '24/7 campus front desk concierge.',
+      'Direct WhatsApp & phone assistance.',
+      'Fast ticket resolution within 1 day.',
+      'Campus visits, directions & bookings.',
+    ],
+    linkText: 'Reach our teams below',
+    linkTarget: '#content',
+    to: '/support#content',
+    statSuffix: 'live desk assistance',
+  },
 };
 
 export default SERVICE_HERO_DATA;

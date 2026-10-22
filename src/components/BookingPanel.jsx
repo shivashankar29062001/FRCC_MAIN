@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
 import { GAMES } from '../features/activities/games.config.js';
 import { LoadingButton } from './ui/controls.jsx';
@@ -47,11 +48,11 @@ import { ROUTES } from '../config/routes.js';
 const STORAGE_KEY = 'frcc.bookingBar.v2';
 
 const TABS = [
-  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: ROUTES.stay },
-  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: ROUTES.halls },
-  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: ROUTES.parking },
-  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: ROUTES.activities },
-  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership },
+  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: ROUTES.stay, booking: '/book/stay' },
+  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: ROUTES.halls, booking: '/book/hall' },
+  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: ROUTES.parking, booking: '/parking/book' },
+  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: ROUTES.activities, booking: '/book/activities/process' },
+  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership, booking: '/membership/join' },
 ];
 
 // Game list comes from the activities team's config — the single source of truth.
@@ -368,9 +369,7 @@ function targetFor(tabId, v) {
   }
 
   const qs = params.toString();
-  // In Hyatt-style browsing, search always navigates to the public showcase page with query parameters
-  // so results are displayed on the public page without requiring sign-in.
-  const base = t.showcase;
+  const base = t?.booking || t?.showcase || '/book';
   return `${base}${qs ? `?${qs}` : ''}`;
 }
 
@@ -380,6 +379,7 @@ function targetFor(tabId, v) {
  */
 function useBookingForm(defaultTab, preselect) {
   const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const navigate = useNavigate();
   const [tab, setTab] = useState(() => {
     // Section landing pages pass preselect + their own tab; everywhere else the
@@ -465,7 +465,11 @@ function useBookingForm(defaultTab, preselect) {
     // Brief beat so the button's loading state is perceptible, then redirect.
     setTimeout(() => {
       setBusy(false);
-      navigate(target);
+      if (!user) {
+        openAuthPrompt(target);
+      } else {
+        navigate(target);
+      }
     }, 450);
   }
 
