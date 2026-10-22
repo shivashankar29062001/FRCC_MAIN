@@ -57,8 +57,10 @@ export function ServiceLanding({ service = 'stay', hero }) {
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
       openAuthPrompt(location.state.from);
+      // Immediately clear authPrompt from history state so closing/re-rendering never loops
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.state, user, openAuthPrompt]);
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   function handleActionClick(e, to) {
     if (!user) {

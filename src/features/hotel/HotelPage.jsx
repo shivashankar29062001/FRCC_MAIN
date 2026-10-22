@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLocation, useSearchParams, Link } from 'react-router-dom';
+import { useLocation, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
 import { ServiceHero } from '../../components/ServiceHero.jsx';
@@ -61,6 +61,7 @@ function calculateNights(start, end) {
 
 export function HotelPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isMember, pushToast, addBooking } = useApp();
   const { openAuthPrompt } = useAuthModal();
@@ -68,8 +69,9 @@ export function HotelPage() {
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
       openAuthPrompt(location.state.from);
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.state, user, openAuthPrompt]);
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   function handleSelectRoom(e, targetUrl) {
     if (!user) {

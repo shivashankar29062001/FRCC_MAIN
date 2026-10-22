@@ -14,6 +14,8 @@ import { HERO_CARD } from '../data/membership.js';
 import { venues } from '../data/dining.js';
 import { todayISO } from '../utils/helpers.js';
 import { formatDMY } from '../utils/dates.js';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 
 function DiningHeroCard() {
   const navigate = useNavigate();
@@ -98,6 +100,8 @@ function getSlot(service) {
 }
 
 export function ServiceHero({ service = 'stay' }) {
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const [headlineDone, setHeadlineDone] = useState(false);
   const data = SERVICE_HERO_DATA[service] || SERVICE_HERO_DATA.stay;
   const slot = getSlot(service);
@@ -203,7 +207,13 @@ export function ServiceHero({ service = 'stay' }) {
               <div className="mt-6">
                 <Link
                   to={HERO_CARD.buttonLink}
-                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                  onClick={(e) => {
+                    if (!user) {
+                      e.preventDefault();
+                      openAuthPrompt(HERO_CARD.buttonLink);
+                    }
+                  }}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
                 >
                   {HERO_CARD.buttonText}
                 </Link>
