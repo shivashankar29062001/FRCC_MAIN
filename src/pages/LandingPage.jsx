@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
@@ -71,7 +71,8 @@ const addressLines = getAddressLines();
 const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
 
 export function LandingPage() {
-  const { hash, state } = useLocation();
+  const { hash, state, pathname, search } = useLocation();
+  const navigate = useNavigate();
   const [activityCategory, setActivityCategory] = useState('all');
   const [photoIndex, setPhotoIndex] = useState(null);
   const [headlineDone, setHeadlineDone] = useState(false);
@@ -83,8 +84,9 @@ export function LandingPage() {
   useEffect(() => {
     if (state?.authPrompt && pendingFrom) {
       openAuthPrompt(pendingFrom);
+      navigate(pathname + search, { replace: true, state: {} });
     }
-  }, [state?.authPrompt, pendingFrom, openAuthPrompt]);
+  }, [state?.authPrompt, pendingFrom, openAuthPrompt, navigate, pathname, search]);
 
   // Deep links jump straight to section — instant, no smooth scroll
   useEffect(() => {
@@ -159,7 +161,11 @@ export function LandingPage() {
                 {/* 6 · Plain text link */}
                 <div className="mt-[18px]">
                   <Link
+<<<<<<< HEAD
                     to={ROUTES.signup}
+=======
+                    to="/membership"
+>>>>>>> 6bab811354f3a499b848cd3910653c8e234dc2ab
                     className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
                     <span>Become a member</span>

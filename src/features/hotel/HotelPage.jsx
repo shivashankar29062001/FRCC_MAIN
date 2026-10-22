@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLocation, useSearchParams, Link } from 'react-router-dom';
+import { useLocation, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { useAuthModal } from '../../app/context/AuthModalContext.jsx';
 import { ServiceHero } from '../../components/ServiceHero.jsx';
@@ -61,6 +61,7 @@ function calculateNights(start, end) {
 
 export function HotelPage() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isMember, pushToast, addBooking } = useApp();
   const { openAuthPrompt } = useAuthModal();
@@ -68,8 +69,9 @@ export function HotelPage() {
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
       openAuthPrompt(location.state.from);
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.state, user, openAuthPrompt]);
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   function handleSelectRoom(e, targetUrl) {
     if (!user) {
@@ -355,8 +357,14 @@ export function HotelPage() {
   const basePrice = pricePerNight * nights * Number(draft.roomsCount || 1);
   const memberDiscount = isEffectiveMember ? Math.round(basePrice * (memberDiscountPercent / 100)) : 0;
   const afterMember = Math.max(0, basePrice - memberDiscount);
-  const couponDiscount = appliedCoupon ? Math.round(afterMember * ((appliedCoupon.percent_off || 100) / 100)) : 0;
-  const total = Math.max(0, afterMember - couponDiscount);
+  const couponDiscount = appliedCoupon
+    ? (appliedCoupon.fixed_final_price !== undefined
+        ? Math.max(0, afterMember - appliedCoupon.fixed_final_price)
+        : Math.round(afterMember * ((appliedCoupon.percent_off || 100) / 100)))
+    : 0;
+  const total = appliedCoupon?.fixed_final_price !== undefined
+    ? Math.min(afterMember, appliedCoupon.fixed_final_price)
+    : Math.max(0, afterMember - couponDiscount);
 
   // Live Summary Card for FlowShell
   const staySummary = useMemo(() => {
@@ -589,7 +597,7 @@ export function HotelPage() {
       <div className="min-h-screen bg-slate-50 text-slate-800">
         <ServiceHero service="stay" />
 
-        <div id="content" className="container-x py-12 sm:py-16">
+        <div id="content" className="container-x py-12 sm:py-16 scroll-mt-24">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
               <p className="eyebrow">Accommodations</p>
@@ -1257,7 +1265,9 @@ export function HotelPage() {
                           ✓ {appliedCoupon.code}
                         </span>
                         <span className="text-xs text-slate-600">
-                          {appliedCoupon.percent_off}% discount applied (−{formatInr(couponDiscount)})
+                          {appliedCoupon.fixed_final_price !== undefined
+                            ? `Total bill reduced to ₹${appliedCoupon.fixed_final_price} (−${formatInr(couponDiscount)})`
+                            : `${appliedCoupon.percent_off}% discount applied (−${formatInr(couponDiscount)})`}
                         </span>
                       </div>
                       <button

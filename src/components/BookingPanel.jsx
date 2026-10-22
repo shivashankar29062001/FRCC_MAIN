@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
@@ -200,25 +200,76 @@ function SelectInput({ id, error, inputClass = inputCls, nativeArrow = false, op
 }
 
 /**
- * Date field typed as DD/MM/YYYY. The value it reports is the text the visitor
- * typed (the site's own format); parseDMY() turns it into the ISO date the
- * booking flow takes.
+ * Date field with interactive calendar picker and typed DD/MM/YYYY fallback.
+ * Clicking the field or calendar icon opens the native calendar.
  */
 function DateInput({ id, error, value, onChange, inputClass, ...props }) {
+  const pickerRef = useRef(null);
+
+  const isoValue = useMemo(() => {
+    if (!value) return '';
+    const parts = value.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+  }, [value]);
+
+  function handlePickerChange(e) {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    onChange(`${d}/${m}/${y}`);
+  }
+
+  function openPicker() {
+    if (pickerRef.current) {
+      try {
+        pickerRef.current.showPicker();
+      } catch {
+        pickerRef.current.focus();
+      }
+    }
+  }
+
   return (
-    <TextInput
-      id={id}
-      error={error}
-      inputClass={inputClass}
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder="DD/MM/YYYY"
-      maxLength={10}
-      value={value || ''}
-      onChange={(e) => onChange(maskDMY(e.target.value))}
-      {...props}
-    />
+    <div className="relative w-full">
+      <TextInput
+        id={id}
+        error={error}
+        inputClass={cx(inputClass, 'pr-8 cursor-pointer')}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="DD/MM/YYYY"
+        maxLength={10}
+        value={value || ''}
+        onClick={openPicker}
+        onChange={(e) => onChange(maskDMY(e.target.value))}
+        {...props}
+      />
+      <input
+        ref={pickerRef}
+        type="date"
+        value={isoValue}
+        min={todayISO()}
+        onChange={handlePickerChange}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          openPicker();
+        }}
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
+        aria-label="Select date"
+      >
+        <CalendarIcon className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 

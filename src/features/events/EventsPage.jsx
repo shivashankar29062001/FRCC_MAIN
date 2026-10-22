@@ -78,7 +78,7 @@ export function EventsPage() {
       <ServiceHero service="events" />
 
       {/* 2 · Main Content Area */}
-      <div id="content" className="container-x py-10 sm:py-14 scroll-mt-20">
+      <div id="content" className="container-x py-10 sm:py-14 scroll-mt-24">
         {/* Section Heading & Category Filter Chips */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200/80 pb-6">
           <div>

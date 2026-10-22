@@ -168,8 +168,11 @@ export function AppProvider({ children }) {
 
   const signup = useCallback(async ({ name, emailOrPhone, password }) => {
     const { user: authUser } = await authService.signUp({ name, emailOrPhone, password });
+    if (authUser) {
+      await hydrateUserData(authUser);
+    }
     return authUser;
-  }, []);
+  }, [hydrateUserData]);
 
   const logout = useCallback(async () => {
     try {

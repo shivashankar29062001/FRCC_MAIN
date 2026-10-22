@@ -11,23 +11,28 @@ export function ScrollToTop() {
   const { pathname, hash } = useLocation();
 
   useLayoutEffect(() => {
-    const prevScrollBehavior = document.documentElement.style.scrollBehavior;
-    document.documentElement.style.scrollBehavior = 'auto';
-
     if (hash) {
       const id = decodeURIComponent(hash.replace(/^#/, ''));
-      const element = document.getElementById(id);
-      if (element) {
-        element.scrollIntoView();
-      } else {
-        window.scrollTo(0, 0);
+      const scrollToElement = () => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return true;
+        }
+        return false;
+      };
+
+      if (!scrollToElement()) {
+        const timer = setTimeout(scrollToElement, 80);
+        return () => clearTimeout(timer);
       }
     } else {
+      const prevScrollBehavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = 'auto';
       window.scrollTo(0, 0);
+      document.documentElement.style.scrollBehavior = prevScrollBehavior;
     }
-
-    document.documentElement.style.scrollBehavior = prevScrollBehavior;
-  }, [pathname]);
+  }, [pathname, hash]);
 
   return null;
 }

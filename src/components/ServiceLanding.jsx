@@ -58,8 +58,10 @@ export function ServiceLanding({ service = 'stay', hero }) {
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
       openAuthPrompt(location.state.from);
+      // Immediately clear authPrompt from history state so closing/re-rendering never loops
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.state, user, openAuthPrompt]);
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   function handleActionClick(e, to) {
     if (!user) {
@@ -269,7 +271,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       {hero || <ServiceHero service={heroService} />}
 
       {/* 2 · Main Section */}
-      <section className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
+      <section id="content" className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
         <div className="container-x section">
           {/* Header */}
           <div className="max-w-2xl">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { HeroImage } from './HeroImage.jsx';
 import { HeroSlider } from './HeroSlider.jsx';
 import { BookingCard } from './BookingPanel.jsx';
@@ -14,6 +14,8 @@ import { HERO_CARD } from '../data/membership.js';
 import { venues } from '../data/dining.js';
 import { todayISO } from '../utils/helpers.js';
 import { formatDMY } from '../utils/dates.js';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 
 function DiningHeroCard() {
   const navigate = useNavigate();
@@ -98,18 +100,38 @@ function getSlot(service) {
 }
 
 export function ServiceHero({ service = 'stay' }) {
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const [headlineDone, setHeadlineDone] = useState(false);
   const data = SERVICE_HERO_DATA[service] || SERVICE_HERO_DATA.stay;
   const slot = getSlot(service);
   const isHub = service === 'hub';
   const offers = OFFERS_DATA[service] || null;
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  function handleScroll(e) {
-    e.preventDefault();
+  function handleExplore(e) {
     const targetId = (data.linkTarget || '#content').replace(/^#/, '');
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const currentPath = location.pathname;
+    const targetPath = (data.to || '').split('#')[0];
+
+    // If we are already on this service's page and the element exists in DOM:
+    if (currentPath === targetPath || !targetPath) {
+      const el = document.getElementById(targetId);
+      if (el) {
+        e.preventDefault();
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+          window.history.replaceState(null, '', `#${targetId}`);
+        } catch {}
+        return;
+      }
+    }
+
+    // Otherwise navigate directly to the target URL
+    if (data.to && currentPath !== targetPath) {
+      e.preventDefault();
+      navigate(data.to);
     }
   }
 
@@ -159,14 +181,14 @@ export function ServiceHero({ service = 'stay' }) {
                 </div>
 
                 <div className="mt-[18px]">
-                  <a
-                    href={data.linkTarget || '#content'}
-                    onClick={handleScroll}
-                    className="landing-hero-member-link inline-flex items-center gap-1.5"
+                  <Link
+                    to={data.to || data.linkTarget || '#content'}
+                    onClick={handleExplore}
+                    className="landing-hero-member-link inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>{data.linkText}</span>
                     <ArrowRightIcon className="h-4 w-4" />
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -185,7 +207,13 @@ export function ServiceHero({ service = 'stay' }) {
               <div className="mt-6">
                 <Link
                   to={HERO_CARD.buttonLink}
-                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                  onClick={(e) => {
+                    if (!user) {
+                      e.preventDefault();
+                      openAuthPrompt(HERO_CARD.buttonLink);
+                    }
+                  }}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
                 >
                   {HERO_CARD.buttonText}
                 </Link>
@@ -201,12 +229,13 @@ export function ServiceHero({ service = 'stay' }) {
                 Screenings, workshops, discussions, and cultural evenings celebrating cinema and arts.
               </p>
               <div className="mt-6">
-                <a
-                  href="#content"
-                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                <Link
+                  to="/events#content"
+                  onClick={handleExplore}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
                 >
                   Explore events
-                </a>
+                </Link>
               </div>
             </div>
           ) : (

@@ -31,8 +31,9 @@ export function DiningLandingPage() {
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
       openAuthPrompt(location.state.from);
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.state, user, openAuthPrompt]);
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   // Book a table bar state
   const [barVenue, setBarVenue] = useState('restaurant');
@@ -73,7 +74,7 @@ export function DiningLandingPage() {
       {/* 1 · Service Hero */}
       <ServiceHero service="dining" />
 
-      <div id="content" className="container-x py-10 sm:py-14 space-y-10">
+      <div id="content" className="container-x py-10 sm:py-14 space-y-10 scroll-mt-24">
         {/* 2 · Compact "Book a table" search bar */}
         <section
           aria-label="Book a table search"

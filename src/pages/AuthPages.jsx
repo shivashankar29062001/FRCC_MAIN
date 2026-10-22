@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { Input, PasswordInput, LoadingButton } from '../components/ui/controls.jsx';
@@ -84,12 +84,21 @@ function AuthLayout({ brand, children }) {
 }
 
 export function SignupPage() {
-  const { signup, pushToast } = useApp();
+  const { user, signup, pushToast } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState({ name: '', emailOrPhone: '', password: '' });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const patch = (p) => setForm((f) => ({ ...f, ...p }));
+
+  useEffect(() => {
+    if (user) {
+      navigate('/home', { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (user) return null;
 
   function validate() {
     const next = {};
@@ -113,8 +122,9 @@ export function SignupPage() {
     signup(form)
       .then(() => {
         setBusy(false);
-        pushToast('Account created successfully! Please sign in.');
-        navigate('/signin');
+        pushToast('Account created successfully! Welcome to FRCC.');
+        const target = location.state?.from || '/home';
+        navigate(target, { replace: true });
       })
       .catch((err) => {
         setBusy(false);
@@ -222,9 +232,14 @@ export function SigninPage() {
     return '/home';
   }, [location.state?.from]);
 
-  // Redirect logged-in users immediately (replace so no history entry).
+  // Redirect logged-in users safely inside useEffect (never during render)
+  useEffect(() => {
+    if (user) {
+      navigate(resolvedFrom, { replace: true });
+    }
+  }, [user, resolvedFrom, navigate]);
+
   if (user) {
-    navigate(resolvedFrom, { replace: true });
     return null;
   }
 
