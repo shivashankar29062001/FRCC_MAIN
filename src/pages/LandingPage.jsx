@@ -161,11 +161,7 @@ export function LandingPage() {
                 {/* 6 · Plain text link */}
                 <div className="mt-[18px]">
                   <Link
-<<<<<<< HEAD
-                    to={ROUTES.signup}
-=======
-                    to="/membership"
->>>>>>> 6bab811354f3a499b848cd3910653c8e234dc2ab
+                    to={ROUTES.membership}
                     className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
                     <span>Become a member</span>
