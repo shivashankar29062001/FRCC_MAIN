@@ -284,10 +284,16 @@ export function Navbar() {
               <CalendarIcon className="h-4 w-4 text-gold-600" /> My bookings
             </Link>
           </li>
-          {isMember && (
+          {isMember ? (
             <li>
               <Link role="menuitem" to="/membership/dashboard" onClick={onNavigate} className={rowLink}>
                 <MembershipIcon className="h-4 w-4 text-gold-600" /> Membership dashboard
+              </Link>
+            </li>
+          ) : (
+            <li>
+              <Link role="menuitem" to="/membership" onClick={onNavigate} className={rowLink}>
+                <MembershipIcon className="h-4 w-4 text-gold-600" /> Become a member
               </Link>
             </li>
           )}
@@ -394,7 +400,7 @@ export function Navbar() {
           <div className="flex items-center justify-end gap-2">
             <div className="hidden items-center gap-2 min-[1200px]:flex">
               {!user && <NavLink to={ROUTES.signin} state={signinState} className={navLink}>Sign in</NavLink>}
-              {isMember ? (
+              {user ? (
                 <GoldCta to={ROUTES.book} onClick={onBookNow}>Book now</GoldCta>
               ) : (
                 <GoldCta to={ROUTES.membership} onClick={closeAll}>Become a member</GoldCta>
@@ -508,7 +514,7 @@ export function Navbar() {
                     Sign in
                   </NavLink>
                 )}
-                {isMember ? (
+                {user ? (
                   <GoldCta to={ROUTES.book} size="md" className="mt-2 w-full" onClick={onBookNow}>Book now</GoldCta>
                 ) : (
                   <GoldCta to={ROUTES.membership} size="md" className="mt-2 w-full" onClick={closeAll}>Become a member</GoldCta>
