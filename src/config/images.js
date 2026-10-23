@@ -74,6 +74,7 @@ export const OBJECT_POSITIONS = {
   'hero-hub': 'center 50%',
   'hero-contact': 'center 50%',
   'hero-profile': 'center 50%',
+  'hero-book': 'center 50%',
 };
 
 export function getObjectPosition(slot) {
@@ -83,6 +84,7 @@ export function getObjectPosition(slot) {
 export const REMOTE = {
   'hero-home': 'https://images.unsplash.com/photo-1728051104503-e1a4a19d638c?w=2400&q=80&auto=format&fit=crop',
   'hero-stay': 'https://images.unsplash.com/photo-1762245308715-b721cf3267b6?w=2400&q=80&auto=format&fit=crop',
+  'hero-book': 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=2400&q=80&auto=format&fit=crop',
   'hero-dining': 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=2400&q=80&auto=format&fit=crop',
   'dining-restaurant': 'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=1600&q=80&auto=format&fit=crop',
   'dining-coffee-shop': 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1600&q=80&auto=format&fit=crop',
@@ -235,6 +237,7 @@ export const FALLBACK = {
   basketball: REMOTE.tennis,
   'hero-events': REMOTE.membershipEvents || REMOTE.galleryEvent,
   'hero-contact': REMOTE['hero-contact'],
+  'hero-book': REMOTE['hero-book'],
   'event-short-film-screening-night': REMOTE.membershipEvents,
   'event-classic-cinema-weekend': REMOTE.hallStage,
   'event-filmmakers-and-artists-meetup': REMOTE.galleryLounge,
