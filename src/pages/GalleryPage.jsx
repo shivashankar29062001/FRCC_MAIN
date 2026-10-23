@@ -5,66 +5,16 @@ import { galleryItems as baseGalleryItems } from '../data/gallery.js';
 
 // ---------------------------------------------------------------------------
 // /gallery — FRCC Public Gallery
-// Chips: All, Launch event, Posters, Awards
-// Automatically loads awards images from /src/assets/awards/ or /src/assets/Awards/
+// Chips: All, Launch event, Posters
 // Masonry layout (columns-1 md:columns-2 lg:columns-3) with natural image ratio (no cropping)
 // Full-screen viewer with zoom (buttons, double-click, pinch), swipe, counter, focus trap
 // Pagination: 12 items first + "Load more"
 // ---------------------------------------------------------------------------
 
-// Auto-load all awards images with import.meta.glob (eager, url)
-const awardsGlob = import.meta.glob(
-  [
-    '../assets/awards/*.{webp,jpg,jpeg,png,avif,WEBP,JPG,JPEG,PNG,AVIF}',
-    '../assets/Awards/*.{webp,jpg,jpeg,png,avif,WEBP,JPG,JPEG,PNG,AVIF}',
-  ],
-  {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  }
-);
-
-function getAwardItems() {
-  const entries = Object.entries(awardsGlob);
-  const seen = new Set();
-  const unique = [];
-
-  for (const [path, url] of entries) {
-    const filename = path.split('/').pop() || '';
-    const norm = filename.toLowerCase();
-    if (!seen.has(norm)) {
-      seen.add(norm);
-      unique.push({ filename, url });
-    }
-  }
-
-  // Natural sort by filename
-  unique.sort((a, b) =>
-    a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
-  );
-
-  return unique.map((item, index) => {
-    const id = `award-${index + 1}`;
-    // TODO: replace with real titles
-    const title = `Award ${index + 1}`;
-    return {
-      id,
-      category: 'awards',
-      categoryRaw: 'awards',
-      src: item.url,
-      title,
-      caption: title,
-      alt: `${title} - Film Recreation & Cultural Centre`,
-    };
-  });
-}
-
 const CATEGORY_TABS = [
   { id: 'all', label: 'All' },
   { id: 'Launch event', label: 'Launch event' },
   { id: 'Posters', label: 'Posters' },
-  { id: 'awards', label: 'Awards' },
 ];
 
 const PAGE_SIZE = 12;
@@ -95,7 +45,7 @@ function GalleryTile({ item, onClick }) {
           aria-label={item.title || item.caption}
         >
           <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-gold-400">
-            {item.category === 'awards' ? 'FRCC Award' : item.caption || 'FRCC Gallery'}
+            {item.caption || 'FRCC Gallery'}
           </span>
           <span className="mt-2 block text-sm font-medium text-slate-300">
             {item.title || item.caption}
@@ -481,20 +431,12 @@ export function GalleryPage() {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  // Load awards images automatically via Vite glob
-  const awardsItems = useMemo(() => getAwardItems(), []);
-
-  // Filter base items to ensure only Launch event and Posters are preserved
-  const baseItems = useMemo(() => {
+  // Base gallery items (Launch event + Posters)
+  const allItems = useMemo(() => {
     return baseGalleryItems.filter(
       (item) => item.category === 'Launch event' || item.category === 'Posters'
     );
   }, []);
-
-  // Combine all items (Launch event + Posters + Awards)
-  const allItems = useMemo(() => {
-    return [...baseItems, ...awardsItems];
-  }, [baseItems, awardsItems]);
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -502,7 +444,6 @@ export function GalleryPage() {
       all: allItems.length,
       'Launch event': allItems.filter((i) => i.category === 'Launch event').length,
       Posters: allItems.filter((i) => i.category === 'Posters').length,
-      awards: allItems.filter((i) => i.category === 'awards').length,
     };
   }, [allItems]);
 
@@ -552,7 +493,7 @@ export function GalleryPage() {
           </p>
         </div>
 
-        {/* 1. Category Tabs: All, Launch event, Posters, Awards with counts */}
+        {/* 1. Category Tabs: All, Launch event, Posters with counts */}
         <div className="mt-8 flex flex-wrap items-center gap-2" role="tablist" aria-label="Gallery categories">
           {CATEGORY_TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -580,10 +521,10 @@ export function GalleryPage() {
           {filteredItems.length === 0 ? (
             <div className="text-center py-16 text-slate-500 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-8 my-6">
               <p className="text-base font-semibold text-navy-900">
-                {activeTab === 'awards' ? 'No awards posters available.' : 'No photos found in this category.'}
+                No photos found in this category.
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                {activeTab === 'awards' ? 'Check back soon for new award additions.' : 'Please select another category above.'}
+                Please select another category above.
               </p>
             </div>
           ) : (
