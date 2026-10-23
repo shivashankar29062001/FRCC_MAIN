@@ -27,8 +27,10 @@ import {
   BellIcon,
   CalendarIcon,
   MembershipIcon,
+  DownloadIcon,
   ArrowRightIcon,
 } from '../components/ui/icons.jsx';
+import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
 
 // ---------------------------------------------------------------------------
 // /profile — EVERY logged-in user. Reached only from the navbar avatar menu.
@@ -106,6 +108,29 @@ function PersonalDetails({ user, membership, pushToast }) {
           </LoadingButton>
         </div>
       </form>
+
+      {/* Membership Quick Access & Application Form Download */}
+      <div className="mt-6 pt-5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            to="/membership/dashboard"
+            className="btn-base inline-flex items-center gap-2 px-4 py-2 bg-navy-50 text-navy-900 hover:bg-navy-100 border border-navy-900/10 text-xs sm:text-sm font-semibold rounded-xl transition"
+          >
+            <MembershipIcon className="h-4 w-4 text-gold-600" />
+            Membership Dashboard
+          </Link>
+          <button
+            type="button"
+            onClick={downloadOfficialApplicationForm}
+            className="btn-base inline-flex items-center gap-2 px-4 py-2 bg-white text-slate-800 hover:text-navy-900 border border-slate-200 hover:border-gold-500 text-xs sm:text-sm font-semibold rounded-xl transition shadow-sm"
+            title="Download official FRCC Membership Application Form PDF"
+          >
+            <DownloadIcon className="h-4 w-4 text-gold-600" />
+            Application Form
+          </button>
+        </div>
+        <p className="text-xs text-slate-500">Official printable membership documentation</p>
+      </div>
     </Card>
   );
 }

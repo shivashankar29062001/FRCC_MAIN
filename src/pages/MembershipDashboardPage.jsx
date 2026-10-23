@@ -22,6 +22,7 @@ import {
 } from '../components/ui/icons.jsx';
 import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { formatDMY } from '../utils/dates.js';
+import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
 
 // ---------------------------------------------------------------------------
 // /membership/dashboard — Shows both membership cards for a stored membership.
@@ -127,11 +128,10 @@ export function MembershipDashboardPage() {
     setPdfError(null);
     setPdfBusy(true);
     try {
-      const { downloadApplicationFormPdf } = await import('../lib/applicationForm.js');
-      await downloadApplicationFormPdf(currentMembership || {});
+      await downloadOfficialApplicationForm();
     } catch (err) {
-      console.error('[MembershipDashboardPage] PDF build error:', err);
-      setPdfError(err?.message || 'Failed to generate application form PDF. Please try again.');
+      console.error('[MembershipDashboardPage] PDF download error:', err);
+      setPdfError(err?.message || 'Failed to download application form. Please try again.');
     } finally {
       setPdfBusy(false);
     }

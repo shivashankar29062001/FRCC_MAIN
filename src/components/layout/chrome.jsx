@@ -22,10 +22,12 @@ import {
   MapPinIcon,
   CalendarIcon,
   MembershipIcon,
+  DownloadIcon,
   InstagramIcon,
   LinkedinIcon,
   YoutubeIcon,
 } from '../ui/icons.jsx';
+import { downloadOfficialApplicationForm } from '../../utils/downloadForm.js';
 import { Logo } from '../Logo.jsx';
 import { LocationTrigger } from '../location/LocationTrigger.jsx';
 import { LocationPanel } from '../location/LocationPanel.jsx';
@@ -297,6 +299,20 @@ export function Navbar() {
               </Link>
             </li>
           )}
+          <li>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                downloadOfficialApplicationForm(e);
+                onNavigate?.();
+              }}
+              className={rowLink}
+              title="Download official FRCC Membership Application Form PDF"
+            >
+              <DownloadIcon className="h-4 w-4 text-gold-600" /> Application form
+            </button>
+          </li>
           {isAdminUser && (
             <li>
               <Link role="menuitem" to="/admin/events" onClick={onNavigate} className={rowLink}>
@@ -375,6 +391,14 @@ export function Navbar() {
             <div className="flex items-center gap-3 border-l border-white/20 pl-3">
               <NavLink to={ROUTES.gallery} className="transition-colors duration-150 hover:text-gold-400">Gallery</NavLink>
               <NavLink to={ROUTES.leadership} className="transition-colors duration-150 hover:text-gold-400">Leadership</NavLink>
+              <button
+                type="button"
+                onClick={downloadOfficialApplicationForm}
+                className="transition-colors duration-150 hover:text-gold-400 cursor-pointer text-left"
+                title="Download official FRCC Membership Application Form PDF"
+              >
+                Application Form
+              </button>
             </div>
           </div>
         </div>
@@ -496,6 +520,18 @@ export function Navbar() {
                   <NavLink to={ROUTES.leadership} onClick={closeAll} className={mobileRowActive}>
                     Leadership
                   </NavLink>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      downloadOfficialApplicationForm(e);
+                      closeAll();
+                    }}
+                    className={cx(mobileRow, 'w-full text-left')}
+                  >
+                    Application Form (PDF)
+                  </button>
                 </li>
               </ul>
 
