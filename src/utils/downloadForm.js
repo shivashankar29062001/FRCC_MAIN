@@ -7,11 +7,12 @@ export async function downloadOfficialApplicationForm(e) {
     e.preventDefault();
   }
 
-  const pdfUrl = '/FRCC-Membership-Application-Form.pdf';
+  const timestamp = Date.now();
+  const pdfUrl = `/FRCC-Membership-Application-Form.pdf?t=${timestamp}`;
   const fileName = 'FRCC-Membership-Application-Form.pdf';
 
   try {
-    const response = await fetch(pdfUrl);
+    const response = await fetch(pdfUrl, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
