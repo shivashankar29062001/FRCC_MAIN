@@ -210,7 +210,13 @@ export function SigninPage() {
 
   // Resolve redirect target (memoized)
   const resolvedFrom = useMemo(() => {
-    const candidates = [location.state?.from];
+    let queryFrom = null;
+    try {
+      queryFrom = new URLSearchParams(location?.search || '').get('from');
+    } catch {
+      /* ignore */
+    }
+    const candidates = [location?.state?.from, queryFrom];
     try {
       candidates.push(window.sessionStorage.getItem('frcc.postLoginRedirect.v1'));
     } catch {
@@ -230,7 +236,7 @@ export function SigninPage() {
       }
     }
     return '/home';
-  }, [location.state?.from]);
+  }, [location?.state?.from, location?.search]);
 
   // Redirect logged-in users safely inside useEffect (never during render)
   useEffect(() => {

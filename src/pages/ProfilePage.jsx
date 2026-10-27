@@ -18,8 +18,6 @@ import {
   StatusTag,
 } from '../components/ui/feedback.jsx';
 import { Input, LoadingButton, SearchInput } from '../components/ui/controls.jsx';
-import { Breadcrumbs } from '../components/ui/sections.jsx';
-import { HeroImage } from '../components/HeroImage.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
 import {
   UserIcon,
@@ -245,6 +243,11 @@ export function ProfilePage({ initialTab = 'details' }) {
   const { bookings: activityBookings, payments: activityPayments } = useActivityBookings();
   const [params] = useSearchParams();
   const [tab, setTab] = useState(params.get('tab') || initialTab);
+
+  useEffect(() => {
+    const t = params.get('tab') || initialTab;
+    if (t) setTab(t);
+  }, [params, initialTab]);
   const [payQuery, setPayQuery] = useState('');
   const [bookingFilter, setBookingFilter] = useState('all');
   const [dbStayBookings, setDbStayBookings] = useState([]);
@@ -253,8 +256,12 @@ export function ProfilePage({ initialTab = 'details' }) {
 
   // Load database stay bookings for user
   useEffect(() => {
+    if (!user?.id) {
+      setDbStayBookings([]);
+      return undefined;
+    }
     let mounted = true;
-    getMyStayBookings(user?.id)
+    getMyStayBookings(user.id)
       .then((records) => {
         if (!mounted || !records) return;
         const mapped = records.map((r) => ({
@@ -292,8 +299,12 @@ export function ProfilePage({ initialTab = 'details' }) {
 
   // Load dining table bookings for user
   useEffect(() => {
+    if (!user?.id) {
+      setDbTableBookings([]);
+      return undefined;
+    }
     let mounted = true;
-    getMyTableBookings(user?.id)
+    getMyTableBookings(user.id)
       .then((records) => {
         if (!mounted || !records) return;
         setDbTableBookings(records);
@@ -308,7 +319,7 @@ export function ProfilePage({ initialTab = 'details' }) {
 
   // Merged unique bookings across AppContext (Stay, etc.), Activities store, Database Stay bookings, and Table bookings
   const bookings = useMemo(() => {
-    const combined = [...(appBookings || []), ...(activityBookings || []), ...dbStayBookings, ...dbTableBookings];
+    const combined = [...(appBookings || []), ...(activityBookings || []), ...(dbStayBookings || []), ...(dbTableBookings || [])];
     const seen = new Set();
     const unique = combined.filter((b) => {
       const id = b.bookingRef || b.bookingId || b.id;
@@ -363,6 +374,38 @@ export function ProfilePage({ initialTab = 'details' }) {
     );
   }, [payments, payQuery]);
 
+  const tabs = useMemo(() => {
+    return TABS.map((t) =>
+      t.id === 'bookings' ? { ...t, count: bookings.length } : t.id === 'payments' ? { ...t, count: payments.length } : t,
+    );
+  }, [bookings.length, payments.length]);
+
+  const headerInfo = useMemo(() => {
+    if (tab === 'bookings') {
+      return {
+        title: 'My bookings',
+        subtitle: 'Your activity and sports bookings, time slots and QR codes.',
+      };
+    }
+    if (tab === 'payments') {
+      return {
+        title: 'Payment history',
+        subtitle: 'Your transaction receipts, payment methods and billing history.',
+      };
+    }
+    return {
+      title: 'Profile',
+      subtitle:
+        [
+          user?.name,
+          user?.emailOrPhone,
+          membership?.memberCode || membership?.memberId ? `Member ID: ${membership?.memberCode || membership?.memberId}` : user?.userId,
+        ]
+          .filter(Boolean)
+          .join(' · ') || 'Manage your personal details, password and notification preferences.',
+    };
+  }, [tab, user, membership]);
+
   if (loading) {
     return (
       <div className="container-x section space-y-6">
@@ -380,30 +423,13 @@ export function ProfilePage({ initialTab = 'details' }) {
     );
   }
 
-  const tabs = TABS.map((t) =>
-    t.id === 'bookings' ? { ...t, count: bookings.length } : t.id === 'payments' ? { ...t, count: payments.length } : t,
-  );
-
-  const isBookingsTab = tab === 'bookings';
-  const heroSlot = isBookingsTab ? 'hero-bookings' : 'hero-profile';
-
   return (
     <div>
-      <HeroImage slot={heroSlot} />
+      <div className="container-x pt-5 pb-12 sm:pt-6 sm:pb-16">
+        <h1 className="h-section">{headerInfo.title}</h1>
+        <p className="mt-1 text-sm sm:text-base text-slate-600">{headerInfo.subtitle}</p>
 
-      <div className="container-x section-top">
-        <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: isBookingsTab ? 'My bookings' : 'Profile' }]} />
-        <h1 className="h-section mt-3">{isBookingsTab ? 'My bookings' : `Hi, ${(user?.name || 'Member').split(' ')[0]}`}</h1>
-        <p className="mt-1 text-slate-600">
-          {isBookingsTab
-            ? 'Your activity and sports bookings, time slots and QR codes.'
-            : [
-                user?.emailOrPhone,
-                (membership?.memberCode || membership?.memberId) ? `Member ID: ${membership?.memberCode || membership?.memberId}` : user?.userId,
-              ].filter(Boolean).join(' · ')}
-        </p>
-
-        <div role="tablist" aria-label="Profile sections" className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        <div role="tablist" aria-label="Profile sections" className="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           {tabs.map((t) => {
             const selected = tab === t.id;
             return (

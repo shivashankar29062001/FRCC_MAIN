@@ -420,7 +420,7 @@ export const games = [
     openFrom: '06:00',
     openTo: '22:00',
     maxPlayers: 30,
-    imageKey: 'facilityGym',
+    imageKey: 'luxury-gym',
     blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna.',
     level: 'All fitness levels',
     hours: { open: 6, close: 22 },

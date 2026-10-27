@@ -38,6 +38,10 @@ export function AppProvider({ children }) {
     const s = readSession();
     return s.loggedIn ? s : null;
   });
+  const [authLoading, setAuthLoading] = useState(() => {
+    const s = readSession();
+    return !s.loggedIn;
+  });
 
   const [bookings, setBookings] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -96,9 +100,9 @@ export function AppProvider({ children }) {
         }
       }
 
-      if (remoteBookings.length > 0) setBookings(remoteBookings);
-      if (remotePayments.length > 0) setPayments(remotePayments);
-      if (remoteNotifs.length > 0) {
+      setBookings(Array.isArray(remoteBookings) ? remoteBookings : []);
+      setPayments(Array.isArray(remotePayments) ? remotePayments : []);
+      if (Array.isArray(remoteNotifs) && remoteNotifs.length > 0) {
         setNotifications(
           remoteNotifs.map((n) => ({
             id: n.id,
@@ -128,11 +132,15 @@ export function AppProvider({ children }) {
     });
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        hydrateUserData(session.user);
-      }
-    });
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (session?.user) {
+          await hydrateUserData(session.user);
+        }
+      })
+      .finally(() => {
+        setAuthLoading(false);
+      });
 
     return () => {
       authListener?.subscription?.unsubscribe();
@@ -301,6 +309,7 @@ export function AppProvider({ children }) {
   const value = useMemo(
     () => ({
       user,
+      authLoading,
       userId: user?.userId || null,
       login,
       signup,
@@ -318,7 +327,7 @@ export function AppProvider({ children }) {
       notifications,
       refreshUserData,
     }),
-    [user, login, signup, logout, bookings, payments, membership, isMember, setIsMember, saveMembership, addBooking, toasts, pushToast, notifications, refreshUserData],
+    [user, authLoading, login, signup, logout, bookings, payments, membership, isMember, setIsMember, saveMembership, addBooking, toasts, pushToast, notifications, refreshUserData],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

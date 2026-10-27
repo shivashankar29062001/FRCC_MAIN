@@ -32,13 +32,18 @@ export class ErrorBoundary extends Component {
               We're sorry, but an unexpected error occurred. Please try refreshing the page.
             </p>
             {this.state.error && (
-              <details className="mt-4 text-left p-3 rounded-xl bg-slate-100 text-xs text-slate-600">
-                <summary className="font-semibold cursor-pointer">Error details</summary>
-                <pre className="mt-2 overflow-auto max-h-40 font-mono text-red-700 whitespace-pre-wrap">
-                  {this.state.error?.stack || this.state.error?.message || String(this.state.error)}
+              <details open={Boolean(import.meta.env?.DEV)} className="mt-4 text-left p-3 rounded-xl bg-slate-100 text-xs text-slate-600">
+                <summary className="font-semibold cursor-pointer">
+                  Error details {import.meta.env?.DEV ? '(Development mode)' : ''}
+                </summary>
+                <div className="mt-2 font-mono text-red-700 font-semibold text-xs">
+                  {this.state.error?.message || String(this.state.error)}
+                </div>
+                <pre className="mt-1 overflow-auto max-h-40 font-mono text-red-600 whitespace-pre-wrap text-[11px]">
+                  {this.state.error?.stack || ''}
                 </pre>
                 {this.state.errorInfo?.componentStack && (
-                  <pre className="mt-2 overflow-auto max-h-40 font-mono text-slate-600 whitespace-pre-wrap">
+                  <pre className="mt-2 overflow-auto max-h-40 font-mono text-slate-600 whitespace-pre-wrap text-[11px]">
                     {this.state.errorInfo.componentStack}
                   </pre>
                 )}

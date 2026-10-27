@@ -48,7 +48,7 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
     .from('bookings')
     .insert([payload])
     .select()
-    .single();
+    .maybeSingle();
 
   if (bookingErr) {
     console.error('Error inserting booking:', bookingErr);
@@ -70,7 +70,7 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
       .from('payments')
       .insert([payPayload])
       .select()
-      .single();
+      .maybeSingle();
 
     if (!payErr) {
       payment = payData;
@@ -103,18 +103,18 @@ export async function getUserBookings(userId = null) {
 
   return (data || []).map((b) => ({
     ...b,
-    id: b.booking_id,
-    bookingId: b.booking_id,
-    gameName: b.title,
-    game: b.category === 'activity' ? b.title.toLowerCase().replace(/\s+/g, '-') : b.title,
-    date: b.date || b.checkin,
-    slot: b.slot,
-    players: b.players,
-    amount: Number(b.amount || 0),
-    subtotal: Number(b.subtotal || 0),
-    discount: Number(b.discount || 0),
-    status: b.status,
-    createdAt: b.created_at,
+    id: b?.booking_id,
+    bookingId: b?.booking_id,
+    gameName: b?.title || 'Booking',
+    game: b?.category === 'activity' ? (b?.title || '').toLowerCase().replace(/\s+/g, '-') : (b?.title || 'Booking'),
+    date: b?.date || b?.checkin,
+    slot: b?.slot,
+    players: b?.players,
+    amount: Number(b?.amount || 0),
+    subtotal: Number(b?.subtotal || 0),
+    discount: Number(b?.discount || 0),
+    status: b?.status,
+    createdAt: b?.created_at,
   }));
 }
 
@@ -138,12 +138,12 @@ export async function getUserPayments(userId = null) {
   }
 
   return (data || []).map((p) => ({
-    id: p.payment_id,
-    bookingId: p.booking_id,
-    method: p.method,
-    amount: Number(p.amount || 0),
-    status: p.status,
-    date: p.created_at,
+    id: p?.payment_id,
+    bookingId: p?.booking_id,
+    method: p?.method,
+    amount: Number(p?.amount || 0),
+    status: p?.status,
+    date: p?.created_at,
   }));
 }
 
@@ -156,7 +156,7 @@ export async function cancelBooking(bookingId) {
     .update({ status: 'Cancelled', updated_at: new Date().toISOString() })
     .eq('booking_id', bookingId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
   return data;

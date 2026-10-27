@@ -119,8 +119,9 @@ export const REMOTE = {
   'kids-play-area': 'https://images.unsplash.com/photo-1763753743781-313e93737d46?w=1600&q=80&auto=format&fit=crop',
   football: 'https://images.unsplash.com/photo-1654462977797-a349656aadcf?w=1600&q=80&auto=format&fit=crop',
   facilityPool: 'https://images.unsplash.com/photo-1758448756167-88dc934c58e4?w=2400&q=80&auto=format&fit=crop',
-  facilityRestaurant: 'https://images.unsplash.com/photo-1777502286570-2725dff09ce5?w=2400&q=80&auto=format&fit=crop',
   facilityGym: 'https://images.unsplash.com/photo-1758957646695-ec8bce3df462?w=2400&q=80&auto=format&fit=crop',
+  'luxury-gym': 'https://images.unsplash.com/photo-1758957646695-ec8bce3df462?w=2400&q=80&auto=format&fit=crop',
+  facilitygym: 'https://images.unsplash.com/photo-1758957646695-ec8bce3df462?w=2400&q=80&auto=format&fit=crop',
   'room-deluxe-lake-view': 'https://images.unsplash.com/photo-1641133639375-f71c3c1220a1?w=1600&q=80&auto=format&fit=crop',
   'room-executive-suite': 'https://images.unsplash.com/photo-1785815353984-0c479e1d11fd?w=1600&q=80&auto=format&fit=crop',
   'room-family-suite': 'https://images.unsplash.com/photo-1776500587879-5f8acadf4a69?w=1600&q=80&auto=format&fit=crop',
@@ -359,6 +360,8 @@ export const IMAGES = {
   football: GAME('football', 'Football', 'FRCC football match in play on the campus pitch'),
   squash: GAME('squash', 'Squash', 'FRCC indoor squash courts with glass back'),
   basketball: GAME('basketball', 'Basketball', 'FRCC outdoor floodlit basketball court'),
+  'luxury-gym': GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
+  facilitygym: GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
 
   // =========================================================================
   // ROOMS — one slot per room type (mega-menu + section pages)
@@ -671,8 +674,11 @@ export function roomSlot(type) {
  */
 export function gameSlot(id) {
   const key = String(id || '').toLowerCase();
+  if (IMAGES[id]) return IMAGES[id];
   if (IMAGES[key]) return IMAGES[key];
-  // TODO-REPLACE-SQUASH-BASKETBALL-PHOTO
+  if (key === 'facilitygym' || key === 'luxury-gym' || key === 'luxurygym') {
+    return IMAGES['luxury-gym'] || IMAGES.facilityGym;
+  }
   return {
     slot: key,
     name: id,

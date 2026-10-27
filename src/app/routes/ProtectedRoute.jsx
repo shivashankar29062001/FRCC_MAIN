@@ -41,7 +41,7 @@ function getPublicFallback(pathname) {
 }
 
 export function ProtectedRoute({ children, forceGated = false }) {
-  const { user } = useApp();
+  const { user, authLoading } = useApp();
   const loc = useLocation();
   const { openAuthPrompt } = useAuthModal();
 
@@ -50,13 +50,21 @@ export function ProtectedRoute({ children, forceGated = false }) {
   const isGated = requireSignIn === 'services' || forceGated;
 
   useEffect(() => {
-    if (!user && isGated) {
+    if (!authLoading && !user && isGated) {
       const from = `${loc.pathname}${loc.search}`;
       if (isSafeRedirect(from)) {
         openAuthPrompt(from);
       }
     }
-  }, [user, isGated, loc.pathname, loc.search, openAuthPrompt]);
+  }, [authLoading, user, isGated, loc.pathname, loc.search, openAuthPrompt]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[50vh] grid place-items-center bg-cream">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-500 border-t-transparent" />
+      </div>
+    );
+  }
 
   if (!user && isGated) {
     const from = `${loc.pathname}${loc.search}`;
@@ -68,8 +76,8 @@ export function ProtectedRoute({ children, forceGated = false }) {
       }
     }
     const fallbackPath = getPublicFallback(loc.pathname);
-    if (fallbackPath === loc.pathname) {
-      return <Navigate to="/" replace state={{ from, authPrompt: true }} />;
+    if (fallbackPath === loc.pathname || fallbackPath === '/') {
+      return <Navigate to={`/signin?from=${encodeURIComponent(from)}`} replace state={{ from, authPrompt: true }} />;
     }
     return <Navigate to={fallbackPath} replace state={{ from, authPrompt: true }} />;
   }
