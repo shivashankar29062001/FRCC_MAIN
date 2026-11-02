@@ -81,6 +81,53 @@ const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
 export default function ParkingBookingPage() {
+  // ---------------------------------------------------------------------------
+  // Initialise confirmedBooking + slot availability from stored bookings on mount,
+  // so a hard refresh restores the previous state.
+  // ---------------------------------------------------------------------------
+  function readStoredBookings() {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Initialise confirmedBooking + slot availability from stored bookings on mount,
+  // so a hard refresh restores the previous state.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const storedBookings = readStoredBookings();
+
+    // Set confirmedBooking to the most recent CONFIRMED booking (not CANCELLED)
+    const confirmed = storedBookings.find(
+      (b) =>
+        b.bookingStatus !== BOOKING_STATUS.CANCELLED &&
+        b.bookingStatusCode !== BOOKING_STATUS_CODE.CANCELLED
+    );
+    setConfirmedBooking(confirmed || null);
+
+    // Start with all slots available, then mark slots as 'booked' only for
+    // CONFIRMED bookings.  CANCELLED bookings do NOT claim a slot.
+    const initialSlots = generateInitialSlots();
+    const slots = initialSlots.map((s) => ({ ...s }));
+    storedBookings.forEach((booking) => {
+      if (
+        booking.bookingStatus !== BOOKING_STATUS.CANCELLED &&
+        booking.bookingStatusCode !== BOOKING_STATUS_CODE.CANCELLED
+      ) {
+        const slot = slots.find((s) => s.id === booking.parkingSlot);
+        if (slot) {
+          slot.status = 'booked';
+        }
+      }
+    });
+    setSlots(slots);
+  }, []); // run once on mount
+
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [slots, setSlots] = useState(INITIAL_SLOTS);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -194,6 +241,15 @@ export default function ParkingBookingPage() {
       newErrors.vehicleNumber = 'Please enter your vehicle registration number.';
     } else if (formData.vehicleNumber.trim().length < 4) {
       newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP01AB1234).';
+    } else {
+      // Format validation for Indian vehicle registration numbers
+      // Pattern: 2 uppercase letters + 1-2 digits + 0-2 uppercase letters + 4 digits
+      // Examples: AP02AB1234, TS09CD5678
+      const normalized = formData.vehicleNumber.trim().toUpperCase();
+      const vehicleNumberRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/;
+      if (!vehicleNumberRegex.test(normalized)) {
+        newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP02AB1234).';
+      }
     }
 
     if (!numberOfDays || numberOfDays < 1 || numberOfDays > 7) {
