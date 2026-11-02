@@ -16,7 +16,7 @@ import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, ca
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
-import { getRoomTypes, createBooking as createStayReservation, getAvailability } from '../../api/stay.js';
+import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -86,14 +86,14 @@ export function HotelPage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   // Room types from API/database
-  const [roomTypes, setRoomTypes] = useState(ALL_ROOMS);
+  const [roomTypes, setRoomTypes] = useState(() => deduplicateRoomTypes(ALL_ROOMS));
 
   useEffect(() => {
     let mounted = true;
     getRoomTypes()
       .then((data) => {
         if (mounted && data && data.length > 0) {
-          setRoomTypes(data);
+          setRoomTypes(deduplicateRoomTypes(data));
         }
       })
       .catch((err) => {
@@ -104,21 +104,7 @@ export function HotelPage() {
     };
   }, []);
 
-  const [confirmedBooking, setConfirmedBooking] = useState(() => {
-    try {
-      const raw = window.sessionStorage.getItem('frcc_stay_confirmed');
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed) {
-        if (user?.id && (parsed.userId === user.id || parsed.user_id === user.id || parsed.userId === user.userId)) {
-          return parsed;
-        }
-        window.sessionStorage.removeItem('frcc_stay_confirmed');
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   // --- SessionStorage Draft State Initialization ---
   const [draft, setDraft] = useState(() => {
@@ -130,42 +116,42 @@ export function HotelPage() {
       /* ignore */
     }
 
-    let hasConfirmed = false;
-    try {
-      const raw = window.sessionStorage.getItem('frcc_stay_confirmed');
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && user?.id && (parsed.userId === user.id || parsed.user_id === user.id || parsed.userId === user.userId)) {
-        hasConfirmed = true;
-      }
-    } catch {
-      /* ignore */
-    }
-
     const itemParam = searchParams.get('item') || searchParams.get('room') || '';
     const initialRoom = itemParam
       ? ALL_ROOMS.find((r) => r.id === itemParam || r.type === itemParam)
       : null;
 
     const initialArea = searchParams.get('area') || initialRoom?.areaId || saved?.areaId || HOTEL_AREAS[0]?.id || 'vja';
+    const isFreshRoomSelection = Boolean(itemParam);
 
     return {
-      step: hasConfirmed ? 5 : (saved?.step !== undefined ? saved.step : 0),
+      step: isFreshRoomSelection ? 0 : ((saved?.step !== undefined && saved.step < 5) ? saved.step : 0),
       areaId: initialArea,
       checkin: searchParams.get('checkin') || saved?.checkin || getTodayISO(),
       checkout: searchParams.get('checkout') || saved?.checkout || getTomorrowISO(),
-      adults: searchParams.get('adults') || saved?.adults || '2', // SAMPLE
-      children: searchParams.get('children') || saved?.children || '0', // SAMPLE
-      roomsCount: searchParams.get('rooms') || saved?.roomsCount || '1', // SAMPLE
-      selectedRoomId: initialRoom?.id || saved?.selectedRoomId || (ALL_ROOMS.find((r) => r.areaId === initialArea)?.id || ALL_ROOMS[0]?.id),
+      adults: searchParams.get('adults') || (isFreshRoomSelection ? '2' : (saved?.adults || '2')),
+      children: searchParams.get('children') || (isFreshRoomSelection ? '0' : (saved?.children || '0')),
+      roomsCount: searchParams.get('rooms') || (isFreshRoomSelection ? '1' : (saved?.roomsCount || '1')),
+      selectedRoomId: initialRoom?.id || (isFreshRoomSelection ? undefined : saved?.selectedRoomId) || (ALL_ROOMS.find((r) => r.areaId === initialArea)?.id || ALL_ROOMS[0]?.id),
       name: saved?.name || user?.name || '',
-      mobile: saved?.mobile || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : ''),
-      email: saved?.email || user?.email || (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : ''),
-      specialRequest: saved?.specialRequest || '', // SAMPLE
+      mobile: saved?.mobile || user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : ''),
+      email: saved?.email || (user?.email && !user.email.toLowerCase().endsWith('@frcc.member') ? user.email : (user?.emailOrPhone && user.emailOrPhone.includes('@') && !user.emailOrPhone.toLowerCase().endsWith('@frcc.member') ? user.emailOrPhone : '')),
+      specialRequest: isFreshRoomSelection ? '' : (saved?.specialRequest || ''),
       paymentMethod: saved?.paymentMethod || 'upi',
     };
   });
 
   const [paying, setPaying] = useState(false);
+
+  // When browsing stay landing page, clear any previous stay booking draft or confirmation
+  useEffect(() => {
+    if (!isBookingFlow) {
+      try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem('frcc_stay_confirmed');
+      } catch (_) {}
+    }
+  }, [isBookingFlow]);
 
   // Discard past confirmation if user changes or logs out
   useEffect(() => {
@@ -181,10 +167,15 @@ export function HotelPage() {
     }
   }, [user?.id, user?.userId, confirmedBooking]);
 
-  // Sync draft to sessionStorage
+  // Sync draft to sessionStorage for refresh safety during active flow (steps 0-4)
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      if (draft.step < 5) {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      } else {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem('frcc_stay_confirmed');
+      }
     } catch {
       /* ignore */
     }
@@ -203,12 +194,12 @@ export function HotelPage() {
       const updates = {};
       if (!prev.name && user.name) updates.name = user.name;
       if (!prev.mobile) {
-        const uMob = user.mobile || (user.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
-        if (uMob) updates.mobile = uMob.replace(/\D/g, '').slice(0, 10);
+        const uMob = user.phone || user.mobile || (user.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
+        if (uMob) updates.mobile = uMob.replace(/\D/g, '').slice(-10);
       }
       if (!prev.email) {
         const uEmail = user.email || (user.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
-        if (uEmail) updates.email = uEmail;
+        if (uEmail && !uEmail.toLowerCase().endsWith('@frcc.member')) updates.email = uEmail;
       }
       return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
     });
@@ -282,10 +273,10 @@ export function HotelPage() {
   }, [draft.checkin, draft.checkout]);
 
   const displayRooms = useMemo(() => {
-    if (availabilityRooms.length > 0) return availabilityRooms;
-    return roomTypes.map((r) => ({
+    const raw = availabilityRooms.length > 0 ? availabilityRooms : roomTypes;
+    return deduplicateRoomTypes(raw).map((r) => ({
       ...r,
-      available: r.rooms_total || r.roomsTotal || 10,
+      available: r.available !== undefined ? r.available : (r.rooms_total || r.roomsTotal || 10),
     }));
   }, [availabilityRooms, roomTypes]);
 
@@ -536,12 +527,13 @@ export function HotelPage() {
       }
 
       const bookingRef = created?.booking_ref || created?.bookingRef || fallbackBookingRef;
-      const bookingId = created?.id || bookingRef;
+      const bookingId = bookingRef;
 
       const confirmationRecord = {
         id: bookingId,
         bookingId,
         bookingRef,
+        stayId: created?.id || null,
         userId: user?.id || user?.userId || null,
         user_id: user?.id || null,
         category: 'hotel',
@@ -574,7 +566,7 @@ export function HotelPage() {
       };
 
       try {
-        window.sessionStorage.setItem('frcc_stay_confirmed', JSON.stringify(confirmationRecord));
+        window.sessionStorage.removeItem('frcc_stay_confirmed');
         window.sessionStorage.removeItem(STORAGE_KEY);
       } catch {
         /* ignore */
@@ -616,9 +608,10 @@ export function HotelPage() {
     const defaultCheckin = searchParams.get('checkin') || draft.checkin || getTodayISO();
     const defaultCheckout = searchParams.get('checkout') || draft.checkout || getTomorrowISO();
 
+    const uniqueRooms = deduplicateRoomTypes(roomTypes);
     const filteredLandingRooms = categoryFilter === 'all'
-      ? roomTypes
-      : roomTypes.filter((r) => r.category === categoryFilter);
+      ? uniqueRooms
+      : uniqueRooms.filter((r) => r.category === categoryFilter);
 
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -1368,7 +1361,13 @@ export function HotelPage() {
                   type="checkbox"
                   id="accept-terms"
                   checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setTermsAccepted(checked);
+                    if (checked && submitError && submitError.toLowerCase().includes('terms')) {
+                      setSubmitError('');
+                    }
+                  }}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-gold-500 focus:ring-gold-500"
                 />
                 <span className="text-xs text-slate-700 font-medium leading-relaxed">

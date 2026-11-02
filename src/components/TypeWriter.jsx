@@ -10,8 +10,8 @@ import { useEffect, useRef, useState } from 'react';
  * - holdTime: pause in ms after completing a phrase before deleting (default 1600)
  * - startDelay: initial delay in ms before typing starts (default 0)
  * - loop: boolean (whether to loop)
- * - caret: boolean (whether to render caret, default true)
- * - caretFadeDelay: delay in ms before single-text caret fades out (default 1500)
+ * - showCursor: boolean (whether to render cursor bar, default false)
+ * - caretFadeDelay: delay in ms before single-text cursor fades out when showCursor is true (default 1500)
  * - onComplete: callback called when full text or phrase finishes typing
  * - className: optional CSS class string
  */
@@ -23,11 +23,13 @@ export function TypeWriter({
   holdTime = 1600,
   startDelay = 0,
   loop = false,
-  caret = true,
+  showCursor = false,
+  caret,
   caretFadeDelay = 1500,
   onComplete,
   className = '',
 }) {
+  const hasCursor = typeof showCursor === 'boolean' ? (showCursor || Boolean(caret)) : Boolean(caret);
   const phraseList = Array.isArray(phrases) && phrases.length > 0 ? phrases : [text];
   const fullText = Array.isArray(phrases) && phrases.length > 0 ? phrases.join(' ') : text;
   const isLooping = loop || (Array.isArray(phrases) && phrases.length > 1);
@@ -40,10 +42,10 @@ export function TypeWriter({
   });
 
   const [phraseIndex, setPhraseIndex] = useState(0);
-  const [displayedText, setDisplayedText] = useState(() => (reducedMotion ? phraseList[0] : ''));
+  const [displayedText, setDisplayedText] = useState(() => (reducedMotion ? (phraseList[0] || '') : ''));
   const [isDeleting, setIsDeleting] = useState(false);
-  const [caretVisible, setCaretVisible] = useState(() => !reducedMotion && caret);
-  const [caretFading, setCaretFading] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(() => !reducedMotion && hasCursor);
+  const [cursorFading, setCursorFading] = useState(false);
 
   const timeoutRef = useRef(null);
   const onCompleteRef = useRef(onComplete);
@@ -61,8 +63,8 @@ export function TypeWriter({
 
   useEffect(() => {
     if (reducedMotion) {
-      setDisplayedText(phraseList[0]);
-      setCaretVisible(false);
+      setDisplayedText(phraseList[0] || '');
+      setCursorVisible(false);
       onCompleteRef.current?.();
       return undefined;
     }
@@ -83,11 +85,11 @@ export function TypeWriter({
           timeoutRef.current = setTimeout(() => {
             setIsDeleting(true);
           }, holdTime);
-        } else if (caretFadeDelay > 0) {
+        } else if (hasCursor && caretFadeDelay > 0) {
           timeoutRef.current = setTimeout(() => {
-            setCaretFading(true);
+            setCursorFading(true);
             timeoutRef.current = setTimeout(() => {
-              setCaretVisible(false);
+              setCursorVisible(false);
             }, 400);
           }, caretFadeDelay);
         }
@@ -106,16 +108,18 @@ export function TypeWriter({
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [displayedText, isDeleting, phraseIndex, reducedMotion, isLooping, speed, deleteSpeed, holdTime, startDelay, caretFadeDelay]);
+  }, [displayedText, isDeleting, phraseIndex, reducedMotion, isLooping, speed, deleteSpeed, holdTime, startDelay, hasCursor, caretFadeDelay]);
 
   return (
-    <span className={className}>
+    <span className={`inline-block min-h-[1.2em] ${className}`.trim()}>
       <span className="sr-only">{fullText}</span>
       <span aria-hidden="true">
-        {displayedText}
-        {caret && caretVisible && (
+        {displayedText || <span className="invisible select-none">&nbsp;</span>}
+        {hasCursor && cursorVisible && (
           <span
-            className={`typewriter-caret ${caretFading ? 'typewriter-caret--fade' : ''}`}
+            className={`inline-block ml-0.5 font-light select-none text-current ${
+              cursorFading ? 'opacity-0 transition-opacity duration-400 ease-out' : ''
+            }`}
             aria-hidden="true"
           >
             |

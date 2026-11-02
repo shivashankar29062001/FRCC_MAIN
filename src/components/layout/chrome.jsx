@@ -28,6 +28,7 @@ import {
   YoutubeIcon,
 } from '../ui/icons.jsx';
 import { downloadOfficialApplicationForm } from '../../utils/downloadForm.js';
+import { formatMobileDisplay } from '../../utils/phone.js';
 import { Logo } from '../Logo.jsx';
 import { LocationTrigger } from '../location/LocationTrigger.jsx';
 import { LocationPanel } from '../location/LocationPanel.jsx';
@@ -124,11 +125,14 @@ const ACCOUNT_ROW_LINK =
 // Details block shared by the dropdown and the mobile panel.
 function AccountDetails({ user, isMember }) {
   const displayName = (user?.name || '').trim();
-  const contactEmail =
-    (user?.email || '').trim() ||
+  const isSynthetic = (val) => Boolean(val && String(val).toLowerCase().endsWith('@frcc.member'));
+  const rawEmail = (user?.email || '').trim() ||
     (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
+  const isLegacy = isSynthetic(rawEmail) || isSynthetic(user?.authEmail) || user?.isLegacy || !user?.hasRealEmail;
+  const contactEmail = isLegacy ? '' : rawEmail;
   const contactMobile =
     (user?.mobile || user?.phone || '').trim() ||
+    (isSynthetic(rawEmail) ? rawEmail.replace(/@frcc\.member$/i, '') : '') ||
     (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
 
   return (
@@ -144,8 +148,21 @@ function AccountDetails({ user, isMember }) {
           <span className="truncate">{displayName || 'My Account'}</span>
           {isMember && <span className="tag tag-gold shrink-0 !px-2 !py-0.5 !text-[10px]">Member</span>}
         </p>
-        {contactEmail && <p className="truncate text-xs text-slate-500">{contactEmail}</p>}
-        {contactMobile && <p className="truncate text-xs text-slate-500">{contactMobile}</p>}
+        {contactEmail ? (
+          <p className="truncate text-xs text-slate-500">{contactEmail}</p>
+        ) : (
+          <p className="truncate text-xs text-amber-700 font-medium">
+            Email: <span className="font-semibold">not added</span>
+            <Link to="/profile?tab=details" className="ml-1 text-[11px] font-semibold text-navy-900 underline hover:text-gold-600">
+              Add email
+            </Link>
+          </p>
+        )}
+        {contactMobile && (
+          <p className="truncate text-xs text-slate-500">
+            {formatMobileDisplay(contactMobile)}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -416,6 +433,16 @@ export function Navbar() {
       isActive ? cx('text-navy-900', underline) : 'text-slate-600 hover:bg-slate-100 hover:text-navy-900',
     );
   const plainLink = 'relative rounded-lg px-3 py-2 text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-navy-900';
+  const topUnderline = 'relative after:absolute after:inset-x-0 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-gold-400';
+  const topNavLink = ({ isActive }) =>
+    cx(
+      'transition-colors duration-150 py-0.5 whitespace-nowrap',
+      isActive ? cx('text-gold-400 font-semibold', topUnderline) : 'text-slate-300 hover:text-gold-400',
+    );
+  const isApplicationForm =
+    location.pathname === '/application-form' ||
+    location.pathname === '/membership/join' ||
+    location.pathname.startsWith('/membership/join');
   const mobileRow = 'block rounded-xl px-3 py-2.5 font-medium text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900';
   const mobileRowActive = ({ isActive }) => cx(mobileRow, isActive && 'bg-navy-50 text-navy-900');
 
@@ -444,16 +471,14 @@ export function Navbar() {
           <div className="flex items-center gap-4">
             {MEMBER_PROMO_NOTE && <p className="text-gold-400">{MEMBER_PROMO_NOTE}</p>}
             <div className="flex items-center gap-3 border-l border-white/20 pl-3">
-              <NavLink to={ROUTES.gallery} className="transition-colors duration-150 hover:text-gold-400">Gallery</NavLink>
-              <NavLink to={ROUTES.leadership} className="transition-colors duration-150 hover:text-gold-400">Leadership</NavLink>
-              <button
-                type="button"
-                onClick={downloadOfficialApplicationForm}
-                className="transition-colors duration-150 hover:text-gold-400 cursor-pointer text-left"
-                title="Download official FRCC Membership Application Form PDF"
+              <NavLink to={ROUTES.gallery} className={topNavLink}>Gallery</NavLink>
+              <NavLink to={ROUTES.leadership} className={topNavLink}>Leadership</NavLink>
+              <NavLink
+                to={ROUTES.applicationForm || '/membership/join'}
+                className={({ isActive }) => topNavLink({ isActive: isActive || isApplicationForm })}
               >
                 Application Form
-              </button>
+              </NavLink>
             </div>
           </div>
         </div>
@@ -607,16 +632,13 @@ export function Navbar() {
                   </NavLink>
                 </li>
                 <li>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      downloadOfficialApplicationForm(e);
-                      closeAll();
-                    }}
-                    className={cx(mobileRow, 'w-full text-left')}
+                  <NavLink
+                    to={ROUTES.applicationForm || '/membership/join'}
+                    onClick={closeAll}
+                    className={({ isActive }) => mobileRowActive({ isActive: isActive || isApplicationForm })}
                   >
-                    Application Form (PDF)
-                  </button>
+                    Application Form
+                  </NavLink>
                 </li>
               </ul>
 

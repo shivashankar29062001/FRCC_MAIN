@@ -1,32 +1,40 @@
 import { supabase } from './supabase.js';
+import { normalizeMobile } from '../utils/phone.js';
 
 /**
- * Format user login identifier. If user entered a plain phone or handle without @,
- * format it as a valid auth identifier.
+ * Format user login identifier. If legacy phone login is enabled via VITE_ENABLE_LEGACY_PHONE_LOGIN
+ * and input has 10 digits, maps to digits@frcc.member for backward compatibility.
+ * Otherwise, requires and returns a trimmed, lowercased real email.
  */
-function normalizeEmail(emailOrPhone) {
-  const trimmed = (emailOrPhone || '').trim();
-  if (trimmed.includes('@')) return trimmed.toLowerCase();
-  const digitsOnly = trimmed.replace(/\D/g, '');
-  if (digitsOnly.length >= 10) return `${digitsOnly}@frcc.member`;
-  return `${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '')}@frcc.member`;
+function resolveAuthIdentifier(emailInput) {
+  const trimmed = (emailInput || '').trim();
+  const allowLegacy = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_LEGACY_PHONE_LOGIN === 'true';
+  if (allowLegacy) {
+    const digits = normalizeMobile(trimmed);
+    if (/^[6-9]\d{9}$/.test(digits)) {
+      return `${digits}@frcc.member`;
+    }
+  }
+  return trimmed.toLowerCase();
 }
 
 /**
  * Sign up a new user with Supabase Auth & create/sync profile.
+ * Accounts require a real email and mobile number. Never generates a synthetic email.
  */
-export async function signUp({ name, emailOrPhone, password }) {
-  const email = normalizeEmail(emailOrPhone);
-  const cleanPhone = emailOrPhone.includes('@') ? '' : emailOrPhone.trim();
+export async function signUp({ name, email, mobile, password }) {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanPhone = normalizeMobile(mobile);
+  const cleanName = (name || '').trim();
 
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: cleanEmail,
     password,
     options: {
       data: {
-        name: (name || '').trim(),
+        name: cleanName,
         phone: cleanPhone,
-        raw_contact: emailOrPhone,
+        mobile: cleanPhone,
         is_member: false,
       },
     },
@@ -34,7 +42,7 @@ export async function signUp({ name, emailOrPhone, password }) {
 
   if (error) throw error;
 
-  // If user is returned, ensure profile row exists in public.profiles
+  // If user is returned, ensure profile row exists in public.profiles with real email and mobile
   if (data?.user) {
     const uidCode = `FRCC-U-${data.user.id.substring(0, 6).toUpperCase()}`;
     await supabase
@@ -42,8 +50,8 @@ export async function signUp({ name, emailOrPhone, password }) {
       .upsert({
         id: data.user.id,
         user_id_code: uidCode,
-        name: (name || 'Member').trim(),
-        email: data.user.email,
+        name: cleanName || 'Member',
+        email: cleanEmail,
         phone: cleanPhone,
         is_member: false,
       })
@@ -55,12 +63,13 @@ export async function signUp({ name, emailOrPhone, password }) {
 }
 
 /**
- * Sign in existing user with email/password.
+ * Sign in existing user with email and password.
+ * If VITE_ENABLE_LEGACY_PHONE_LOGIN="true", a 10-digit mobile is mapped to legacy @frcc.member auth.
  */
-export async function signIn({ emailOrPhone, password }) {
-  const email = normalizeEmail(emailOrPhone);
+export async function signIn({ email, password }) {
+  const authEmail = resolveAuthIdentifier(email);
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: authEmail,
     password,
   });
 
@@ -155,12 +164,27 @@ export function getPasswordResetRedirectUrl() {
 }
 
 /**
- * Send password reset email.
+ * Update authenticated user's email with verification.
+ * Sends a confirmation email to the new address before completing the update.
  */
-export async function resetPassword(emailOrPhone) {
-  const email = normalizeEmail(emailOrPhone);
+export async function updateEmail(newEmail) {
+  const cleanEmail = (newEmail || '').trim().toLowerCase();
+  const redirectTo = getPasswordResetRedirectUrl().replace('/profile?tab=password', '/profile');
+  const { data, error } = await supabase.auth.updateUser(
+    { email: cleanEmail },
+    { emailRedirectTo: redirectTo }
+  );
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Send password reset email using the user's real email address.
+ */
+export async function resetPassword(email) {
+  const cleanEmail = (email || '').trim().toLowerCase();
   const redirectTo = getPasswordResetRedirectUrl();
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
     redirectTo,
   });
   if (error) throw error;

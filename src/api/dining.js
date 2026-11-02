@@ -196,6 +196,7 @@ export async function createTableBooking(payload) {
     p_email: payload.email || payload.guestEmail || payload.guest_email || '',
     p_notes: payload.notes || payload.specialRequest || null,
     p_age_confirmed: Boolean(payload.ageConfirmed || payload.age_confirmed),
+    p_user_id: currentUserId || null,
   };
 
   const { data, error } = await supabase.rpc('create_table_booking', rpcParams);
@@ -214,6 +215,8 @@ export async function createTableBooking(payload) {
 
   const formattedBooking = {
     id: data.id,
+    uuid: data.id,
+    rawId: data.id,
     client_request_id: data.client_request_id,
     booking_ref: data.booking_ref,
     bookingRef: data.booking_ref,
@@ -285,6 +288,8 @@ export async function getMyTableBookings(userId = null) {
 
     return {
       id: b.id,
+      uuid: b.id,
+      rawId: b.id,
       booking_ref: b.booking_ref,
       bookingRef: b.booking_ref,
       bookingId: b.booking_ref,

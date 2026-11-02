@@ -73,7 +73,25 @@ export function readSession() {
   const parsed = safeParse(window.sessionStorage.getItem(SESSION_STORAGE_KEY)) ||
     safeParse(window.localStorage.getItem(SESSION_STORAGE_KEY));
   if (parsed && (parsed.userId || parsed.id)) {
-    return { ...emptySession, ...parsed, isMember: Boolean(parsed.isMember), loggedIn: true };
+    const rawEmail = (parsed.email || '').trim();
+    const rawContact = (parsed.emailOrPhone || '').trim();
+    const isSynthetic = (v) => Boolean(v && String(v).toLowerCase().endsWith('@frcc.member'));
+    const phone = (parsed.phone || parsed.mobile || (isSynthetic(rawContact) ? rawContact.replace(/@frcc\.member$/i, '') : '')).trim();
+    const isLegacy = isSynthetic(rawEmail) || isSynthetic(rawContact);
+    const cleanEmail = isLegacy ? '' : rawEmail;
+    const cleanContact = cleanEmail || phone;
+    return {
+      ...emptySession,
+      ...parsed,
+      email: cleanEmail,
+      isLegacy,
+      hasRealEmail: Boolean(cleanEmail),
+      emailOrPhone: cleanContact,
+      phone: phone,
+      mobile: phone,
+      isMember: Boolean(parsed.isMember),
+      loggedIn: true,
+    };
   }
   // Demo auto-login only if VITE_DEMO_MODE=true AND no explicit logout marker exists.
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true') {

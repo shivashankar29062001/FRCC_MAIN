@@ -44,7 +44,7 @@ export default function ConventionDate() {
 
       <div className="grid sm:grid-cols-3 gap-4 mb-6">
         <label className="block">Date
-          <input type="date" min={today} className={inputClass} value={booking.date} onChange={e => updateBooking({ date: e.target.value })} /></label>
+          <input type="date" min={today} className={`${inputClass} date-picker-field`} value={booking.date} onChange={e => updateBooking({ date: e.target.value })} /></label>
         <label className="block">Start Time
           <select className={inputClass} value={booking.startTime} onChange={e => updateBooking({ startTime: e.target.value })}>
             <option value="">Select</option>

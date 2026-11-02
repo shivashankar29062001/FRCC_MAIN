@@ -26,7 +26,20 @@ export function useMockQuery(loader, options = {}) {
         return;
       }
       try {
-        setState({ loading: false, error: '', data: loader() });
+        const result = loader();
+        if (result && typeof result.then === 'function') {
+          result
+            .then((res) => {
+              if (!alive) return;
+              setState({ loading: false, error: '', data: res });
+            })
+            .catch((err) => {
+              if (!alive) return;
+              setState({ loading: false, error: err?.message || 'Unexpected error.', data: null });
+            });
+        } else {
+          setState({ loading: false, error: '', data: result });
+        }
       } catch (e) {
         setState({ loading: false, error: e?.message || 'Unexpected error.', data: null });
       }

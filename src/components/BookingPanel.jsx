@@ -202,9 +202,10 @@ function SelectInput({ id, error, inputClass = inputCls, nativeArrow = false, op
 
 /**
  * Date field with interactive calendar picker and typed DD/MM/YYYY fallback.
- * Clicking the field or calendar icon opens the native calendar.
+ * The left icon is the only visible icon; the native picker indicator is transparent
+ * and stretched over the field so clicking anywhere opens the calendar.
  */
-function DateInput({ id, error, value, onChange, inputClass, ...props }) {
+function DateInput({ id, error, value, onChange, inputClass, min, ...props }) {
   const pickerRef = useRef(null);
 
   const isoValue = useMemo(() => {
@@ -234,11 +235,11 @@ function DateInput({ id, error, value, onChange, inputClass, ...props }) {
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full min-w-0 flex-1 date-input-wrapper">
       <TextInput
         id={id}
         error={error}
-        inputClass={cx(inputClass, 'pr-8 cursor-pointer')}
+        inputClass={cx(inputClass, 'date-picker-field cursor-pointer !pr-2')}
         type="text"
         inputMode="numeric"
         autoComplete="off"
@@ -253,23 +254,12 @@ function DateInput({ id, error, value, onChange, inputClass, ...props }) {
         ref={pickerRef}
         type="date"
         value={isoValue}
-        min={todayISO()}
+        min={min || todayISO()}
         onChange={handlePickerChange}
-        className="sr-only"
+        className="date-picker-native-overlay"
         tabIndex={-1}
         aria-hidden="true"
       />
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          openPicker();
-        }}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
-        aria-label="Select date"
-      >
-        <CalendarIcon className="h-4 w-4" />
-      </button>
     </div>
   );
 }
@@ -485,10 +475,10 @@ function Fields({ tab, v, errors, patch, busy }) {
       {tab === 'stay' && (
         <>
           <Field id="stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
-            <DateInput id="stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
+            <DateInput id="stay-checkin" error={errors.checkin} value={v.checkin} min={todayISO()} onChange={(val) => patch({ checkin: val })} />
           </Field>
           <Field id="stay-checkout" label="Check-out" icon={CalendarIcon} error={errors.checkout}>
-            <DateInput id="stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
+            <DateInput id="stay-checkout" error={errors.checkout} value={v.checkout} min={v.checkin ? parseDMY(v.checkin) || todayISO() : todayISO()} onChange={(val) => patch({ checkout: val })} />
           </Field>
           <Field id="stay-guests" label="Guests" icon={UsersIcon} error={errors.adults}>
             <SelectInput id="stay-guests" error={errors.adults} value={v.adults || ''} onChange={(e) => patch({ adults: e.target.value })} options={GUEST_OPTIONS} placeholder="Guests…" />
@@ -620,7 +610,7 @@ function CardField({ id, label, icon: Icon, error, children }) {
     <div className="min-w-0 flex-1">
       <label htmlFor={id} className="booking-label">{label}</label>
       <div className="relative">
-        <span aria-hidden className="booking-field-icon">
+        <span aria-hidden className="booking-field-icon pointer-events-none">
           <Icon className="h-4 w-4" />
         </span>
         {children}
@@ -692,10 +682,10 @@ function CardFields({ tab, v, errors, patch, busy, compact = false }) {
         <>
           <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
-              <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
+              <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} min={todayISO()} onChange={(val) => patch({ checkin: val })} />
             </CardField>
             <CardField id="card-stay-checkout" label="Check-out" icon={CalendarIcon} error={errors.checkout}>
-              <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
+              <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} min={v.checkin ? parseDMY(v.checkin) || todayISO() : todayISO()} onChange={(val) => patch({ checkout: val })} />
             </CardField>
           </div>
           <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>

@@ -21,7 +21,7 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
   const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || bookingRecord.user_id || null;
 
   const payload = {
-    booking_id: bookingRecord.bookingId || bookingRecord.id,
+    booking_id: bookingRecord.bookingRef || bookingRecord.bookingId || bookingRecord.id,
     user_id: currentUserId,
     category: bookingRecord.category || 'activity',
     title: bookingRecord.title || bookingRecord.gameName || bookingRecord.roomName || bookingRecord.hallName || bookingRecord.zoneName || 'Booking',
@@ -111,8 +111,13 @@ export async function getUserBookings(userId = null) {
 
   return (data || []).map((b) => ({
     ...b,
-    id: b?.booking_id,
+    id: b?.id || b?.booking_id,
+    uuid: b?.id,
+    rawId: b?.id,
+    booking_id: b?.booking_id,
     bookingId: b?.booking_id,
+    bookingRef: b?.booking_id,
+    booking_ref: b?.booking_id,
     user_id: b?.user_id || targetUserId,
     userId: b?.user_id || targetUserId,
     gameName: b?.title || 'Booking',

@@ -12,11 +12,39 @@ const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_M
 const mockStayBookings = [];
 
 /**
+ * Deduplicate room types so that aliases (e.g. 'standard-room' and 'vja-standard-room')
+ * or repeated records never show double cards to users.
+ */
+export function deduplicateRoomTypes(list) {
+  if (!Array.isArray(list)) return [];
+  const map = new Map();
+  for (const item of list) {
+    if (!item) continue;
+    const nameKey = String(item.name || '').trim().toLowerCase();
+    const areaKey = String(item.area_id || item.areaId || 'vijayawada').trim().toLowerCase();
+    const key = `${areaKey}:${nameKey}`;
+
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, item);
+    } else {
+      // If one of them has the canonical 'vja-' ID, prefer it over the unprefixed alias
+      const existingId = String(existing.id || '');
+      const currentId = String(item.id || '');
+      if (!existingId.startsWith('vja-') && currentId.startsWith('vja-')) {
+        map.set(key, item);
+      }
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Fetch all active room types.
  */
 export async function getRoomTypes() {
   if (isMock) {
-    return LOCAL_ROOMS.map((r) => ({
+    const raw = LOCAL_ROOMS.map((r) => ({
       id: r.id,
       area_id: r.areaId || 'vijayawada',
       category: r.category,
@@ -31,6 +59,7 @@ export async function getRoomTypes() {
       amenities: r.amenities,
       active: true,
     }));
+    return deduplicateRoomTypes(raw);
   }
 
   try {
@@ -41,13 +70,13 @@ export async function getRoomTypes() {
       .order('price_per_night', { ascending: true });
 
     if (!error && data && data.length > 0) {
-      return data;
+      return deduplicateRoomTypes(data);
     }
   } catch (err) {
     console.warn('Error fetching room_types from database, falling back to local data:', err);
   }
 
-  return LOCAL_ROOMS.map((r) => ({
+  const fallback = LOCAL_ROOMS.map((r) => ({
     id: r.id,
     area_id: r.areaId || 'vijayawada',
     category: r.category,
@@ -62,6 +91,7 @@ export async function getRoomTypes() {
     amenities: r.amenities,
     active: true,
   }));
+  return deduplicateRoomTypes(fallback);
 }
 
 /**
@@ -100,8 +130,8 @@ export async function getAvailability(checkIn, checkOut) {
       p_check_out: checkOut,
     });
 
-    if (!error && data) {
-      return data;
+    if (!error && data && data.length > 0) {
+      return deduplicateRoomTypes(data);
     }
   } catch (err) {
     console.warn('Error invoking get_available_rooms RPC, using fallback:', err);
@@ -232,11 +262,23 @@ export async function getMyStayBookings(userId = null) {
     return [];
   }
 
-  return (data || []).map((b) => ({
-    ...b,
-    user_id: b.user_id || currentUserId,
-    userId: b.user_id || currentUserId,
-  }));
+  return (data || []).map((b) => {
+    const ref = b.booking_ref || b.bookingRef || b.id;
+    return {
+      ...b,
+      id: b.id,
+      uuid: b.id,
+      rawId: b.id,
+      db_id: b.id,
+      stay_id: b.id,
+      raw_id: b.id,
+      booking_ref: ref,
+      bookingRef: ref,
+      bookingId: ref,
+      user_id: b.user_id || currentUserId,
+      userId: b.user_id || currentUserId,
+    };
+  });
 }
 
 export default {

@@ -154,12 +154,26 @@ export function AppProvider({ children }) {
         profile?.is_member || (memberData && String(memberData.status).toLowerCase() === 'active')
       );
 
+      const isSynthetic = (val) => Boolean(val && String(val).toLowerCase().endsWith('@frcc.member'));
+      const rawEmail = (profile?.email || supabaseUser.email || '').trim();
+      const rawPhone = (profile?.phone || supabaseUser.user_metadata?.phone || '').trim();
+      const extractedPhone = isSynthetic(rawEmail) ? rawEmail.replace(/@frcc\.member$/i, '') : '';
+      const realPhone = rawPhone || extractedPhone;
+      const isLegacy = isSynthetic(rawEmail);
+      const realEmail = isLegacy ? '' : rawEmail;
+      const realContact = realPhone || realEmail;
+
       const sessionObj = {
         id: supabaseUser.id,
         userId: profile?.user_id_code || `FRCC-U-${supabaseUser.id.substring(0, 6).toUpperCase()}`,
-        name: profile?.name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Member',
-        emailOrPhone: profile?.email || supabaseUser.email || profile?.phone || '',
-        phone: profile?.phone || supabaseUser.user_metadata?.phone || '',
+        name: profile?.name || supabaseUser.user_metadata?.name || (realEmail ? realEmail.split('@')[0] : 'Member'),
+        email: realEmail,
+        authEmail: rawEmail, // Kept internally for Supabase auth backend operations
+        isLegacy,
+        hasRealEmail: Boolean(realEmail),
+        emailOrPhone: realContact,
+        phone: realPhone,
+        mobile: realPhone,
         isMember: memberStatus,
         loggedIn: true,
       };
@@ -170,6 +184,7 @@ export function AppProvider({ children }) {
           prevUser.id === sessionObj.id &&
           prevUser.userId === sessionObj.userId &&
           prevUser.name === sessionObj.name &&
+          prevUser.email === sessionObj.email &&
           prevUser.emailOrPhone === sessionObj.emailOrPhone &&
           prevUser.phone === sessionObj.phone &&
           prevUser.isMember === sessionObj.isMember &&
@@ -339,7 +354,7 @@ export function AppProvider({ children }) {
     });
   }, [user?.id]);
 
-  const login = useCallback(async ({ emailOrPhone, password }) => {
+  const login = useCallback(async ({ email, emailOrPhone, password }) => {
     clearLoggedOutMarker();
     clearUserSessionAndDrafts(user?.id);
     setBookings([]);
@@ -347,14 +362,15 @@ export function AppProvider({ children }) {
     setMembership(null);
     setIsMemberState(false);
     setNotifications(seedNotifications);
-    const { user: authUser } = await authService.signIn({ emailOrPhone, password });
+    const resolvedEmail = email || emailOrPhone;
+    const { user: authUser } = await authService.signIn({ email: resolvedEmail, password });
     if (authUser) {
       await hydrateUserData(authUser);
     }
     return authUser;
   }, [user?.id, hydrateUserData]);
 
-  const signup = useCallback(async ({ name, emailOrPhone, password }) => {
+  const signup = useCallback(async ({ name, email, mobile, password, emailOrPhone }) => {
     clearLoggedOutMarker();
     clearUserSessionAndDrafts(user?.id);
     setBookings([]);
@@ -362,7 +378,8 @@ export function AppProvider({ children }) {
     setMembership(null);
     setIsMemberState(false);
     setNotifications(seedNotifications);
-    const { user: authUser } = await authService.signUp({ name, emailOrPhone, password });
+    const resolvedEmail = email || emailOrPhone;
+    const { user: authUser } = await authService.signUp({ name, email: resolvedEmail, mobile, password });
     if (authUser) {
       await hydrateUserData(authUser);
     }
