@@ -22,7 +22,7 @@ export const halls = [
     includesFood: true, // Client: includesFood true (wording "with food")
     priceNote: 'with food',
     capacityMin: 30,
-    capacityMax: 100000,
+    capacityMax: 10000,
     capacity: 100000, // Maximum capacity
     capacityBreakdown: { theater: 50000, banquet: 35000, classroom: 15000, reception: 100000 }, // SAMPLE
     prices: { hour: 1500, halfDay: 1500, fullDay: 1500, perPerson: 1500 }, // Backwards compatibility

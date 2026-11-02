@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { inr, hoursUntilEvent, canCancel, CANCEL_WINDOW_HOURS } from '../utils/format';
+import { inr, hoursUntilEvent, getBookingRefundPolicy, getRefundMethod, maskPhone, maskEmail } from '../utils/format';
 import * as pay from '../services/payment';
 import { getCurrentUser } from '../services/auth';
 
@@ -21,6 +21,7 @@ export default function MyBookings() {
   const [view, setView] = useState(null);
   const [cancelFor, setCancelFor] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelNotice, setCancelNotice] = useState(false);
 
   const user = getCurrentUser();
 
@@ -47,22 +48,19 @@ export default function MyBookings() {
   const doCancel = async () => {
     setCancelling(true);
     try {
-      const refundAmount = cancelFor.amountPaid ?? cancelFor.amount ?? 0;
-      // Refund goes to the original payment method (mock in test mode).
-      await pay.refund(cancelFor.id, refundAmount);
+      // The server decides the refund with the shared policy; any client amount is ignored.
       const r = await api(`/bookings/${cancelFor.id}/cancel`, { method: 'POST' });
       setMsg(r.message);
+      setCancelNotice(true);
       setCancelFor(null);
       load();
+      // The cancellation is already final; a mock refund failure must not hide that.
+      pay.refund(cancelFor.id, r.booking?.refundAmount ?? 0).catch(e => console.error('Refund call failed:', e.message));
     } catch (e) { setError(e.message); } finally { setCancelling(false); }
   };
 
-  const refundNote = (b) => {
-    if (['EMI_CREDIT', 'EMI_NO_COST', 'EMI_DEBIT'].includes(b.paymentMethod)) return 'Refund via issuing bank per its policy.';
-    if (['BANK_TRANSFER', 'CORPORATE_INVOICE'].includes(b.paymentMethod)) return 'Refund will be processed manually within 5-7 working days.';
-    if (b.paymentMethod === 'ADVANCE_PAY_AT_VENUE') return 'Only the advance amount has been refunded.';
-    return 'Refunded to the original payment method.';
-  };
+  // Fallback for older cancelled bookings that predate the stored refundMethod.
+  const refundNote = (b) => getRefundMethod(b.paymentMethod);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -73,14 +71,16 @@ export default function MyBookings() {
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
       {msg && <p className="text-green-700 mb-4">{msg}</p>}
+      {cancelNotice && <p className="text-green-700 text-sm mb-4">Cancellation notice sent.</p>}
 
       {loading ? <p>Loading…</p> : filtered.length === 0 ? (
         <p className="text-gray-500 bg-white rounded shadow p-6 text-center">No bookings yet.</p>
       ) : (
         <div className="grid gap-4">
           {filtered.map(b => {
-            const cancellable = canCancel(b);
-            const within48 = b.status === 'CONFIRMED' && classify(b) === 'Upcoming' && hoursUntilEvent(b.date, b.startTime) <= CANCEL_WINDOW_HOURS;
+            const policy = getBookingRefundPolicy(b);
+            const cancellable = policy.allowed;
+            const started = policy.hoursUntilStart <= 0;
             return (
               <div key={b.id} className="bg-white rounded shadow p-4 flex flex-col sm:flex-row gap-4">
                 <img src={b.hall?.images?.[0] || '/images/halls/grand-ballroom.svg'} alt={b.hallName} loading="lazy" className="w-full sm:w-40 h-28 object-cover rounded" onError={(e) => { e.target.src = '/images/halls/grand-ballroom.svg'; }} />
@@ -91,12 +91,17 @@ export default function MyBookings() {
                   <p>Amount: {inr(b.amount)} • Payment: {b.paymentStatus} • <span className={b.status === 'CONFIRMED' ? 'text-green-700' : b.status === 'CANCELLED' ? 'text-red-600' : 'text-amber-600'}>{b.status}</span></p>
                   <p className="text-gray-600">Paid via {(b.paymentMethod || 'UPI_ID').replaceAll('_', ' ')} {b.maskedInstrument ? `• ${b.maskedInstrument}` : ''}{b.balanceDue > 0 ? ` • Due at venue: ${inr(b.balanceDue)}` : ''}</p>
                   {b.status === 'PENDING_VERIFICATION' && <button onClick={async () => { await api(`/bookings/${b.id}/mark-paid`, { method: 'POST' }); setMsg('Marked as paid (admin mock).'); load(); }} className="text-xs border border-amber-600 text-amber-700 rounded px-2 py-0.5">Admin mock: Mark as Paid</button>}
-                  {within48 && <p className="text-amber-600 mt-1">Cancellation is not available within 48 hours of the event.</p>}
-                  {b.status === 'CANCELLED' && <p className="text-red-600 mt-1">Cancelled • Refund: {inr(b.refundAmount)} — {refundNote(b)}</p>}
+                  {b.status === 'CONFIRMED' && (
+                    <p className="text-xs text-gray-500 mt-1">Confirmation sent to {maskPhone(b.phone)} and {maskEmail(b.email)}</p>
+                  )}
+                  {started && b.status === 'CONFIRMED' && (
+                    <p className="text-amber-600 mt-1">Cancellation is not available after the event has started.</p>
+                  )}
+                  {b.status === 'CANCELLED' && <p className="text-red-600 mt-1">Cancelled • Refund: {inr(b.refundAmount)}{b.refundPercent != null ? ` (${b.refundPercent}%)` : ''} — {b.refundMethod || refundNote(b)}</p>}
                   <div className="flex gap-2 mt-3 flex-wrap">
                     <button onClick={() => setView(view === b.id ? null : b.id)} className="border border-navy text-navy rounded px-3 py-1">View Details</button>
                     {b.status === 'CONFIRMED' && classify(b) === 'Upcoming' && (
-                      <button disabled={!cancellable} onClick={() => setCancelFor(b)} title={within48 ? 'Within 48 hours' : ''}
+                      <button disabled={!cancellable} onClick={() => setCancelFor(b)} title={!cancellable && started ? 'Event has started' : ''}
                         className="border border-red-500 text-red-600 rounded px-3 py-1 disabled:opacity-40 disabled:cursor-not-allowed">Cancel Booking</button>
                     )}
                   </div>
@@ -125,8 +130,21 @@ export default function MyBookings() {
           <div className="bg-white rounded p-6 max-w-md">
             <h3 className="text-xl mb-2">Cancel Booking?</h3>
             <p className="text-sm text-gray-600 mb-1">{cancelFor.hallName} • {cancelFor.date} {cancelFor.startTime}–{cancelFor.endTime}</p>
-            <p className="mb-1">Refund amount: <strong className="text-green-700">{inr(cancelFor.amountPaid ?? cancelFor.amount)}</strong> (100% — cancelled more than 48 hours before the event).</p>
-            <p className="text-sm text-gray-600 mb-4">Refunded to your original payment method — {(cancelFor.paymentMethod || '').replaceAll('_', ' ')} • {cancelFor.maskedInstrument || ''}. {refundNote(cancelFor)}</p>
+            {(() => {
+              const p = getBookingRefundPolicy(cancelFor);
+              return (
+                <>
+                  <p className="text-sm mb-1">Time left: <strong>{Math.max(0, Math.floor(p.hoursUntilStart))} hours</strong></p>
+                  <p className="mb-1">Refund: <strong className="text-green-700">{inr(p.refundAmount)}</strong> ({p.refundPercent}% of amount paid)</p>
+                  <p className="text-sm text-gray-600 mb-2">Refund method: {(cancelFor.paymentMethod || '').replaceAll('_', ' ')}{cancelFor.maskedInstrument ? ` • ${cancelFor.maskedInstrument}` : ''}. {p.refundMethod}</p>
+                  {p.hoursUntilStart <= 48 && (
+                    <p className="text-amber-700 text-sm bg-amber-50 border border-amber-300 rounded px-3 py-2 mb-2">
+                      Cancelling within 48 hours of the event gives a 50% refund.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
             <div className="flex justify-end gap-3">
               <button onClick={() => setCancelFor(null)} className="border rounded px-4 py-2">Keep Booking</button>
               <button onClick={doCancel} disabled={cancelling} className="bg-red-600 text-white rounded px-4 py-2 disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</button>

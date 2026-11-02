@@ -200,7 +200,7 @@ export function HallPage() {
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim());
     const guestsNum = Number(draft.guests);
     const validGuests = isFunctionHall
-      ? guestsNum >= 30 && guestsNum <= 100000
+      ? guestsNum >= 30 && guestsNum <= 10000
       : guestsNum >= 1;
     const validHours = isMeetingHall
       ? Number(draft.hours) >= 1 && Boolean(draft.startTime)
@@ -478,7 +478,7 @@ export function HallPage() {
 
                     <div className="mt-4 flex items-baseline justify-between border-t border-slate-100 pt-3">
                       <span className="text-xs text-emerald-700 font-semibold">
-                        {isItemFunc ? 'Seats 30 – 1,00,000 guests' : 'Seats up to 50 guests'}
+                        {isItemFunc ? 'Seats 30 – 10,000 guests' : 'Seats up to 50 guests'}
                       </span>
                       <span className="font-display font-bold text-navy-900">
                         {isItemFunc ? (
@@ -540,14 +540,14 @@ export function HallPage() {
                 ]}
               />
 
-              {/* Function Hall: guests input min 30, max 1,00,000, validation messages; show "₹1,500 per person, with food" */}
+              {/* Function Hall: guests input min 30, max 10,000, validation messages; show "₹1,500 per person, with food" */}
               {isFunctionHall ? (
                 <div>
                   <Input
-                    label="Expected Guests Count (Min 30, Max 1,00,000) *"
+                    label="Expected Guests Count (Min 30, Max 10,000) *"
                     type="number"
                     min={30}
-                    max={100000}
+                    max={10000}
                     value={draft.guests}
                     onChange={(e) => updateDraft({ guests: e.target.value })}
                     placeholder="e.g. 250"
@@ -560,9 +560,9 @@ export function HallPage() {
                       Minimum 30 guests required for Function Hall
                     </p>
                   )}
-                  {Number(draft.guests) > 100000 && (
+                  {Number(draft.guests) > 10000 && (
                     <p className="mt-1 text-xs text-rose-600 font-medium">
-                      Maximum 1,00,000 guests allowed for Function Hall
+                      Maximum 10,000 guests allowed for Function Hall
                     </p>
                   )}
                 </div>

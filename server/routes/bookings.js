@@ -1,6 +1,7 @@
 const express = require('express');
 const { readDb, writeDb, uid } = require('../db');
 const auth = require('../middleware/auth');
+const notifications = require('../services/notifications');
 
 const router = express.Router();
 const toMins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -28,8 +29,8 @@ router.post('/', auth, (req, res) => {
   if (!hall) return res.status(404).json({ error: 'Hall not found.' });
   const guestCount = Number(guests);
   if (!Number.isFinite(guestCount) || guestCount < 30) return res.status(400).json({ error: 'Guest count must be at least 30.' });
-  if (guestCount > 100000) return res.status(400).json({ error: 'Guest count cannot exceed 1,00,000.' });
-  if (guestCount > hall.capacity) return res.status(400).json({ error: `This hall holds up to ${hall.capacity} guests. Choose a larger hall or reduce guests.` });
+  if (guestCount > 10000) return res.status(400).json({ error: 'Guest count cannot exceed 10,000.' });
+  if (guestCount > hall.capacity) return res.status(400).json({ error: `This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.` });
 
   // Re-check availability on the server to prevent double booking
   const blocking = ['CONFIRMED', 'PENDING_VERIFICATION'];
@@ -72,11 +73,24 @@ router.post('/', auth, (req, res) => {
     areaName: hall.areaName || hall.area,
     paymentStatus: isOfflinePending ? 'PENDING_VERIFICATION' : (clientStatus === 'PARTIAL' ? 'PARTIAL' : clientStatus === 'PENDING_VERIFICATION' ? 'PENDING_VERIFICATION' : 'PAID'),
     status: isOfflinePending ? 'PENDING_VERIFICATION' : 'CONFIRMED',
-    createdAt: new Date().toISOString(), cancelledAt: null, refundAmount: 0, refundRef: null
+    createdAt: new Date().toISOString(), cancelledAt: null,
+    refundPercent: 0, refundAmount: 0, refundMethod: null, refundRef: null,
+    notifyUpdates: req.body.notifyUpdates !== false
   };
   db.bookings.push(booking);
-  db.notifications.push({ id: uid('N'), userId: req.user.id, message: `Booking confirmed — ${booking.id} for ${hall.name} on ${date} (${startTime}–${endTime}).`, read: false, createdAt: new Date().toISOString() });
+  const bookingNotice = booking.status === 'PENDING_VERIFICATION'
+    ? `Booking received — ${booking.id} for ${hall.name} on ${date} (${startTime}–${endTime}). Payment verification pending.`
+    : `Booking confirmed — ${booking.id} for ${hall.name} on ${date} (${startTime}–${endTime}).`;
+  db.notifications.push({ id: uid('N'), userId: req.user.id, message: bookingNotice, read: false, createdAt: new Date().toISOString() });
   writeDb(db);
+
+  // Fire-and-forget: a messaging failure must never block or roll back the booking.
+  if (booking.status === 'CONFIRMED') {
+    notifications.sendBookingConfirmed(booking).catch((e) => console.error('[notify] confirmed dispatch failed:', e.message));
+  } else {
+    notifications.sendBookingPending(booking).catch((e) => console.error('[notify] pending dispatch failed:', e.message));
+  }
+
   res.json({ booking });
 });
 
@@ -91,39 +105,34 @@ router.get('/my', auth, (req, res) => {
   res.json({ bookings });
 });
 
-const CANCELLATION_WINDOW_HOURS = 48; // configurable policy
-const REFUND_PERCENT = 100;           // 100% refund when cancelled more than 48h before
-
-router.post('/:id/cancel', auth, (req, res) => {
+router.post('/:id/cancel', auth, async (req, res) => {
   const db = readDb();
   const b = db.bookings.find(x => x.id === req.params.id);
   if (!b || b.userId !== req.user.id) return res.status(404).json({ error: 'Booking not found.' });
   if (b.status === 'CANCELLED') return res.status(400).json({ error: 'Booking is already CANCELLED.' });
 
-  const [h, m] = b.startTime.split(':').map(Number);
-  const start = new Date(`${b.date}T00:00:00`); start.setHours(h, m, 0, 0);
-  const hoursUntil = (start.getTime() - Date.now()) / 3600000;
-  if (hoursUntil < CANCELLATION_WINDOW_HOURS)
-    return res.status(400).json({ error: 'Cancellation is not available within 48 hours of the event.' });
+  // Server clock + hall local time (IST). Any refund amount in req.body is ignored.
+  const { getRefundPolicy } = await import('../../shared/refundPolicy.js');
+  const policy = getRefundPolicy(b, new Date());
+  if (!policy.allowed) return res.status(400).json({ error: policy.reason });
 
   b.status = 'CANCELLED';
   b.cancelledAt = new Date().toISOString();
-  // Refund only what was actually paid (advance bookings refund the advance only)
-  b.refundAmount = Math.round((b.amountPaid ?? b.amount) * REFUND_PERCENT / 100);
+  b.refundPercent = policy.refundPercent;
+  b.refundAmount = policy.refundAmount;
+  b.refundMethod = policy.refundMethod;
   b.paymentStatus = 'REFUNDED';
+  b.balanceDue = 0; // balance is cancelled, nothing left to pay
   b.refundRef = 'RFD_' + Date.now();
 
-  let note = '';
-  if (typeof b.paymentMethod === 'string' && b.paymentMethod.startsWith('EMI'))
-    note = ' EMI refunds are processed via the issuing bank per its policy.';
-  else if (b.paymentMethod === 'BANK_TRANSFER' || b.paymentMethod === 'CORPORATE_INVOICE')
-    note = ' Refund will be processed manually within 5-7 working days.';
-  else if (b.paymentMethod === 'ADVANCE_PAY_AT_VENUE')
-    note = ' Only the advance amount has been refunded.';
-
-  db.notifications.push({ id: uid('N'), userId: req.user.id, message: `Booking cancelled, refund initiated — ${b.id}. Refund of ₹${b.refundAmount} to your original payment method.${note}`, read: false, createdAt: new Date().toISOString() });
+  const refundText = `₹${Number(b.refundAmount).toLocaleString('en-IN', { maximumFractionDigits: 2 })} (${b.refundPercent}%)`;
+  db.notifications.push({ id: uid('N'), userId: req.user.id, message: `Booking cancelled, refund initiated — ${b.id}. Refund of ${refundText} to your original payment method. ${policy.refundMethod}`, read: false, createdAt: new Date().toISOString() });
   writeDb(db);
-  res.json({ booking: b, message: `Cancellation successful. Refund of ₹${b.refundAmount} has been initiated.${note}` });
+
+  // Fire-and-forget: booking/cancellation is already saved and must not depend on messaging.
+  notifications.sendBookingCancelled(b).catch((e) => console.error('[notify] cancelled dispatch failed:', e.message));
+
+  res.json({ booking: b, message: `Cancellation successful. Refund of ${refundText} has been initiated. ${policy.refundMethod}` });
 });
 
 // Mock admin toggle: mark a PENDING_VERIFICATION booking as paid
@@ -138,6 +147,7 @@ router.post('/:id/mark-paid', auth, (req, res) => {
   b.balanceDue = 0;
   db.notifications.push({ id: uid('N'), userId: req.user.id, message: `Booking ${b.id} payment confirmed by admin.`, read: false, createdAt: new Date().toISOString() });
   writeDb(db);
+  notifications.sendBookingConfirmed(b).catch((e) => console.error('[notify] confirmed dispatch failed:', e.message));
   res.json({ booking: b });
 });
 

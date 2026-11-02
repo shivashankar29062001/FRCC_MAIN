@@ -7,6 +7,7 @@ const EMPTY = {
   date: '', startTime: '', endTime: '',
   eventType: '', guests: '', eventDetails: '',
   organizerName: '', phone: '', email: '', specialRequests: '',
+  notifyUpdates: true,
 };
 
 export function BookingProvider({ children }) {

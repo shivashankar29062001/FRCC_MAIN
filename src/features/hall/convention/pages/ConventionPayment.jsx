@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
-import { inr } from '../utils/format';
+import { inr, CANCELLATION_POLICY_TEXT } from '../utils/format';
 import * as pay from '../services/payment';
 import UpiIdFlow from '../components/payment/UpiIdFlow';
 import UpiAppPicker from '../components/payment/UpiAppPicker';
@@ -121,6 +121,7 @@ export default function ConventionPayment() {
         transactionRef: extra.transactionRef,
         emiTenure: extra.emiTenure, emiMonthlyAmount: extra.emiMonthlyAmount,
         gstin: extra.gstin, utrNumber: extra.utrNumber,
+        notifyUpdates: booking.notifyUpdates !== false,
         venueName: hall?.venueName, area: hall?.area, city: hall?.city,
         hallName: hall?.name, cityName: hall?.cityName, areaName: hall?.areaName,
       },
@@ -369,6 +370,7 @@ export default function ConventionPayment() {
               <p className="text-amber-700">Booking will be pending verification until payment is confirmed.</p>
             )}
           </div>
+          <p className="text-xs text-gray-500 mt-3">Cancellation policy: {CANCELLATION_POLICY_TEXT}</p>
         </aside>
       </div>
 

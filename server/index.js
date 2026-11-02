@@ -1,3 +1,8 @@
+const path = require('path');
+// Load server-side notification/SMTP settings from the project .env when supported.
+// Shell/host environment variables take precedence.
+try { process.loadEnvFile(path.join(__dirname, '..', '.env')); } catch { /* .env is optional */ }
+
 const express = require('express');
 const cors = require('cors');
 const bookingRoutes = require('./routes/bookings');

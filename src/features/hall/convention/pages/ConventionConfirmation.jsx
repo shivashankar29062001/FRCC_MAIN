@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
-import { inr, canCancel } from '../utils/format';
+import { inr, getBookingRefundPolicy, maskPhone, maskEmail, CANCELLATION_POLICY_TEXT } from '../utils/format';
 import { api } from '../services/api';
 import * as pay from '../services/payment';
 
@@ -17,6 +17,7 @@ export default function ConventionConfirmation() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelMsg, setCancelMsg] = useState('');
+  const [cancelNotice, setCancelNotice] = useState(false);
   const [cancelErr, setCancelErr] = useState('');
 
   // Fallback: if the booking state was lost on refresh, load it by ID from the URL.
@@ -133,6 +134,12 @@ export default function ConventionConfirmation() {
       ['Transaction Ref', booking.transactionRef],
       ['Booking Status', booking.status],
     ];
+    if (booking.status === 'CANCELLED') {
+      rows.push(
+        ['Refund', `Rs. ${booking.refundAmount ?? 0} (${booking.refundPercent ?? 0}%)`],
+        ['Refund Method', booking.refundMethod || 'Refund will be made to the original payment method.'],
+      );
+    }
     // First row starts at y = 104
     let y = headerHeight + 24; // 104
     rows.forEach(([k, v]) => {
@@ -152,27 +159,39 @@ export default function ConventionConfirmation() {
     doc.setFont('times', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(labelColor);
-    doc.text('Cancellation: 100% refund if cancelled more than 48 hours before the event.', 20, y + 8);
+    doc.text(`Cancellation: ${CANCELLATION_POLICY_TEXT}`, 20, y + 8, { maxWidth: 170 });
     doc.save(`FRCC-Receipt-${booking.id}.pdf`);
   };
 
   const doCancel = async () => {
-    setCancelling(true); setCancelErr('');;
+    setCancelling(true); setCancelErr('');
     try {
-      const refundAmount = booking.amountPaid ?? booking.amount ?? 0;
-      await pay.refund(booking.id, refundAmount);
+      // The server computes the refund with the shared policy; any client amount is ignored.
       const r = await api(`/bookings/${booking.id}/cancel`, { method: 'POST' });
       setCancelMsg(r.message);
-      const updated = { ...booking, status: 'CANCELLED', paymentStatus: 'REFUNDED', refundAmount: r.booking?.refundAmount ?? refundAmount };
+      setCancelNotice(true);
+      const updated = {
+        ...booking,
+        status: 'CANCELLED',
+        paymentStatus: 'REFUNDED',
+        refundPercent: r.booking?.refundPercent ?? 0,
+        refundAmount: r.booking?.refundAmount ?? 0,
+        refundMethod: r.booking?.refundMethod ?? null,
+        balanceDue: 0,
+      };
       setBooking(updated);
       setConfirmed(updated);
       setCancelOpen(false);
+      // Cancellation is already final; a mock refund failure must not hide that.
+      pay.refund(booking.id, r.booking?.refundAmount ?? 0).catch(e => console.error('Refund call failed:', e.message));
     } catch (e) {
       setCancelErr(e.message);
     } finally { setCancelling(false); }
   };
 
-  const eligible = canCancel(booking);
+  const policy = getBookingRefundPolicy(booking);
+  const eligible = policy.allowed && booking.status === 'CONFIRMED';
+  const started = policy.hoursUntilStart <= 0;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -181,6 +200,7 @@ export default function ConventionConfirmation() {
       <div className="bg-white rounded shadow p-6">
         <p className="text-green-700 font-semibold mb-4">✓ Payment successful — your hall is booked.</p>
         {cancelMsg && <p className="text-green-700 text-sm mb-3">{cancelMsg}</p>}
+        {cancelNotice && <p className="text-green-700 text-sm mb-3">Cancellation notice sent.</p>}
         {cancelErr && <p className="text-red-600 text-sm mb-3">{cancelErr}</p>}
         <dl className="grid sm:grid-cols-2 gap-y-2 gap-x-6 text-sm">
           <dt className="font-semibold">Booking ID</dt><dd>{booking.id}</dd>
@@ -206,13 +226,20 @@ export default function ConventionConfirmation() {
         </dl>
         {booking.status === 'PENDING_VERIFICATION' && <p className="text-amber-700 text-sm mt-3">⏳ Your booking is pending verification. It will be confirmed once we receive your payment.</p>}
         {booking.paymentStatus === 'PARTIAL' && <p className="text-amber-700 text-sm mt-3">Partial payment received — balance of {inr(booking.balanceDue)} is due at the venue.</p>}
-        <p className="text-xs text-gray-500 mt-4">Cancellation policy: Full refund (100%) of the amount paid if cancelled more than 48 hours before the event start. Cancellations within 48 hours are not permitted. EMI refunds go via the issuing bank; bank-transfer/corporate refunds are processed manually within 5-7 working days.</p>
+        {booking.status === 'CONFIRMED' && (
+          <p className="text-xs text-gray-500 mt-4">Confirmation sent to {maskPhone(booking.phone)} and {maskEmail(booking.email)}</p>
+        )}
+        <p className="text-xs text-gray-500 mt-2">Cancellation policy: {CANCELLATION_POLICY_TEXT}</p>
         <div className="flex flex-wrap gap-3 mt-6">
           <button onClick={downloadableReceipt} className="bg-gold text-navy font-semibold px-5 py-2 rounded">Download Receipt (PDF)</button>
           <button onClick={() => { resetBooking(); navigate('/my-bookings'); }} className="bg-navy text-gold px-5 py-2 rounded">View My Bookings</button>
-          {eligible && booking.status !== 'CANCELLED' && (
-            <button onClick={() => { setCancelOpen(true); setCancelMsg(''); setCancelErr(''); }}
-              className="border border-red-500 text-red-600 px-5 py-2 rounded">Cancel Booking</button>
+          {booking.status !== 'CANCELLED' && (
+            <button disabled={!eligible} onClick={() => { setCancelOpen(true); setCancelMsg(''); setCancelErr(''); }}
+              title={!eligible && started ? 'Event has started' : ''}
+              className="border border-red-500 text-red-600 px-5 py-2 rounded disabled:opacity-40 disabled:cursor-not-allowed">Cancel Booking</button>
+          )}
+          {!eligible && started && booking.status === 'CONFIRMED' && (
+            <p className="text-amber-600 text-sm w-full">Cancellation is not available after the event has started.</p>
           )}
         </div>
       </div>
@@ -222,13 +249,16 @@ export default function ConventionConfirmation() {
           <div className="bg-white rounded p-6 max-w-md">
             <h3 className="text-xl mb-2">Cancel Booking?</h3>
             <p className="text-sm text-gray-600 mb-1">{booking.hallName} • {booking.date} {booking.startTime}–{booking.endTime}</p>
-            <p className="mb-1">Refund amount: <strong className="text-green-700">{inr(booking.amountPaid ?? booking.amount)}</strong></p>
-            <p className="text-sm text-gray-600 mb-4">
-              Original payment method: {(booking.paymentMethod || '').replaceAll('_', ' ')} • {booking.maskedInstrument || ''}
-              {['EMI_CREDIT', 'EMI_NO_COST', 'EMI_DEBIT'].includes(booking.paymentMethod) && ' — EMI refunds are processed via the issuing bank.'}
-              {['BANK_TRANSFER', 'CORPORATE_INVOICE'].includes(booking.paymentMethod) && ' — Refund will be processed manually within 5-7 working days.'}
-              {booking.paymentMethod === 'ADVANCE_PAY_AT_VENUE' && ' — Only the advance amount has been refunded.'}
+            <p className="text-sm mb-1">Time left: <strong>{Math.max(0, Math.floor(policy.hoursUntilStart))} hours</strong></p>
+            <p className="mb-1">Refund: <strong className="text-green-700">{inr(policy.refundAmount)}</strong> ({policy.refundPercent}% of amount paid)</p>
+            <p className="text-sm text-gray-600 mb-2">
+              Refund method: {(booking.paymentMethod || '').replaceAll('_', ' ')}{booking.maskedInstrument ? ` • ${booking.maskedInstrument}` : ''}. {policy.refundMethod}
             </p>
+            {policy.hoursUntilStart <= 48 && (
+              <p className="text-amber-700 text-sm bg-amber-50 border border-amber-300 rounded px-3 py-2 mb-2">
+                Cancelling within 48 hours of the event gives a 50% refund.
+              </p>
+            )}
             <div className="flex justify-end gap-3">
               <button onClick={() => setCancelOpen(false)} className="border rounded px-4 py-2">Keep Booking</button>
               <button onClick={doCancel} disabled={cancelling} className="bg-red-600 text-white rounded px-4 py-2 disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</button>
