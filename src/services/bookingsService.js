@@ -18,7 +18,7 @@ export function generateBookingId(prefix = 'ACT') {
  */
 export async function createBooking(bookingRecord, paymentRecord = null) {
   const { data: sessionData } = await supabase.auth.getSession();
-  const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || null;
+  const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || bookingRecord.user_id || null;
 
   const payload = {
     booking_id: bookingRecord.bookingId || bookingRecord.id,
@@ -86,16 +86,24 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
  * Fetch all bookings for a user.
  */
 export async function getUserBookings(userId = null) {
-  let query = supabase
-    .from('bookings')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (userId) {
-    query = query.eq('user_id', userId);
+  let targetUserId = userId;
+  if (!targetUserId) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      targetUserId = sessionData?.session?.user?.id || null;
+    } catch (_) {}
   }
 
-  const { data, error } = await query;
+  if (!targetUserId) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('user_id', targetUserId)
+    .order('created_at', { ascending: false });
+
   if (error) {
     console.warn('Error fetching bookings:', error);
     return [];
@@ -105,6 +113,8 @@ export async function getUserBookings(userId = null) {
     ...b,
     id: b?.booking_id,
     bookingId: b?.booking_id,
+    user_id: b?.user_id || targetUserId,
+    userId: b?.user_id || targetUserId,
     gameName: b?.title || 'Booking',
     game: b?.category === 'activity' ? (b?.title || '').toLowerCase().replace(/\s+/g, '-') : (b?.title || 'Booking'),
     date: b?.date || b?.checkin,
@@ -122,16 +132,24 @@ export async function getUserBookings(userId = null) {
  * Fetch all payments for a user.
  */
 export async function getUserPayments(userId = null) {
-  let query = supabase
-    .from('payments')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (userId) {
-    query = query.eq('user_id', userId);
+  let targetUserId = userId;
+  if (!targetUserId) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      targetUserId = sessionData?.session?.user?.id || null;
+    } catch (_) {}
   }
 
-  const { data, error } = await query;
+  if (!targetUserId) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', targetUserId)
+    .order('created_at', { ascending: false });
+
   if (error) {
     console.warn('Error fetching payments:', error);
     return [];
@@ -139,7 +157,10 @@ export async function getUserPayments(userId = null) {
 
   return (data || []).map((p) => ({
     id: p?.payment_id,
+    payment_id: p?.payment_id,
     bookingId: p?.booking_id,
+    user_id: p?.user_id || targetUserId,
+    userId: p?.user_id || targetUserId,
     method: p?.method,
     amount: Number(p?.amount || 0),
     status: p?.status,

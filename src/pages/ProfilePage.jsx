@@ -133,7 +133,7 @@ function PersonalDetails({ user, membership, pushToast }) {
   );
 }
 
-function ChangePassword({ pushToast }) {
+function ChangePassword({ pushToast, isPasswordRecovery = false, onPasswordUpdated }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -158,7 +158,10 @@ function ChangePassword({ pushToast }) {
       setCurrent('');
       setNext('');
       setConfirm('');
-      pushToast('Password updated successfully in Supabase.');
+      if (onPasswordUpdated) {
+        onPasswordUpdated();
+      }
+      pushToast('Password updated successfully! Full account access is now restored.');
     } catch (apiErr) {
       setErr(apiErr?.message || 'Failed to update password.');
       pushToast(apiErr?.message || 'Failed to update password.', 'error');
@@ -169,13 +172,15 @@ function ChangePassword({ pushToast }) {
 
   return (
     <Card>
-      <h3 className="h-card">Change Password</h3>
+      <h3 className="h-card">{isPasswordRecovery ? 'Set New Password' : 'Change Password'}</h3>
       <p className="caption mt-1">Minimum 8 characters</p>
       <form onSubmit={save} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="pw-current">Current password</label>
-          <Input id="pw-current" name="current" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
-        </div>
+        {!isPasswordRecovery && (
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="pw-current">Current password</label>
+            <Input id="pw-current" name="current" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
+          </div>
+        )}
         <div>
           <label className="label" htmlFor="pw-new">New password</label>
           <Input id="pw-new" name="new" type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" />
@@ -187,7 +192,7 @@ function ChangePassword({ pushToast }) {
         {err && <p className="field-error sm:col-span-2" role="alert">{err}</p>}
         <div className="sm:col-span-2">
           <LoadingButton loading={saving} className="px-6 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
-            Update password
+            {isPasswordRecovery ? 'Save new password & unlock account' : 'Update password'}
           </LoadingButton>
         </div>
       </form>
@@ -238,16 +243,30 @@ function NotificationPrefs({ pushToast }) {
 }
 
 export function ProfilePage({ initialTab = 'details' }) {
-  const { user, membership, pushToast, bookings: appBookings, payments: appPayments } = useApp();
+  const {
+    user,
+    membership,
+    pushToast,
+    bookings: appBookings,
+    payments: appPayments,
+    isPasswordRecovery,
+    clearPasswordRecovery,
+  } = useApp();
   // Bookings and payments from activity store and global app store
-  const { bookings: activityBookings, payments: activityPayments } = useActivityBookings();
+  const { bookings: activityBookings, payments: activityPayments } = useActivityBookings(user?.id);
   const [params] = useSearchParams();
-  const [tab, setTab] = useState(params.get('tab') || initialTab);
+  const [tab, setTab] = useState(() => (isPasswordRecovery ? 'password' : (params.get('tab') || initialTab)));
 
   useEffect(() => {
+    if (isPasswordRecovery) {
+      if (tab !== 'password') {
+        setTab('password');
+      }
+      return;
+    }
     const t = params.get('tab') || initialTab;
     if (t) setTab(t);
-  }, [params, initialTab]);
+  }, [params, initialTab, isPasswordRecovery, tab]);
   const [payQuery, setPayQuery] = useState('');
   const [bookingFilter, setBookingFilter] = useState('all');
   const [dbStayBookings, setDbStayBookings] = useState([]);
@@ -269,6 +288,8 @@ export function ProfilePage({ initialTab = 'details' }) {
           bookingId: r.booking_ref || r.id,
           bookingRef: r.booking_ref || r.id,
           category: 'hotel',
+          user_id: r.user_id || user.id,
+          userId: r.user_id || user.id,
           roomName: r.room_types?.name || 'Hotel Room',
           title: r.room_types?.name || 'Hotel Room',
           areaName: 'Vijayawada Campus',
@@ -307,7 +328,13 @@ export function ProfilePage({ initialTab = 'details' }) {
     getMyTableBookings(user.id)
       .then((records) => {
         if (!mounted || !records) return;
-        setDbTableBookings(records);
+        setDbTableBookings(
+          (records || []).map((r) => ({
+            ...r,
+            user_id: r.user_id || user.id,
+            userId: r.user_id || user.id,
+          }))
+        );
       })
       .catch((err) => {
         console.warn('Unable to load table bookings:', err);
@@ -317,9 +344,26 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
-  // Merged unique bookings across AppContext (Stay, etc.), Activities store, Database Stay bookings, and Table bookings
+  // Merged unique bookings strictly isolated to the authenticated user
   const bookings = useMemo(() => {
-    const combined = [...(appBookings || []), ...(activityBookings || []), ...(dbStayBookings || []), ...(dbTableBookings || [])];
+    if (!user?.id) return [];
+    const uid = user.id;
+    const userCode = user.userId;
+
+    const matchesUser = (item) => {
+      if (!item) return false;
+      const bUid = item.user_id || item.userId;
+      if (bUid === uid) return true;
+      if (userCode && bUid === userCode) return true;
+      return false;
+    };
+
+    const userAppBookings = (appBookings || []).filter(matchesUser);
+    const userActivityBookings = (activityBookings || []).filter(matchesUser);
+    const userStayBookings = (dbStayBookings || []).filter(matchesUser);
+    const userTableBookings = (dbTableBookings || []).filter(matchesUser);
+
+    const combined = [...userAppBookings, ...userActivityBookings, ...userStayBookings, ...userTableBookings];
     const seen = new Set();
     const unique = combined.filter((b) => {
       const id = b.bookingRef || b.bookingId || b.id;
@@ -333,11 +377,32 @@ export function ProfilePage({ initialTab = 'details' }) {
       const timeB = new Date(b.createdAt || b.created_at || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [appBookings, activityBookings, dbStayBookings, dbTableBookings]);
+  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings]);
 
-  // Merged unique payments
+  // Merged unique payments strictly isolated to the authenticated user
   const payments = useMemo(() => {
-    const combined = [...(appPayments || []), ...(activityPayments || [])];
+    if (!user?.id) return [];
+    const uid = user.id;
+    const userCode = user.userId;
+
+    // Collect booking IDs that belong to the user
+    const userBookingIds = new Set(
+      bookings.map((b) => b.bookingRef || b.bookingId || b.id).filter(Boolean)
+    );
+
+    const matchesUserPayment = (p) => {
+      if (!p) return false;
+      const pUid = p.user_id || p.userId;
+      if (pUid === uid) return true;
+      if (userCode && pUid === userCode) return true;
+      if (p.bookingId && userBookingIds.has(p.bookingId)) return true;
+      return false;
+    };
+
+    const userAppPayments = (appPayments || []).filter(matchesUserPayment);
+    const userActivityPayments = (activityPayments || []).filter(matchesUserPayment);
+
+    const combined = [...userAppPayments, ...userActivityPayments];
     const seen = new Set();
     return combined.filter((p) => {
       const id = p.id || p.paymentId;
@@ -345,7 +410,7 @@ export function ProfilePage({ initialTab = 'details' }) {
       seen.add(id);
       return true;
     });
-  }, [appPayments, activityPayments]);
+  }, [user, bookings, appPayments, activityPayments]);
 
   const filteredBookings = useMemo(() => {
     if (bookingFilter === 'stay') {
@@ -375,12 +440,26 @@ export function ProfilePage({ initialTab = 'details' }) {
   }, [payments, payQuery]);
 
   const tabs = useMemo(() => {
-    return TABS.map((t) =>
-      t.id === 'bookings' ? { ...t, count: bookings.length } : t.id === 'payments' ? { ...t, count: payments.length } : t,
-    );
-  }, [bookings.length, payments.length]);
+    return TABS.map((t) => {
+      const isLocked = isPasswordRecovery && t.id !== 'password';
+      let count;
+      if (t.id === 'bookings') count = bookings.length;
+      if (t.id === 'payments') count = payments.length;
+      return {
+        ...t,
+        isLocked,
+        count: isLocked ? undefined : count,
+      };
+    });
+  }, [bookings.length, payments.length, isPasswordRecovery]);
 
   const headerInfo = useMemo(() => {
+    if (isPasswordRecovery) {
+      return {
+        title: 'Reset Password',
+        subtitle: 'You signed in via a password recovery link. Please choose a new password to unlock full access.',
+      };
+    }
     if (tab === 'bookings') {
       return {
         title: 'My bookings',
@@ -404,7 +483,7 @@ export function ProfilePage({ initialTab = 'details' }) {
           .filter(Boolean)
           .join(' · ') || 'Manage your personal details, password and notification preferences.',
     };
-  }, [tab, user, membership]);
+  }, [tab, user, membership, isPasswordRecovery]);
 
   if (loading) {
     return (
@@ -429,26 +508,51 @@ export function ProfilePage({ initialTab = 'details' }) {
         <h1 className="h-section">{headerInfo.title}</h1>
         <p className="mt-1 text-sm sm:text-base text-slate-600">{headerInfo.subtitle}</p>
 
+        {isPasswordRecovery && (
+          <div className="mt-4 mb-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm flex items-start gap-3">
+            <ShieldIcon className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h4 className="font-semibold text-sm">Password Reset Session</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                You are currently in password recovery mode. For security, other account sections (Personal Details, Bookings, Payments) are locked until you set a new password.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div role="tablist" aria-label="Profile sections" className="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           {tabs.map((t) => {
             const selected = tab === t.id;
+            const isLocked = Boolean(t.isLocked);
             return (
               <button
                 key={t.id}
                 id={`tab-${t.id}`}
                 role="tab"
                 type="button"
+                disabled={isLocked}
                 aria-selected={selected}
+                aria-disabled={isLocked}
                 aria-controls={`panel-${t.id}`}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  if (isLocked) {
+                    pushToast('Please set a new password first before accessing other sections.', 'error');
+                    return;
+                  }
+                  setTab(t.id);
+                }}
                 className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
                   selected
                     ? 'bg-navy-900 text-white shadow-card'
+                    : isLocked
+                    ? 'border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-60'
                     : 'border border-slate-200 bg-white text-slate-600 hover:border-navy-900/30 hover:text-navy-900'
                 }`}
+                title={isLocked ? 'Locked until password is changed' : undefined}
               >
                 <t.icon className="h-4 w-4" />
                 {t.label}
+                {isLocked && <span className="text-[11px] font-normal text-slate-400">🔒</span>}
                 {typeof t.count === 'number' && (
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${selected ? 'bg-gold-500 text-navy-950' : 'bg-slate-100 text-slate-500'}`}>
                     {t.count}
@@ -460,22 +564,28 @@ export function ProfilePage({ initialTab = 'details' }) {
         </div>
 
         <div className="pt-6">
-          {tab === 'details' && (
+          {tab === 'details' && !isPasswordRecovery && (
             <div id="panel-details" role="tabpanel" aria-labelledby="tab-details">
               <Reveal><PersonalDetails user={user} membership={membership} pushToast={pushToast} /></Reveal>
             </div>
           )}
           {tab === 'password' && (
             <div id="panel-password" role="tabpanel" aria-labelledby="tab-password">
-              <Reveal><ChangePassword pushToast={pushToast} /></Reveal>
+              <Reveal>
+                <ChangePassword
+                  pushToast={pushToast}
+                  isPasswordRecovery={isPasswordRecovery}
+                  onPasswordUpdated={clearPasswordRecovery}
+                />
+              </Reveal>
             </div>
           )}
-          {tab === 'notifications' && (
+          {tab === 'notifications' && !isPasswordRecovery && (
             <div id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications">
               <Reveal><NotificationPrefs pushToast={pushToast} /></Reveal>
             </div>
           )}
-          {tab === 'bookings' && (
+          {tab === 'bookings' && !isPasswordRecovery && (
             <div id="panel-bookings" role="tabpanel" aria-labelledby="tab-bookings">
               {/* Category Filter for bookings */}
               {bookings.length > 0 && (
@@ -640,7 +750,7 @@ export function ProfilePage({ initialTab = 'details' }) {
               )}
             </div>
           )}
-          {tab === 'payments' && (
+          {tab === 'payments' && !isPasswordRecovery && (
             <div id="panel-payments" role="tabpanel" aria-labelledby="tab-payments">
               {payments.length === 0 ? (
                 <EmptyState

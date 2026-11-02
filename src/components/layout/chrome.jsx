@@ -118,20 +118,194 @@ const MENU_LINKS = [
   { key: 'events', label: 'Events', to: ROUTES.events },
 ];
 
+const ACCOUNT_ROW_LINK =
+  'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900';
+
+// Details block shared by the dropdown and the mobile panel.
+function AccountDetails({ user, isMember }) {
+  const displayName = (user?.name || '').trim();
+  const contactEmail =
+    (user?.email || '').trim() ||
+    (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
+  const contactMobile =
+    (user?.mobile || user?.phone || '').trim() ||
+    (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
+
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5">
+      <span
+        aria-hidden
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-navy-50 font-display text-sm font-bold text-navy-800 ring-1 ring-gold-500/60"
+      >
+        {displayName ? initialsOf(displayName) : <UserIcon className="h-5 w-5" />}
+      </span>
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 font-semibold text-navy-900">
+          <span className="truncate">{displayName || 'My Account'}</span>
+          {isMember && <span className="tag tag-gold shrink-0 !px-2 !py-0.5 !text-[10px]">Member</span>}
+        </p>
+        {contactEmail && <p className="truncate text-xs text-slate-500">{contactEmail}</p>}
+        {contactMobile && <p className="truncate text-xs text-slate-500">{contactMobile}</p>}
+      </div>
+    </div>
+  );
+}
+
+// Signed-in menu: profile, bookings, the member dashboard and Logout.
+function AccountRows({ onNavigate, isMember, isAdminUser, onLogout, isPasswordRecovery = false }) {
+  return (
+    <>
+      <ul className="p-2 text-sm">
+        <li>
+          <Link
+            role="menuitem"
+            to={isPasswordRecovery ? '/profile?tab=password' : '/profile'}
+            onClick={onNavigate}
+            className={ACCOUNT_ROW_LINK}
+          >
+            <UserIcon className="h-4 w-4 text-gold-600" /> {isPasswordRecovery ? 'Change password' : 'My profile'}
+          </Link>
+        </li>
+        <li>
+          {isPasswordRecovery ? (
+            <span
+              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-slate-400 opacity-60 cursor-not-allowed select-none"
+              title="Locked until password is changed"
+            >
+              <CalendarIcon className="h-4 w-4 text-slate-400" /> My bookings <span className="ml-auto text-[11px]">🔒</span>
+            </span>
+          ) : (
+            <Link role="menuitem" to="/profile/bookings" onClick={onNavigate} className={ACCOUNT_ROW_LINK}>
+              <CalendarIcon className="h-4 w-4 text-gold-600" /> My bookings
+            </Link>
+          )}
+        </li>
+        {isMember ? (
+          <li>
+            {isPasswordRecovery ? (
+              <span
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-slate-400 opacity-60 cursor-not-allowed select-none"
+                title="Locked until password is changed"
+              >
+                <MembershipIcon className="h-4 w-4 text-slate-400" /> Membership dashboard <span className="ml-auto text-[11px]">🔒</span>
+              </span>
+            ) : (
+              <Link role="menuitem" to="/membership/dashboard" onClick={onNavigate} className={ACCOUNT_ROW_LINK}>
+                <MembershipIcon className="h-4 w-4 text-gold-600" /> Membership dashboard
+              </Link>
+            )}
+          </li>
+        ) : (
+          <li>
+            {isPasswordRecovery ? null : (
+              <Link role="menuitem" to="/membership" onClick={onNavigate} className={ACCOUNT_ROW_LINK}>
+                <MembershipIcon className="h-4 w-4 text-gold-600" /> Become a member
+              </Link>
+            )}
+          </li>
+        )}
+        <li>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              downloadOfficialApplicationForm(e);
+              onNavigate?.();
+            }}
+            className={ACCOUNT_ROW_LINK}
+            title="Download official FRCC Membership Application Form PDF"
+          >
+            <DownloadIcon className="h-4 w-4 text-gold-600" /> Application form
+          </button>
+        </li>
+        {isAdminUser && (
+          <li>
+            <Link role="menuitem" to="/admin/events" onClick={onNavigate} className={ACCOUNT_ROW_LINK}>
+              <span className="flex h-4 w-4 items-center justify-center rounded text-[11px] font-bold text-gold-600">★</span> Admin
+            </Link>
+          </li>
+        )}
+      </ul>
+      <div className="border-t border-slate-100 p-2">
+        <button
+          type="button"
+          role="menuitem"
+          onClick={onLogout}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-red-600 transition-colors duration-150 hover:bg-red-50"
+        >
+          <LogOutIcon className="h-4 w-4" /> Logout
+        </button>
+      </div>
+    </>
+  );
+}
+
+// One circular avatar + dropdown, right end of the bar (desktop and mobile).
+function AccountMenu({
+  menuId,
+  isOpen,
+  onToggle,
+  closeAll,
+  user,
+  isMember,
+  isAdminUser,
+  onLogout,
+  isPasswordRecovery = false,
+}) {
+  const displayName = (user?.name || '').trim();
+  const triggerId = menuId ? `${menuId}-trigger` : undefined;
+  const dropdownId = menuId ? `${menuId}-dropdown` : undefined;
+
+  return (
+    <div className="relative">
+      <button
+        id={triggerId}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(isOpen)}
+        aria-controls={isOpen ? dropdownId : undefined}
+        aria-label="Account menu"
+        onClick={onToggle}
+        className="grid h-9 w-9 place-items-center rounded-full bg-navy-50 font-display text-xs font-bold text-navy-800 ring-1 ring-gold-500/60 transition-colors duration-150 hover:ring-2 hover:ring-gold-500"
+      >
+        <span aria-hidden className="grid h-full w-full place-items-center">
+          {displayName ? initialsOf(displayName) : <UserIcon className="h-4 w-4" />}
+        </span>
+      </button>
+
+      {isOpen && (
+        <div id={dropdownId} className="absolute right-0 z-30 w-72 max-w-[calc(100vw-2rem)] pt-2">
+          <div className="card overflow-hidden !p-0" role="menu" aria-label="Account menu">
+            <AccountDetails user={user} isMember={isMember} />
+            <AccountRows
+              onNavigate={closeAll}
+              isMember={isMember}
+              isAdminUser={isAdminUser}
+              onLogout={onLogout}
+              isPasswordRecovery={isPasswordRecovery}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Navbar() {
-  const { user, logout, isMember } = useApp();
+  const { user, logout, isMember, isPasswordRecovery } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const headerRef = useRef(null);
   const [open, setOpen] = useState(false); // mobile panel
   const [menu, setMenu] = useState(null); // open mega-menu key (desktop)
   const [mMenu, setMMenu] = useState(null); // open accordion key (mobile)
-  const [avatar, setAvatar] = useState(false); // account menu
+  const [avatar, setAvatar] = useState(null); // 'desktop' | 'mobile' | null
   const [isAdminUser, setIsAdminUser] = useState(false);
 
   useEffect(() => {
     let active = true;
-    if (user) {
+    const userId = user?.id;
+    if (userId) {
       isAdmin()
         .then((res) => {
           if (active) setIsAdminUser(Boolean(res));
@@ -145,13 +319,13 @@ export function Navbar() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user?.id]);
 
   function closeAll() {
     setOpen(false);
     setMenu(null);
     setMMenu(null);
-    setAvatar(false);
+    setAvatar(null);
   }
 
   // Close everything on navigation.
@@ -159,7 +333,7 @@ export function Navbar() {
     setOpen(false);
     setMenu(null);
     setMMenu(null);
-    setAvatar(false);
+    setAvatar(null);
   }, [location.pathname]);
 
   // "Book now" scrolls to the booking card on the landing page and opens
@@ -179,7 +353,7 @@ export function Navbar() {
       setOpen(false);
       setMenu(null);
       setMMenu(null);
-      setAvatar(false);
+      setAvatar(null);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -189,9 +363,12 @@ export function Navbar() {
   useEffect(() => {
     if (!menu && !avatar) return undefined;
     function onDown(e) {
-      if (headerRef.current?.contains(e.target)) return;
+      const headerEl = headerRef.current;
+      if (!headerEl) return;
+      const path = typeof e.composedPath === 'function' ? e.composedPath() : [];
+      if (path.includes(headerEl) || headerEl.contains(e.target)) return;
       setMenu(null);
-      setAvatar(false);
+      setAvatar(null);
     }
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -231,15 +408,6 @@ export function Navbar() {
     closeAll();
   }
 
-  // Contact lines for the account block. The session holds one emailOrPhone
-  // value (plus optional email/mobile once later teams add them) — show each
-  // available line, never an empty one.
-  const displayName = (user?.name || '').trim();
-  const contactEmail = (user?.email || '').trim()
-    || (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
-  const contactMobile = (user?.mobile || user?.phone || '').trim()
-    || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone.trim() : '');
-
   // Active link gets a gold underline; hover is a colour change only (150ms).
   const underline = 'relative after:absolute after:inset-x-2.5 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-gold-500';
   const navLink = ({ isActive }) =>
@@ -248,121 +416,8 @@ export function Navbar() {
       isActive ? cx('text-navy-900', underline) : 'text-slate-600 hover:bg-slate-100 hover:text-navy-900',
     );
   const plainLink = 'relative rounded-lg px-3 py-2 text-slate-600 transition-colors duration-150 hover:bg-slate-100 hover:text-navy-900';
-  const rowLink = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900';
   const mobileRow = 'block rounded-xl px-3 py-2.5 font-medium text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900';
   const mobileRowActive = ({ isActive }) => cx(mobileRow, isActive && 'bg-navy-50 text-navy-900');
-
-  // Details block shared by the dropdown and the mobile panel.
-  function AccountDetails() {
-    return (
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5">
-        <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-navy-50 font-display text-sm font-bold text-navy-800 ring-1 ring-gold-500/60">
-          {displayName ? initialsOf(displayName) : <UserIcon className="h-5 w-5" />}
-        </span>
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 font-semibold text-navy-900">
-            <span className="truncate">{displayName || 'My Account'}</span>
-            {isMember && <span className="tag tag-gold shrink-0 !px-2 !py-0.5 !text-[10px]">Member</span>}
-          </p>
-          {contactEmail && <p className="truncate text-xs text-slate-500">{contactEmail}</p>}
-          {contactMobile && <p className="truncate text-xs text-slate-500">{contactMobile}</p>}
-        </div>
-      </div>
-    );
-  }
-
-  // Signed-in menu: profile, bookings, the member dashboard and Logout.
-  function AccountRows({ onNavigate }) {
-    return (
-      <>
-        <ul className="p-2 text-sm">
-          <li>
-            <Link role="menuitem" to="/profile" onClick={onNavigate} className={rowLink}>
-              <UserIcon className="h-4 w-4 text-gold-600" /> My profile
-            </Link>
-          </li>
-          <li>
-            <Link role="menuitem" to="/profile/bookings" onClick={onNavigate} className={rowLink}>
-              <CalendarIcon className="h-4 w-4 text-gold-600" /> My bookings
-            </Link>
-          </li>
-          {isMember ? (
-            <li>
-              <Link role="menuitem" to="/membership/dashboard" onClick={onNavigate} className={rowLink}>
-                <MembershipIcon className="h-4 w-4 text-gold-600" /> Membership dashboard
-              </Link>
-            </li>
-          ) : (
-            <li>
-              <Link role="menuitem" to="/membership" onClick={onNavigate} className={rowLink}>
-                <MembershipIcon className="h-4 w-4 text-gold-600" /> Become a member
-              </Link>
-            </li>
-          )}
-          <li>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={(e) => {
-                downloadOfficialApplicationForm(e);
-                onNavigate?.();
-              }}
-              className={rowLink}
-              title="Download official FRCC Membership Application Form PDF"
-            >
-              <DownloadIcon className="h-4 w-4 text-gold-600" /> Application form
-            </button>
-          </li>
-          {isAdminUser && (
-            <li>
-              <Link role="menuitem" to="/admin/events" onClick={onNavigate} className={rowLink}>
-                <span className="flex h-4 w-4 items-center justify-center rounded text-[11px] font-bold text-gold-600">★</span> Admin
-              </Link>
-            </li>
-          )}
-        </ul>
-        <div className="border-t border-slate-100 p-2">
-          <button
-            type="button"
-            role="menuitem"
-            onClick={doLogout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-medium text-red-600 transition-colors duration-150 hover:bg-red-50"
-          >
-            <LogOutIcon className="h-4 w-4" /> Logout
-          </button>
-        </div>
-      </>
-    );
-  }
-
-  // One circular avatar + dropdown, right end of the bar (desktop and mobile).
-  function AccountMenu() {
-    return (
-      <div className="relative">
-        <button
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={avatar}
-          aria-label="Account menu"
-          onClick={() => { setAvatar((a) => !a); setMenu(null); }}
-          className="grid h-9 w-9 place-items-center rounded-full bg-navy-50 font-display text-xs font-bold text-navy-800 ring-1 ring-gold-500/60 transition-colors duration-150 hover:ring-2 hover:ring-gold-500"
-        >
-          <span aria-hidden className="grid h-full w-full place-items-center">
-            {displayName ? initialsOf(displayName) : <UserIcon className="h-4 w-4" />}
-          </span>
-        </button>
-
-        {avatar && (
-          <div className="absolute right-0 z-30 w-72 max-w-[calc(100vw-2rem)] pt-2">
-            <div className="card overflow-hidden !p-0" role="menu" aria-label="Account menu">
-              <AccountDetails />
-              <AccountRows onNavigate={closeAll} />
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   // Hover menus close when the pointer leaves the header — the panel is a
   // descendant of it, so moving from a trigger down into the cards keeps the
@@ -429,12 +484,42 @@ export function Navbar() {
               ) : (
                 <GoldCta to={ROUTES.membership} onClick={closeAll}>Become a member</GoldCta>
               )}
-              {user && <AccountMenu />}
+              {user && (
+                <AccountMenu
+                  menuId="desktop-account-menu"
+                  isOpen={avatar === 'desktop'}
+                  onToggle={() => {
+                    setAvatar((a) => (a === 'desktop' ? null : 'desktop'));
+                    setMenu(null);
+                  }}
+                  closeAll={closeAll}
+                  user={user}
+                  isMember={isMember}
+                  isAdminUser={isAdminUser}
+                  onLogout={doLogout}
+                  isPasswordRecovery={isPasswordRecovery}
+                />
+              )}
             </div>
 
             {/* Mobile · avatar (signed in) + hamburger */}
             <div className="flex items-center gap-2 min-[1200px]:hidden">
-              {user && <AccountMenu />}
+              {user && (
+                <AccountMenu
+                  menuId="mobile-account-menu"
+                  isOpen={avatar === 'mobile'}
+                  onToggle={() => {
+                    setAvatar((a) => (a === 'mobile' ? null : 'mobile'));
+                    setMenu(null);
+                  }}
+                  closeAll={closeAll}
+                  user={user}
+                  isMember={isMember}
+                  isAdminUser={isAdminUser}
+                  onLogout={doLogout}
+                  isPasswordRecovery={isPasswordRecovery}
+                />
+              )}
               <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}

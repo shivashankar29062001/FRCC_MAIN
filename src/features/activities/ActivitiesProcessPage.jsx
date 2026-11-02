@@ -141,7 +141,14 @@ export function ActivitiesProcessPage() {
   const [confirmed, setConfirmed] = useState(() => {
     try {
       const raw = window.sessionStorage.getItem('frcc_activities_confirmed');
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed) {
+        if (user?.id && (parsed.userId === user.id || parsed.user_id === user.id || parsed.userId === user.userId)) {
+          return parsed;
+        }
+        window.sessionStorage.removeItem('frcc_activities_confirmed');
+      }
+      return null;
     } catch {
       return null;
     }
@@ -168,7 +175,7 @@ export function ActivitiesProcessPage() {
   });
 
   const [step, setStep] = useState(() => {
-    if (confirmed) return 5;
+    if (confirmed && user?.id && (confirmed.userId === user.id || confirmed.user_id === user.id || confirmed.userId === user.userId)) return 5;
     if (paramValid) return 1;
     let saved = null;
     try {
@@ -183,6 +190,20 @@ export function ActivitiesProcessPage() {
 
   const [errors, setErrors] = useState({});
   const [paying, setPaying] = useState(false);
+
+  // Purge past confirmation receipt if user changes or logs out
+  useEffect(() => {
+    if (confirmed) {
+      const matches = user?.id && (confirmed.userId === user.id || confirmed.user_id === user.id || confirmed.userId === user.userId);
+      if (!matches) {
+        setConfirmed(null);
+        setStep(paramValid ? 1 : 0);
+        try {
+          window.sessionStorage.removeItem('frcc_activities_confirmed');
+        } catch (_) {}
+      }
+    }
+  }, [user?.id, user?.userId, confirmed, paramValid]);
 
   // Sync draft and step to sessionStorage for refresh safety
   useEffect(() => {
@@ -363,7 +384,8 @@ export function ActivitiesProcessPage() {
 
       const record = {
         bookingId,
-        userId: user?.userId || 'guest',
+        userId: user?.id || user?.userId || null,
+        user_id: user?.id || null,
         game: draft.gameId,
         gameName: game?.name || draft.gameId,
         date: draft.date,
@@ -382,6 +404,8 @@ export function ActivitiesProcessPage() {
       const { booking } = saveActivityBooking({
         booking: record,
         payment: {
+          userId: user?.id || user?.userId || null,
+          user_id: user?.id || null,
           method: draft.paymentMethod,
           amount: pricing.total,
           status: atVenue ? 'Pending' : 'Success',

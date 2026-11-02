@@ -107,7 +107,14 @@ export function HotelPage() {
   const [confirmedBooking, setConfirmedBooking] = useState(() => {
     try {
       const raw = window.sessionStorage.getItem('frcc_stay_confirmed');
-      return raw ? JSON.parse(raw) : null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed) {
+        if (user?.id && (parsed.userId === user.id || parsed.user_id === user.id || parsed.userId === user.userId)) {
+          return parsed;
+        }
+        window.sessionStorage.removeItem('frcc_stay_confirmed');
+      }
+      return null;
     } catch {
       return null;
     }
@@ -125,7 +132,11 @@ export function HotelPage() {
 
     let hasConfirmed = false;
     try {
-      hasConfirmed = Boolean(window.sessionStorage.getItem('frcc_stay_confirmed'));
+      const raw = window.sessionStorage.getItem('frcc_stay_confirmed');
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && user?.id && (parsed.userId === user.id || parsed.user_id === user.id || parsed.userId === user.userId)) {
+        hasConfirmed = true;
+      }
     } catch {
       /* ignore */
     }
@@ -155,6 +166,20 @@ export function HotelPage() {
   });
 
   const [paying, setPaying] = useState(false);
+
+  // Discard past confirmation if user changes or logs out
+  useEffect(() => {
+    if (confirmedBooking) {
+      const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
+      if (!matches) {
+        setConfirmedBooking(null);
+        setDraft((d) => ({ ...d, step: 0 }));
+        try {
+          window.sessionStorage.removeItem('frcc_stay_confirmed');
+        } catch (_) {}
+      }
+    }
+  }, [user?.id, user?.userId, confirmedBooking]);
 
   // Sync draft to sessionStorage
   useEffect(() => {
@@ -517,6 +542,8 @@ export function HotelPage() {
         id: bookingId,
         bookingId,
         bookingRef,
+        userId: user?.id || user?.userId || null,
+        user_id: user?.id || null,
         category: 'hotel',
         title: selectedRoom.name,
         roomName: selectedRoom.name,

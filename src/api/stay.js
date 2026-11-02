@@ -122,6 +122,13 @@ export async function getAvailability(checkIn, checkOut) {
 export async function createBooking(payload) {
   const clientRequestId = payload.clientRequestId || payload.client_request_id || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+  let sessionUserId = null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    sessionUserId = sessionData?.session?.user?.id || null;
+  } catch (_) {}
+  const currentUserId = payload.userId || payload.user_id || sessionUserId;
+
   if (isMock) {
     const year = new Date().getFullYear();
     const random6 = String(Math.floor(100000 + Math.random() * 900000));
@@ -140,7 +147,8 @@ export async function createBooking(payload) {
       id: `mock-stay-${Date.now()}`,
       client_request_id: clientRequestId,
       booking_ref: bookingRef,
-      user_id: payload.userId || payload.user_id || null,
+      user_id: currentUserId,
+      userId: currentUserId,
       room_type_id: roomType.id,
       check_in: payload.checkIn || payload.check_in,
       check_out: payload.checkOut || payload.check_out,
@@ -199,14 +207,19 @@ export async function createBooking(payload) {
  * Fetch stay bookings for the current or specified user.
  */
 export async function getMyStayBookings(userId = null) {
-  if (isMock) {
-    return [...mockStayBookings].reverse();
+  let currentUserId = userId;
+  if (!currentUserId) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      currentUserId = sessionData?.session?.user?.id || null;
+    } catch (_) {}
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const currentUserId = userId || sessionData?.session?.user?.id;
-
   if (!currentUserId) return [];
+
+  if (isMock) {
+    return mockStayBookings.filter((b) => b.user_id === currentUserId).reverse();
+  }
 
   const { data, error } = await supabase
     .from('stay_bookings')
@@ -219,7 +232,11 @@ export async function getMyStayBookings(userId = null) {
     return [];
   }
 
-  return data || [];
+  return (data || []).map((b) => ({
+    ...b,
+    user_id: b.user_id || currentUserId,
+    userId: b.user_id || currentUserId,
+  }));
 }
 
 export default {

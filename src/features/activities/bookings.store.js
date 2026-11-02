@@ -5,9 +5,24 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createBooking as createBookingInSupabase, getUserBookings, getUserPayments } from '../../services/bookingsService.js';
+import { readSession } from '../../app/session.js';
 
-export const BOOKINGS_STORAGE_KEY = 'frcc.activities.bookings.v1';
+export const BASE_BOOKINGS_STORAGE_KEY = 'frcc.activities.bookings.v1';
+export const BOOKINGS_STORAGE_KEY = BASE_BOOKINGS_STORAGE_KEY;
 const CHANGED_EVENT = 'frcc:activity-bookings-changed';
+
+// Clean legacy non-user-specific storage key on load once
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem(BASE_BOOKINGS_STORAGE_KEY);
+  }
+} catch {
+  /* ignore */
+}
+
+export function getBookingsStorageKey(userId) {
+  return userId ? `${BASE_BOOKINGS_STORAGE_KEY}.${userId}` : `${BASE_BOOKINGS_STORAGE_KEY}.anon`;
+}
 
 function safeParse(raw) {
   try {
@@ -19,18 +34,20 @@ function safeParse(raw) {
   }
 }
 
-export function readStore() {
+export function readStore(userId = null) {
   if (typeof window === 'undefined') return { bookings: [], payments: [] };
   try {
-    return safeParse(window.localStorage.getItem(BOOKINGS_STORAGE_KEY)) || { bookings: [], payments: [] };
+    const key = getBookingsStorageKey(userId);
+    return safeParse(window.localStorage.getItem(key)) || { bookings: [], payments: [] };
   } catch {
     return { bookings: [], payments: [] };
   }
 }
 
-function writeStore(next) {
+function writeStore(next, userId = null) {
   try {
-    window.localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(next));
+    const key = getBookingsStorageKey(userId);
+    window.localStorage.setItem(key, JSON.stringify(next));
   } catch {
     /* storage disabled — in-memory readers still work per load */
   }
@@ -44,21 +61,34 @@ let paySeq = 5000;
  * @returns {{ booking, payment }}
  */
 export function saveActivityBooking({ booking, payment }) {
-  const store = readStore();
+  const currentUserId = booking?.userId || booking?.user_id || null;
+  const store = readStore(currentUserId);
   const record = {
     ...booking,
+    userId: currentUserId,
+    user_id: currentUserId,
     category: booking.category || 'activity',
     createdAt: booking.createdAt || new Date().toISOString(),
   };
   paySeq += 1;
   const payRecord = payment
-    ? { id: `PAY-${paySeq}`, bookingId: record.bookingId, ...payment, date: new Date().toISOString() }
+    ? {
+        id: `PAY-${paySeq}`,
+        bookingId: record.bookingId,
+        userId: currentUserId,
+        user_id: currentUserId,
+        ...payment,
+        date: new Date().toISOString(),
+      }
     : null;
 
-  writeStore({
-    bookings: [record, ...store.bookings.filter((b) => b.bookingId !== record.bookingId)],
-    payments: payRecord ? [payRecord, ...store.payments.filter((p) => p.id !== payRecord.id)] : store.payments,
-  });
+  writeStore(
+    {
+      bookings: [record, ...store.bookings.filter((b) => b.bookingId !== record.bookingId)],
+      payments: payRecord ? [payRecord, ...store.payments.filter((p) => p.id !== payRecord.id)] : store.payments,
+    },
+    currentUserId
+  );
 
   // Sync to Supabase in the background
   createBookingInSupabase(record, payRecord)
@@ -74,18 +104,26 @@ export function saveActivityBooking({ booking, payment }) {
 }
 
 /** Reactive reader — Profile and any other page stay in sync. */
-export function useActivityBookings() {
-  const [store, setStore] = useState(readStore);
+export function useActivityBookings(currentUserOrId = null) {
+  const activeUserId = typeof currentUserOrId === 'object' && currentUserOrId !== null
+    ? (currentUserOrId.id || currentUserOrId.userId || null)
+    : (currentUserOrId || (typeof window !== 'undefined' ? (readSession()?.id || null) : null));
+
+  const [store, setStore] = useState(() => (activeUserId ? readStore(activeUserId) : { bookings: [], payments: [] }));
 
   const fetchRemote = useCallback(async () => {
+    if (!activeUserId) {
+      setStore({ bookings: [], payments: [] });
+      return;
+    }
     try {
       const [remoteBookings, remotePayments] = await Promise.all([
-        getUserBookings(),
-        getUserPayments(),
+        getUserBookings(activeUserId),
+        getUserPayments(activeUserId),
       ]);
 
       if (remoteBookings.length > 0 || remotePayments.length > 0) {
-        const local = readStore();
+        const local = readStore(activeUserId);
         // Merge without duplicating
         const bookingMap = new Map();
         [...local.bookings, ...remoteBookings].forEach((b) => {
@@ -105,7 +143,7 @@ export function useActivityBookings() {
         };
 
         try {
-          window.localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(merged));
+          window.localStorage.setItem(getBookingsStorageKey(activeUserId), JSON.stringify(merged));
         } catch {
           /* ignore */
         }
@@ -114,10 +152,16 @@ export function useActivityBookings() {
     } catch (err) {
       console.warn('Could not sync remote bookings:', err);
     }
-  }, []);
+  }, [activeUserId]);
 
   useEffect(() => {
-    const reload = () => setStore(readStore());
+    if (!activeUserId) {
+      setStore({ bookings: [], payments: [] });
+      return undefined;
+    }
+
+    setStore(readStore(activeUserId));
+    const reload = () => setStore(readStore(activeUserId));
     window.addEventListener(CHANGED_EVENT, reload);
     window.addEventListener('storage', reload);
     fetchRemote();
@@ -126,12 +170,20 @@ export function useActivityBookings() {
       window.removeEventListener(CHANGED_EVENT, reload);
       window.removeEventListener('storage', reload);
     };
-  }, [fetchRemote]);
+  }, [activeUserId, fetchRemote]);
 
   const refresh = useCallback(() => {
-    setStore(readStore());
+    if (!activeUserId) {
+      setStore({ bookings: [], payments: [] });
+      return;
+    }
+    setStore(readStore(activeUserId));
     fetchRemote();
-  }, [fetchRemote]);
+  }, [activeUserId, fetchRemote]);
 
-  return { bookings: store.bookings, payments: store.payments, refresh };
+  return {
+    bookings: activeUserId ? store.bookings : [],
+    payments: activeUserId ? store.payments : [],
+    refresh,
+  };
 }

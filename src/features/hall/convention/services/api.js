@@ -48,11 +48,13 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     const b = body || {};
     const bookingId = `FRCC-H-${Date.now().toString(36).toUpperCase()}`;
 
-    let userId = null;
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      userId = sessionData?.session?.user?.id || null;
-    } catch (_) {}
+    let userId = b.userId || b.user_id || null;
+    if (!userId) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        userId = sessionData?.session?.user?.id || null;
+      } catch (_) {}
+    }
 
     const hallCharge = Number(b.hallCharge) || 0;
     const gst = Math.round(hallCharge * 0.18);

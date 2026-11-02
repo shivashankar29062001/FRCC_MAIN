@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useRef } from 'react';
+import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
 import BookingConfirmation from './components/BookingConfirmation.jsx';
@@ -36,24 +37,35 @@ const generateInitialSlots = () => {
 
 const INITIAL_SLOTS = generateInitialSlots();
 
-const CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
+const BASE_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc_parking_confirmed_bookings_v1';
+const LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
 
-const retainConfirmedBooking = (booking) => {
+// Remove legacy un-namespaced keys on startup
+try {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.removeItem(LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY);
+    window.sessionStorage.removeItem(BASE_CONFIRMED_BOOKINGS_STORAGE_KEY);
+  }
+} catch (_) {}
+
+const getConfirmedBookingsKey = (userId = null) =>
+  userId ? `${BASE_CONFIRMED_BOOKINGS_STORAGE_KEY}.${userId}` : BASE_CONFIRMED_BOOKINGS_STORAGE_KEY;
+
+const retainConfirmedBooking = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
-    window.sessionStorage.setItem(
-      CONFIRMED_BOOKINGS_STORAGE_KEY,
-      JSON.stringify([...existing, booking])
-    );
+    window.sessionStorage.setItem(key, JSON.stringify([...existing, booking]));
   } catch (_) {
     // Storage unavailable
   }
 };
 
-const updateRetainedBookingStatus = (booking) => {
+const updateRetainedBookingStatus = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
     const reference = booking.bookingReference || booking.bookingId;
     const updated = existing.map((b) => {
@@ -68,7 +80,7 @@ const updateRetainedBookingStatus = (booking) => {
       }
       return b;
     });
-    window.sessionStorage.setItem(CONFIRMED_BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
+    window.sessionStorage.setItem(key, JSON.stringify(updated));
   } catch (_) {
     // Storage unavailable
   }
@@ -82,6 +94,7 @@ const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
 export default function ParkingBookingPage() {
+  const { user } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [slots, setSlots] = useState(INITIAL_SLOTS);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -107,6 +120,17 @@ export default function ParkingBookingPage() {
   const pendingBookingRef = useRef(null);
 
   const apiConfigured = isBookingApiConfigured();
+
+  // Reset confirmation receipt if active user changes or logs out
+  useEffect(() => {
+    if (confirmedBooking) {
+      const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
+      if (!matches) {
+        setConfirmedBooking(null);
+        setStep(STEP_CITY);
+      }
+    }
+  }, [user?.id, user?.userId, confirmedBooking]);
 
   // Auto-advance step based on form completion
   useEffect(() => {
@@ -226,7 +250,7 @@ export default function ParkingBookingPage() {
       prevSlots.map((s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s))
     );
 
-    retainConfirmedBooking(booking);
+    retainConfirmedBooking(booking, user?.id);
     setConfirmedBooking(booking);
     setIsSubmitting(false);
     submittingRef.current = false;
@@ -246,6 +270,8 @@ export default function ParkingBookingPage() {
 
     const booking = createBooking({
       bookingReference: generateBookingReference(),
+      userId: user?.id || user?.userId || null,
+      user_id: user?.id || null,
       parkingSlot: selectedSlot,
       vehicleType: formData.vehicleType,
       vehicleNumber: formData.vehicleNumber.trim(),
@@ -338,7 +364,7 @@ export default function ParkingBookingPage() {
       cancelledAt: new Date().toISOString()
     };
     setConfirmedBooking(cancelledBooking);
-    updateRetainedBookingStatus(cancelledBooking);
+    updateRetainedBookingStatus(cancelledBooking, user?.id);
 
     if (isBookingCancelApiConfigured()) {
       setCancelSyncState({ status: 'syncing', error: '' });

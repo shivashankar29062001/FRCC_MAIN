@@ -139,12 +139,29 @@ export async function updatePassword(newPassword) {
 }
 
 /**
+ * Resolve the redirect URL for password reset.
+ * Supports VITE_SITE_URL (for custom/public domains) and respects the app's base path.
+ */
+export function getPasswordResetRedirectUrl() {
+  const envUrl = (import.meta.env.VITE_SITE_URL || import.meta.env.VITE_PUBLIC_URL || '').trim();
+  if (envUrl) {
+    const cleanEnv = envUrl.replace(/\/+$/, '');
+    return `${cleanEnv}/profile?tab=password`;
+  }
+  const origin = window.location.origin.replace(/\/+$/, '');
+  const base = (import.meta.env.BASE_URL || '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  const prefix = base ? `${origin}/${base}` : origin;
+  return `${prefix}/profile?tab=password`;
+}
+
+/**
  * Send password reset email.
  */
 export async function resetPassword(emailOrPhone) {
   const email = normalizeEmail(emailOrPhone);
+  const redirectTo = getPasswordResetRedirectUrl();
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/profile?tab=password`,
+    redirectTo,
   });
   if (error) throw error;
   return data;

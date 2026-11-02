@@ -290,7 +290,14 @@ export function SigninPage() {
     try {
       const { resetPassword } = await import('../services/authService.js');
       await resetPassword(form.emailOrPhone);
-      pushToast('Password reset instructions sent to your email.');
+      const isLocalhost =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalhost && !import.meta.env.VITE_SITE_URL) {
+        pushToast('Reset link sent! Please open the email on THIS computer (localhost cannot be opened from a mobile phone).');
+      } else {
+        pushToast('Password reset instructions sent to your email.');
+      }
     } catch (err) {
       pushToast(err?.message || 'Failed to send reset link.', 'error');
     }

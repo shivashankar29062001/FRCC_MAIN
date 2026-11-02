@@ -9,6 +9,15 @@ export const SESSION_STORAGE_KEY = 'frcc.session.v1';
 export const MEMBER_STORAGE_KEY = 'frcc.isMember.v1';
 export const LOGGED_OUT_MARKER_KEY = 'frcc.loggedOut.v1';
 
+// Remove legacy non-user-specific member flag on load
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem(MEMBER_STORAGE_KEY);
+  }
+} catch {
+  /* ignore */
+}
+
 const emptySession = Object.freeze({ userId: null, name: '', emailOrPhone: '', isMember: false, loggedIn: false });
 
 export const DEMO_USER = Object.freeze({
@@ -58,30 +67,18 @@ function safeParse(raw) {
   }
 }
 
-function readDemoFlag() {
-  try {
-    const saved = window.localStorage.getItem(MEMBER_STORAGE_KEY);
-    if (saved !== null) return saved === '1';
-    return true; // Default demo user has active membership
-  } catch {
-    return true;
-  }
-}
-
 /** Read the current session (works even outside React). */
 export function readSession() {
   if (typeof window === 'undefined') return { ...emptySession };
   const parsed = safeParse(window.sessionStorage.getItem(SESSION_STORAGE_KEY)) ||
     safeParse(window.localStorage.getItem(SESSION_STORAGE_KEY));
-  if (parsed && parsed.userId) {
-    const isMemberVal = parsed.isMember !== undefined ? Boolean(parsed.isMember) : readDemoFlag();
-    return { ...emptySession, ...parsed, isMember: isMemberVal, loggedIn: true };
+  if (parsed && (parsed.userId || parsed.id)) {
+    return { ...emptySession, ...parsed, isMember: Boolean(parsed.isMember), loggedIn: true };
   }
   // Demo auto-login only if VITE_DEMO_MODE=true AND no explicit logout marker exists.
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEMO_MODE === 'true') {
     if (!hasLoggedOutMarker()) {
-      const isMemberVal = readDemoFlag();
-      return { ...DEMO_USER, isMember: isMemberVal };
+      return { ...DEMO_USER };
     }
   }
   return { ...emptySession };
@@ -120,4 +117,3 @@ export function createSessionUser({ name, emailOrPhone, isMember = false }) {
     loggedIn: true,
   };
 }
-
