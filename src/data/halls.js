@@ -22,9 +22,9 @@ export const halls = [
     includesFood: true, // Client: includesFood true (wording "with food")
     priceNote: 'with food',
     capacityMin: 30,
-    capacityMax: 100000,
-    capacity: 100000, // Maximum capacity
-    capacityBreakdown: { theater: 50000, banquet: 35000, classroom: 15000, reception: 100000 }, // SAMPLE
+    capacityMax: 10000,
+    capacity: 10000, // Maximum capacity
+    capacityBreakdown: { theater: 5000, banquet: 3500, classroom: 1500, reception: 10000 }, // SAMPLE
     prices: { hour: 1500, halfDay: 1500, fullDay: 1500, perPerson: 1500 }, // Backwards compatibility
     pricePerDay: { morning: 1500, afternoon: 1500, evening: 1500, fullDay: 1500 },
     timeSlots: ['08:00 - 13:00 (Morning)', '13:00 - 18:00 (Afternoon)', '18:00 - 23:00 (Evening)', '08:00 - 23:00 (Full Day)'],
@@ -48,9 +48,9 @@ export const halls = [
     price: 1600,
     includesFood: false,
     capacityMin: 5, // SAMPLE
-    capacityMax: 50, // SAMPLE
-    capacity: 50, // SAMPLE
-    capacityBreakdown: { theater: 50, banquet: 40, classroom: 30, reception: 50 }, // SAMPLE
+    capacityMax: 200, // SAMPLE
+    capacity: 200, // SAMPLE
+    capacityBreakdown: { theater: 200, banquet: 160, classroom: 120, reception: 200 }, // SAMPLE
     prices: { hour: 1600, halfDay: 8000, fullDay: 16000 },
     pricePerDay: { morning: 8000, afternoon: 8000, evening: 8000, fullDay: 16000 },
     timeSlots: ['08:00 - 13:00 (Morning)', '13:00 - 18:00 (Afternoon)', '18:00 - 23:00 (Evening)', '08:00 - 23:00 (Full Day)'],

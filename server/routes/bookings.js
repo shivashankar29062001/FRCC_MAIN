@@ -1,6 +1,7 @@
 const express = require('express');
 const { readDb, writeDb, uid } = require('../db');
 const auth = require('../middleware/auth');
+const { isValidIndianMobile, INDIAN_MOBILE_MESSAGE } = require('../utils/mobile');
 
 const router = express.Router();
 const toMins = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
@@ -30,6 +31,7 @@ router.post('/', auth, (req, res) => {
   if (!Number.isFinite(guestCount) || guestCount < 30) return res.status(400).json({ error: 'Guest count must be at least 30.' });
   if (guestCount > 100000) return res.status(400).json({ error: 'Guest count cannot exceed 1,00,000.' });
   if (guestCount > hall.capacity) return res.status(400).json({ error: `This hall holds up to ${hall.capacity} guests. Choose a larger hall or reduce guests.` });
+  if (!isValidIndianMobile(phone)) return res.status(400).json({ error: INDIAN_MOBILE_MESSAGE });
 
   // Re-check availability on the server to prevent double booking
   const blocking = ['CONFIRMED', 'PENDING_VERIFICATION'];

@@ -4,6 +4,12 @@ import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr } from '../utils/format';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../../../utils/mobile.js';
 
 const EVENT_TYPES = ['Wedding', 'Conference', 'Birthday', 'Corporate', 'Engagement', 'Workshop', 'Social Gathering', 'Other'];
 
@@ -31,7 +37,7 @@ export default function ConventionDetails() {
     if (Number(booking.guests) > 100000) return setError('Guest count cannot exceed 1,00,000.');
     if (hall && Number(booking.guests) > hall.capacity) return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
-    if (!/^[6-9]\d{9}$/.test(booking.phone)) return setError('Enter a valid 10-digit phone number.');
+    if (!isValidIndianMobile(booking.phone)) return setError(INDIAN_MOBILE_MESSAGE);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(booking.email)) return setError('Enter a valid email address.');
     setError(''); navigate('/convention/payment');
   };
@@ -55,7 +61,20 @@ export default function ConventionDetails() {
             <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: e.target.value })} /></label>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">Phone
-              <input className={inputClass} value={booking.phone} onChange={e => updateBooking({ phone: e.target.value })} placeholder="98XXXXXXXX" /></label>
+              <input
+                className={inputClass}
+                type="tel"
+                inputMode="numeric"
+                pattern="[6-9][0-9]{9}"
+                maxLength={10}
+                value={booking.phone}
+                onChange={e => updateBooking({ phone: sanitizeMobileInput(e.target.value) })}
+                onBlur={() => {
+                  if (booking.phone && !isValidIndianMobile(booking.phone)) setError(INDIAN_MOBILE_MESSAGE);
+                  else setError('');
+                }}
+                placeholder={INDIAN_MOBILE_PLACEHOLDER}
+              /></label>
             <label className="block">Email
               <input className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
           </div>

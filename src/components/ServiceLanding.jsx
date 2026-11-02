@@ -119,9 +119,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       return filtered.map((h) => {
         const typeLabel =
           h.type === 'ac' ? 'Central AC' : h.type === 'boardroom' ? 'Executive Boardroom' : 'Non AC / Natural Air';
-        const capacityLabel = h.pricingUnit === 'per-person'
-          ? `Capacity: ${h.capacityMin} – ${h.capacityMax?.toLocaleString('en-IN')} guests`
-          : `Seats ${h.capacity} guests`;
+        const capacityLabel = `Capacity: ${h.capacity?.toLocaleString('en-IN')} guests`;
         return {
           id: h.id,
           name: h.name,

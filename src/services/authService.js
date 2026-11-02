@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { isValidIndianMobile, isPhoneLike, INDIAN_MOBILE_MESSAGE } from '../utils/mobile.js';
 
 /**
  * Format user login identifier. If user entered a plain phone or handle without @,
@@ -18,6 +19,9 @@ function normalizeEmail(emailOrPhone) {
 export async function signUp({ name, emailOrPhone, password }) {
   const email = normalizeEmail(emailOrPhone);
   const cleanPhone = emailOrPhone.includes('@') ? '' : emailOrPhone.trim();
+  if (cleanPhone && isPhoneLike(cleanPhone) && !isValidIndianMobile(cleanPhone)) {
+    throw new Error(INDIAN_MOBILE_MESSAGE);
+  }
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -113,6 +117,9 @@ export async function getUserProfile(userId) {
  */
 export async function updateProfile(userId, updates) {
   if (!userId) throw new Error('Missing user id');
+  if (updates?.phone && isPhoneLike(updates.phone) && !isValidIndianMobile(updates.phone)) {
+    throw new Error(INDIAN_MOBILE_MESSAGE);
+  }
   const { data, error } = await supabase
     .from('profiles')
     .update({

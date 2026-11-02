@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { isValidIndianMobile } from '../utils/mobile.js';
 
 let paySeqCounter = 5000;
 
@@ -17,6 +18,9 @@ export function generateBookingId(prefix = 'ACT') {
  * Persist any booking (Activities, Stay, Hall, Parking) to Supabase.
  */
 export async function createBooking(bookingRecord, paymentRecord = null) {
+  if (bookingRecord?.mobile && !isValidIndianMobile(bookingRecord.mobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const { data: sessionData } = await supabase.auth.getSession();
   const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || null;
 

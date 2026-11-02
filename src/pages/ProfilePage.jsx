@@ -29,6 +29,10 @@ import {
   ArrowRightIcon,
 } from '../components/ui/icons.jsx';
 import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  isValidEmailOrIndianMobile,
+} from '../utils/mobile.js';
 
 // ---------------------------------------------------------------------------
 // /profile — EVERY logged-in user. Reached only from the navbar avatar menu.
@@ -57,8 +61,8 @@ function PersonalDetails({ user, membership, pushToast }) {
       setErr('Please enter your full name.');
       return;
     }
-    if (contact.trim().length < 5) {
-      setErr('Please enter a valid email or mobile number.');
+    if (!isValidEmailOrIndianMobile(contact, { required: true })) {
+      setErr(contact.includes('@') ? 'Please enter a valid email or mobile number.' : INDIAN_MOBILE_MESSAGE);
       return;
     }
     setSaving(true);

@@ -16,6 +16,12 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatDMY, parseDMY } from '../../utils/dates.js';
 import { todayISO } from '../../utils/helpers.js';
 import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../utils/mobile.js';
+import {
   PrinterIcon,
   CheckCircleIcon,
   ChevronLeftIcon,
@@ -72,7 +78,7 @@ export function TableBookingPage() {
       if (!guestName && user.name) setGuestName(user.name);
       if (!guestEmail && user.email) setGuestEmail(user.email);
       const userPhone = user.mobile || user.phone || (!user.emailOrPhone?.includes('@') ? user.emailOrPhone : '');
-      if (!guestMobile && userPhone) setGuestMobile(userPhone);
+      if (!guestMobile && userPhone) setGuestMobile(sanitizeMobileInput(userPhone));
     }
   }, [user]);
 
@@ -133,8 +139,7 @@ export function TableBookingPage() {
   function validateDetails() {
     const errs = {};
     if (!guestName.trim()) errs.name = 'Full name is required.';
-    const cleanPhone = guestMobile.replace(/\D/g, '');
-    if (cleanPhone.length < 10) errs.mobile = 'Enter a valid 10-digit mobile number.';
+    if (!isValidIndianMobile(guestMobile)) errs.mobile = INDIAN_MOBILE_MESSAGE;
     if (!guestEmail.trim() || !guestEmail.includes('@')) errs.email = 'Valid email is required.';
     if (venue.minAge > 0 && !ageConfirmed) {
       errs.age = 'You must confirm that you are 21 or older.';
@@ -405,10 +410,19 @@ export function TableBookingPage() {
                 <label htmlFor="details-mobile" className="label">Mobile Number (+91) *</label>
                 <input
                   id="details-mobile"
+                  name="mobile"
                   type="tel"
-                  placeholder="10-digit number"
+                  inputMode="numeric"
+                  pattern="[6-9][0-9]{9}"
+                  autoComplete="tel"
+                  maxLength={10}
+                  placeholder={INDIAN_MOBILE_PLACEHOLDER}
                   value={guestMobile}
-                  onChange={(e) => setGuestMobile(e.target.value)}
+                  onChange={(e) => {
+                    setGuestMobile(sanitizeMobileInput(e.target.value));
+                    if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: undefined }));
+                  }}
+                  aria-invalid={Boolean(errors.mobile)}
                   className={`field h-11 w-full text-sm ${errors.mobile ? 'border-rose-400' : ''}`}
                 />
                 {errors.mobile && <p className="field-error mt-1">{errors.mobile}</p>}

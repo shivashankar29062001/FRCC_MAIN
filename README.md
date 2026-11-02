@@ -10,7 +10,8 @@ One account → Hotel, Convention Hall, Parking, Membership (each on a **separat
 
 ```bash
 npm install
-npm run dev      # → http://localhost:5173
+npm run dev:all  # → API on http://localhost:5005 + app on http://localhost:5174
+npm run dev      # → app only on http://localhost:5174
 npm run build    # production build
 npm run lint     # oxlint
 ```

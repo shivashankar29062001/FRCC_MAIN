@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from '../services/supabase.js';
+import { isValidIndianMobile } from '../utils/mobile.js';
 import { venues as LOCAL_VENUES } from '../data/dining.js';
 
 const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
@@ -103,6 +104,10 @@ export async function getTableSlots(venueId, date) {
  * Create a table booking (free, no payment, idempotent via client_request_id).
  */
 export async function createTableBooking(payload) {
+  const mobile = payload.mobile || payload.guestMobile || payload.guest_mobile;
+  if (mobile && !isValidIndianMobile(mobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const clientRequestId = payload.clientRequestId || payload.client_request_id
     || `tbl_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 

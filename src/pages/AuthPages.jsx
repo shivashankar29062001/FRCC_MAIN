@@ -12,6 +12,12 @@ import {
   ArrowRightIcon,
 } from '../components/ui/icons.jsx';
 import { Logo } from '../components/Logo.jsx';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  isValidEmailOrIndianMobile,
+  isValidIndianMobile,
+  isPhoneLike,
+} from '../utils/mobile.js';
 
 // ---------------------------------------------------------------------------
 // Auth screens — split-screen: brand panel (left) + form (right) on desktop,
@@ -102,9 +108,16 @@ export function SignupPage() {
 
   function validate() {
     const next = {};
+    const contact = form.emailOrPhone.trim();
     if (!form.name.trim()) next.name = 'Please enter your name.';
-    if (!form.emailOrPhone.trim()) next.emailOrPhone = 'Enter your email or mobile number.';
-    else if (form.emailOrPhone.trim().length < 4) next.emailOrPhone = 'That looks too short — check it once.';
+    if (!contact) next.emailOrPhone = 'Enter your email or mobile number.';
+    else if (contact.includes('@')) {
+      if (!isValidEmailOrIndianMobile(contact)) next.emailOrPhone = 'Enter a valid email address.';
+    } else if (isPhoneLike(contact)) {
+      if (!isValidIndianMobile(contact)) next.emailOrPhone = INDIAN_MOBILE_MESSAGE;
+    } else if (contact.length < 4) {
+      next.emailOrPhone = 'That looks too short — check it once.';
+    }
     if (!form.password) next.password = 'Create a password.';
     else if (form.password.length < 6) next.password = 'Password must be at least 6 characters.';
     return next;
@@ -251,7 +264,11 @@ export function SigninPage() {
 
   function validate() {
     const next = {};
-    if (!form.emailOrPhone.trim()) next.emailOrPhone = 'Enter your email or mobile number.';
+    const contact = form.emailOrPhone.trim();
+    if (!contact) next.emailOrPhone = 'Enter your email or mobile number.';
+    else if (isPhoneLike(contact) && !isValidIndianMobile(contact)) {
+      next.emailOrPhone = INDIAN_MOBILE_MESSAGE;
+    }
     if (!form.password) next.password = 'Enter your password.';
     return next;
   }
