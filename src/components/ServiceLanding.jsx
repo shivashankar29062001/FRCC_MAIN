@@ -117,23 +117,29 @@ export function ServiceLanding({ service = 'stay', hero }) {
     }
 
     if (normService === 'parking') {
-      const filtered = parkingZones.filter((z) => !selectedArea || z.areaId === selectedArea);
-      return filtered.map((z) => ({
-        id: z.id,
-        name: z.name,
-        image: IMAGES[z.id] || IMAGES.parkingEntry,
-        facts: [
-          `${z.spots} parking slots`,
-          `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
-          `Hours: ${z.operatingHours || '24x7'}`,
-        ],
-        priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
-        priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
-        locationId: 'vja-parking',
-        locationName: 'Vijayawada Campus · Automated Parking',
-        buttonLabel: 'Reserve parking',
-        to: `/book/parking?item=${encodeURIComponent(z.id)}`,
-      }));
+      const multiLevelZones = parkingZones.filter(z => z.id === 'vja-multi-level' || z.id === 'hyd-multi-level');
+      return multiLevelZones.map((z) => {
+        const isHyderabad = z.id === 'hyd-multi-level';
+        return {
+          id: z.id,
+          name: z.name,
+          image: IMAGES[z.id] || (isHyderabad ? IMAGES.parkingEntry : IMAGES['vja-multi-level']),
+          googleMapsUrl: isHyderabad
+            ? 'https://www.google.com/maps/search/?api=1&query=Second+Floor%2C+Samridhi+Vasyam%2C+D+No+1%2F98%2F9%2F3%2F23%2C+Capital+Pk+Rd%2C+Above+Axis+Bank+Image+Gardens+Branch%2C+Jaihind+Enclave%2C+Madhapur%2C+Hyderabad%2C+Telangana+500081'
+            : 'https://www.google.com/maps/search/?api=1&query=D.No++24-29-210A%2C+Durgapuram%2C+Gulabithota+Road%2C+Vijayawada%2C+NTR+District%2C+Andhra+Pradesh++520003',
+          locationName: isHyderabad ? 'Hyderabad Campus' : 'Vijayawada Campus',
+          facts: [
+            `${z.spots} parking slots`,
+            `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
+            `Hours: ${z.operatingHours || '24x7'}`,
+          ],
+          priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
+          priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
+          locationId: z.locationId,
+          buttonLabel: 'Reserve parking',
+          to: `/book/parking?item=${encodeURIComponent(z.id)}`,
+        };
+      });
     }
 
     if (normService === 'activities') {

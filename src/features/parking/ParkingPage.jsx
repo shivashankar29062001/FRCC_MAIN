@@ -154,7 +154,7 @@ export function ParkingPage() {
       date: draft.date ? formatDMY(draft.date) : undefined,
       slot: `${draft.selectedSlot} (${draft.duration === 'full-day' ? 'Full Day Pass' : `${draft.duration} Hours`})`,
       location: `${selectedArea.name} Campus · Parking Facility`,
-      locationId: 'vja-parking',
+      locationId: selectedArea.id,
       isFree: true,
       price: 0,
       total: 0,
@@ -232,7 +232,7 @@ export function ParkingPage() {
             <h2 className="h-sub mt-1">When are you parking?</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
               <span>Select arrival campus location, date, time, and vehicle category.</span>
-              <LocationTrigger locationId="vja-parking" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+              <LocationTrigger locationId={selectedArea.id} className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
                 Vijayawada Campus · View on map &amp; get directions
               </LocationTrigger>
             </div>

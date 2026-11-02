@@ -110,18 +110,35 @@ export default function ParkingBookingPage() {
     );
     setConfirmedBooking(confirmed || null);
 
+    // Determine the effective city for slot availability restoration.
+    // Check stored bookings for city information.
+    // If bookings have city fields, use the first one found.
+    // If no bookings have city fields (legacy), default to 'vja' (Vijayawada).
+    let effectiveCity = 'vja';
+    const bookingsWithCity = storedBookings.filter(
+      (b) => b.city && b.city.trim()
+    );
+    if (bookingsWithCity.length > 0) {
+      effectiveCity = bookingsWithCity[0].city;
+    }
+
     // Start with all slots available, then mark slots as 'booked' only for
-    // CONFIRMED bookings.  CANCELLED bookings do NOT claim a slot.
+    // CONFIRMED bookings that match the effective city.
+    // Legacy bookings (without city field) are treated per the effective city.
     const initialSlots = generateInitialSlots();
     const slots = initialSlots.map((s) => ({ ...s }));
+    
     storedBookings.forEach((booking) => {
       if (
         booking.bookingStatus !== BOOKING_STATUS.CANCELLED &&
         booking.bookingStatusCode !== BOOKING_STATUS_CODE.CANCELLED
       ) {
-        const slot = slots.find((s) => s.id === booking.parkingSlot);
-        if (slot) {
-          slot.status = 'booked';
+        const bookingCity = booking.city || effectiveCity; // legacy: use effective city
+        if (bookingCity === effectiveCity) {
+          const slot = slots.find((s) => s.id === booking.parkingSlot);
+          if (slot) {
+            slot.status = 'booked';
+          }
         }
       }
     });
