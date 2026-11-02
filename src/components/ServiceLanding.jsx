@@ -261,7 +261,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
           </div>
 
           {/* Area tabs (ONLY if data has more than one area) */}
-          {hasAreas && (
+          {hasAreas && normService !== 'parking' && (
             <div className="mt-8 border-b border-slate-200 pb-4">
               <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2.5">
                 Select Campus Location
@@ -369,14 +369,25 @@ export function ServiceLanding({ service = 'stay', hero }) {
 
                   {item.locationName && (
                     <div className="mt-1">
-                      <LocationTrigger
-                        locationId={item.locationId}
-                        className="text-xs text-slate-500 hover:text-navy-950 font-normal"
-                        showIcon={true}
-                        iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
-                      >
-                        {item.locationName}
-                      </LocationTrigger>
+                      {item.googleMapsUrl ? (
+                        <a
+                          href={item.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                        >
+                          {item.locationName}
+                        </a>
+                      ) : (
+                        <LocationTrigger
+                          locationId={item.locationId}
+                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                          showIcon={true}
+                          iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                        >
+                          {item.locationName}
+                        </LocationTrigger>
+                      )}
                     </div>
                   )}
 
