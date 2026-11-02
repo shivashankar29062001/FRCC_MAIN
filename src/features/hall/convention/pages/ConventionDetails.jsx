@@ -53,7 +53,40 @@ export default function ConventionDetails() {
             <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: e.target.value })} /></label>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">Phone
-              <input className={inputClass} value={booking.phone} onChange={e => updateBooking({ phone: e.target.value })} placeholder="98XXXXXXXX" /></label>
+              <input
+              className={inputClass}
+              value={booking.phone}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '');
+                updateBooking({ phone: digits.slice(0, 10) });
+              }}
+              onBlur={e => {
+                const phone = booking.phone;
+                const trimmed = phone.trim();
+                if (!trimmed) return setError('Phone number is required');
+                if (!/^[6-9][0-9]{9}$/.test(trimmed)) {
+                  return setError('Enter a valid 10-digit mobile number');
+                }
+                setError('');
+              }}
+              onKeyUp={e => {
+                if (e.key === 'Enter') next();
+              }}
+              onBlur={e => {
+                const phone = booking.phone;
+                if (!phone.trim()) setError('Phone number is required');
+                else if (!/^[6-9][0-9]{9}$/.test(phone)) setError('Enter a valid 10-digit mobile number');
+                else setError('');
+              }}
+              onFocus={e => {
+                if (error) setError('');
+              }}
+              placeholder="98XXXXXXXX"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              autoComplete="tel-national"
+            /></label>
             <label className="block">Email
               <input className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
           </div>

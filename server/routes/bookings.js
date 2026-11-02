@@ -22,6 +22,13 @@ router.post('/', auth, (req, res) => {
   const { hallId, date, startTime, endTime, guests, eventType, eventDetails, organizerName, phone, email, specialRequests, upiIdMasked, transactionRef } = req.body || {};
   if (!hallId || !date || !startTime || !endTime || !guests || !eventType || !organizerName)
     return res.status(400).json({ error: 'Missing required booking fields.' });
+  // Validate first (server-side gate). Only after a valid phone is confirmed
+  // do we normalise and store it, so old bookings are never rewritten.
+  let phoneDigits = String(phone || '').replace(/\\D/g, '');
+  if (phoneDigits.length === 11 && phoneDigits.startsWith('0')) phoneDigits = phoneDigits.slice(1);
+  if (phoneDigits.length === 12 && phoneDigits.startsWith('91')) phoneDigits = phoneDigits.slice(2);
+  if (!/^[6-9][0-9]{9}$/.test(phoneDigits)) return res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' });
+  phone = phoneDigits;
   if (toMins(endTime) <= toMins(startTime)) return res.status(400).json({ error: 'End time must be after start time.' });
 
   const db = readDb();
@@ -49,7 +56,7 @@ router.post('/', auth, (req, res) => {
 
   const booking = {
     id: uid('FRCC'), userId: req.user.id, hallId, hallName: hall.name, date, startTime, endTime,
-    guests: Number(guests), eventType, eventDetails: eventDetails || '', organizerName, phone: phone || '', email: email || '',
+    guests: Number(guests), eventType, eventDetails: eventDetails || '', organizerName, phone, email: email || '',
     specialRequests: specialRequests || '', amount, hallCharge, gst, convenienceFee,
     paymentMethod,
     amountPaid: isOfflinePending ? 0 : (req.body.amountPaid != null ? Math.max(0, Math.round(Number(req.body.amountPaid))) : amount),
