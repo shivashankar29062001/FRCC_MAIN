@@ -48,9 +48,9 @@ export const halls = [
     price: 1600,
     includesFood: false,
     capacityMin: 5, // SAMPLE
-    capacityMax: 50, // SAMPLE
-    capacity: 50, // SAMPLE
-    capacityBreakdown: { theater: 50, banquet: 40, classroom: 30, reception: 50 }, // SAMPLE
+    capacityMax: 200, // SAMPLE
+    capacity: 200, // SAMPLE
+    capacityBreakdown: { theater: 200, banquet: 160, classroom: 120, reception: 200 }, // SAMPLE
     prices: { hour: 1600, halfDay: 8000, fullDay: 16000 },
     pricePerDay: { morning: 8000, afternoon: 8000, evening: 8000, fullDay: 16000 },
     timeSlots: ['08:00 - 13:00 (Morning)', '13:00 - 18:00 (Afternoon)', '18:00 - 23:00 (Evening)', '08:00 - 23:00 (Full Day)'],

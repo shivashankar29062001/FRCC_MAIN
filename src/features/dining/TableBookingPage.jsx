@@ -17,6 +17,12 @@ import { formatDMY, parseDMY } from '../../utils/dates.js';
 import { todayISO } from '../../utils/helpers.js';
 import { normalizeMobile, isValidMobile } from '../../utils/phone.js';
 import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../utils/mobile.js';
+import {
   PrinterIcon,
   CheckCircleIcon,
   ChevronLeftIcon,
@@ -446,8 +452,13 @@ export function TableBookingPage() {
                 <label htmlFor="details-mobile" className="label">Mobile Number (+91) *</label>
                 <input
                   id="details-mobile"
+                  name="mobile"
                   type="tel"
-                  placeholder="10-digit number"
+                  inputMode="numeric"
+                  pattern="[6-9][0-9]{9}"
+                  autoComplete="tel"
+                  maxLength={10}
+                  placeholder={INDIAN_MOBILE_PLACEHOLDER}
                   value={guestMobile}
                   onChange={(e) => {
                     setGuestMobile(e.target.value);

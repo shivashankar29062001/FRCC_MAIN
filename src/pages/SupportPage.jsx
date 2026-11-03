@@ -20,6 +20,7 @@ import {
   CheckIcon,
 } from '../components/ui/icons.jsx';
 import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
+import { INDIAN_MOBILE_MESSAGE, isValidEmailOrIndianMobile, isPhoneLike } from '../utils/mobile.js';
 
 // FAQ shown on the support page.
 const FAQ = [
@@ -96,8 +97,10 @@ export function SupportPage() {
     e.preventDefault();
     const found = {};
     if (!contact.name.trim()) found.name = 'Please tell us your name.';
-    if (contact.email && !/^\S+@\S+\.\S+$/.test(contact.email) && !/^\d{10}$/.test(contact.email.replace(/\D/g, ''))) {
-      found.email = 'Enter a valid email address or phone number.';
+    if (contact.email && !isValidEmailOrIndianMobile(contact.email)) {
+      found.email = isPhoneLike(contact.email)
+        ? INDIAN_MOBILE_MESSAGE
+        : 'Enter a valid email address or phone number.';
     }
     if (!contact.message.trim()) found.message = 'Write a short message so we can help.';
     setContactErr(found);
