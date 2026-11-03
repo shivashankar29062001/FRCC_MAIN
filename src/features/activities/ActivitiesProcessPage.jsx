@@ -11,7 +11,7 @@ import { IMAGES, gameSlot } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
 import { getSlots, getSlotAvailability } from './availability.service.js';
-import { saveActivityBooking, createActivityBookingRemote } from './bookings.store.js';
+import { saveActivityBooking, createActivityBookingRemote, CHANGED_EVENT } from './bookings.store.js';
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
@@ -244,11 +244,29 @@ export function ActivitiesProcessPage() {
     setErrors({});
   };
 
-  // Slots load per game + date from database RPC get_slot_availability
+  // Slots load per game + date from database RPC get_slot_availability / live bookings query
   const slotsQuery = useMockQuery(() => getSlotAvailability(draft.gameId, draft.date), {
     deps: [draft.gameId, draft.date],
     delay: 200,
   });
+  // Always refresh slots when opening the slot picker (step 2)
+  useEffect(() => {
+    if (step === 2 && draft.gameId && draft.date) {
+      slotsQuery.retry();
+    }
+  }, [step, draft.gameId, draft.date]);
+
+  // Immediately refresh slots when an activity booking is confirmed or changed on this device
+  useEffect(() => {
+    const onBookingsChanged = () => {
+      slotsQuery.retry();
+    };
+    window.addEventListener(CHANGED_EVENT, onBookingsChanged);
+    return () => {
+      window.removeEventListener(CHANGED_EVENT, onBookingsChanged);
+    };
+  }, [slotsQuery]);
+
   const slots = slotsQuery.data || [];
   const fullyBooked = !slotsQuery.loading && !slotsQuery.error && slots.length > 0 && slots.every((s) => s.booked);
 
@@ -458,6 +476,7 @@ export function ActivitiesProcessPage() {
       } catch (_) {}
 
       setConfirmed(confirmedRecord);
+      slotsQuery.retry();
       setStep(5);
       pushToast(draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
     } catch (err) {

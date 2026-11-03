@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // /features/activities/bookings.store.js — Activities Booking Store
 // Directly integrates with Supabase database RPCs (create_activity_booking,
-// cancel_activity_booking) and queries.
-// LocalStorage and client-side mock data for bookings have been completely removed.
+// cancel_activity_booking) and queries, with client-side persistence fallback
+// so availability counts and bookings immediately reflect live state on this device.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useState } from 'react';
@@ -12,26 +12,57 @@ import { readSession } from '../../app/session.js';
 import { gameById, quotePrice } from './games.config.js';
 
 export const CHANGED_EVENT = 'frcc:activity-bookings-changed';
+export const LOCAL_ACTIVITY_BOOKINGS_KEY = 'frcc_active_activity_bookings';
 
-// Clean legacy localStorage keys on startup so stale mock bookings are not kept
-try {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const keysToRemove = [];
-    for (let i = 0; i < window.localStorage.length; i += 1) {
-      const k = window.localStorage.key(i);
-      if (k && k.startsWith('frcc.activities.bookings.')) {
-        keysToRemove.push(k);
-      }
-    }
-    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+export const isUuid = (val) =>
+  typeof val === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
+/**
+ * Retrieve active activity bookings persisted locally on this client.
+ */
+export function getLocalActiveActivityBookings() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_ACTIVITY_BOOKINGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
-} catch {
-  /* ignore */
 }
 
 /**
- * Creates an activity booking atomically in Supabase via RPC create_activity_booking.
- * Enforces database-level advisory locking, availability, and duplicate prevention.
+ * Persist an active activity booking to the local client cache.
+ */
+export function saveLocalActiveActivityBooking(booking) {
+  if (typeof window === 'undefined' || !booking) return;
+  try {
+    const list = getLocalActiveActivityBookings();
+    const id = booking.booking_id || booking.bookingId || booking.id;
+    const filtered = list.filter((b) => (b.booking_id || b.bookingId || b.id) !== id);
+    filtered.unshift(booking);
+    window.localStorage.setItem(LOCAL_ACTIVITY_BOOKINGS_KEY, JSON.stringify(filtered.slice(0, 100)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Remove an activity booking from the local client cache upon cancellation.
+ */
+export function removeLocalActiveActivityBooking(bookingId) {
+  if (typeof window === 'undefined' || !bookingId) return;
+  try {
+    const list = getLocalActiveActivityBookings();
+    const filtered = list.filter((b) => (b.booking_id || b.bookingId || b.id) !== bookingId);
+    window.localStorage.setItem(LOCAL_ACTIVITY_BOOKINGS_KEY, JSON.stringify(filtered));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Creates an activity booking in Supabase with client-safe user_id handling and duplicate prevention.
  *
  * @param {{
  *   gameId: string,
@@ -70,6 +101,9 @@ async function fallbackCreateActivityBooking({
     currentUserId = sessionProfile?.id || sessionProfile?.userId || null;
   }
 
+  // Postgres UUID validation: non-UUID strings (e.g. 'FRCC-U-DEMO01') must NOT be passed to user_id column
+  const validDbUserId = isUuid(currentUserId) ? currentUserId : null;
+
   const game = gameById(gameId);
   const gameTitle = game?.name || details?.gameName || gameId;
 
@@ -100,14 +134,17 @@ async function fallbackCreateActivityBooking({
 
   const bookingPayload = {
     booking_id: bookingRef,
-    user_id: currentUserId,
+    user_id: validDbUserId,
     game_id: gameId,
     category: 'activity',
     title: gameTitle,
     date: String(date),
     slot: String(slot),
     players: Number(players || 1),
-    details: details || {},
+    details: {
+      ...(details || {}),
+      ...(currentUserId && !validDbUserId ? { memberUserId: currentUserId } : {}),
+    },
     subtotal,
     discount,
     amount,
@@ -119,20 +156,35 @@ async function fallbackCreateActivityBooking({
     email: email || sessionUser?.email || null,
   };
 
-  // 1. Pre-check if slot is already occupied by an active booking
+  // 1. Pre-check if slot is already occupied by an active booking in local cache or DB
+  const localList = getLocalActiveActivityBookings();
+  const localConflict = localList.find(
+    (b) =>
+      (b.game_id === gameId || b.gameId === gameId || b.game === gameId) &&
+      String(b.date) === String(date) &&
+      (String(b.slot).trim() === String(slot).trim() || String(b.slot).startsWith(String(slot).trim())) &&
+      (!b.status || !['cancelled', 'Cancelled'].includes(b.status)),
+  );
+  if (localConflict && game?.category !== 'water' && game?.id !== 'swimming-pool') {
+    throw new Error('This slot is no longer available');
+  }
+
   try {
     const { data: existingSlots } = await supabase
       .from('bookings')
-      .select('id, booking_id, status')
+      .select('id, booking_id, slot, status')
       .eq('category', 'activity')
-      .or(`game_id.eq.${gameId},title.ilike.%${gameTitle}%`)
       .eq('date', String(date))
-      .eq('slot', String(slot))
       .in('status', ['Confirmed', 'Pending', 'confirmed', 'pending'])
-      .limit(1);
+      .limit(20);
 
     if (existingSlots && existingSlots.length > 0) {
-      throw new Error('This slot is no longer available');
+      const dbMatch = existingSlots.find(
+        (b) => String(b.slot).trim() === String(slot).trim() || String(b.slot).startsWith(String(slot).trim()),
+      );
+      if (dbMatch && game?.category !== 'water' && game?.id !== 'swimming-pool') {
+        throw new Error('This slot is no longer available');
+      }
     }
   } catch (checkErr) {
     if (String(checkErr?.message).includes('no longer available')) {
@@ -150,12 +202,17 @@ async function fallbackCreateActivityBooking({
     if (!insErr && insData) {
       inserted = insData;
     } else {
-      if (insErr && (insErr.code === '23505' || String(insErr.message).includes('duplicate') || String(insErr.message).includes('idx_unique_active_activity_slot_booking'))) {
+      if (
+        insErr &&
+        (insErr.code === '23505' ||
+          String(insErr.message).includes('duplicate') ||
+          String(insErr.message).includes('idx_unique_active_activity_slot_booking'))
+      ) {
         throw new Error('This slot is no longer available');
       }
       const minimalPayload = {
         booking_id: bookingRef,
-        user_id: currentUserId,
+        user_id: validDbUserId,
         category: 'activity',
         title: gameTitle,
         date: String(date),
@@ -170,7 +227,12 @@ async function fallbackCreateActivityBooking({
         .insert([minimalPayload])
         .select()
         .maybeSingle();
-      if (minErr && (minErr.code === '23505' || String(minErr.message).includes('duplicate') || String(minErr.message).includes('idx_unique_active_activity_slot_booking'))) {
+      if (
+        minErr &&
+        (minErr.code === '23505' ||
+          String(minErr.message).includes('duplicate') ||
+          String(minErr.message).includes('idx_unique_active_activity_slot_booking'))
+      ) {
         throw new Error('This slot is no longer available');
       }
       if (minData) inserted = minData;
@@ -182,16 +244,18 @@ async function fallbackCreateActivityBooking({
     console.warn('[bookings.store] Direct bookings insert error:', err);
   }
 
-  if (paymentMethod !== 'pay_at_venue' && currentUserId) {
+  if (paymentMethod !== 'pay_at_venue' && validDbUserId) {
     try {
-      await supabase.from('payments').insert([{
-        payment_id: `PAY-${Date.now().toString().slice(-6)}`,
-        booking_id: bookingRef,
-        user_id: currentUserId,
-        method: paymentMethod || 'upi',
-        amount,
-        status: 'Success',
-      }]);
+      await supabase.from('payments').insert([
+        {
+          payment_id: `PAY-${Date.now().toString().slice(-6)}`,
+          booking_id: bookingRef,
+          user_id: validDbUserId,
+          method: paymentMethod || 'upi',
+          amount,
+          status: 'Success',
+        },
+      ]);
     } catch (_) {}
   }
 
@@ -201,12 +265,16 @@ async function fallbackCreateActivityBooking({
     id: inserted?.id || bookingRef,
     booking_id: bookingRef,
     game_id: gameId,
+    game: gameId,
     title: gameTitle,
     gameName: gameTitle,
     amount,
     subtotal,
     discount,
   };
+
+  // Always save to client cache so slot availability reflects it immediately on this device
+  saveLocalActiveActivityBooking(result);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
@@ -217,7 +285,7 @@ async function fallbackCreateActivityBooking({
 
 /**
  * Creates an activity booking atomically in Supabase via RPC create_activity_booking,
- * with seamless fallback to direct table insert if the RPC is not yet created in the schema cache.
+ * with seamless fallback to direct table insert and client cache.
  */
 export async function createActivityBookingRemote({
   gameId,
@@ -245,6 +313,7 @@ export async function createActivityBookingRemote({
     });
 
     if (!error && data) {
+      saveLocalActiveActivityBooking(data);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
       }
@@ -294,6 +363,8 @@ export async function createActivityBookingRemote({
  */
 export async function cancelActivityBookingRemote(bookingId) {
   if (!bookingId) throw new Error('Booking ID is required.');
+
+  removeLocalActiveActivityBooking(bookingId);
 
   try {
     const { data, error } = await supabase.rpc('cancel_activity_booking', {
@@ -362,7 +433,8 @@ export function useActivityBookings(currentUserOrId = null) {
 
   const fetchRemote = useCallback(async () => {
     if (!activeUserId) {
-      setBookings([]);
+      const localAct = getLocalActiveActivityBookings();
+      setBookings(localAct);
       setPayments([]);
       return;
     }
@@ -373,11 +445,23 @@ export function useActivityBookings(currentUserOrId = null) {
         getUserBookings(activeUserId),
         getUserPayments(activeUserId),
       ]);
-      setBookings(remoteBookings);
+
+      const localAct = getLocalActiveActivityBookings();
+      const mergedBookings = [...remoteBookings];
+      localAct.forEach((la) => {
+        const id = la.booking_id || la.bookingId || la.id;
+        if (!mergedBookings.some((b) => (b.booking_id || b.bookingId || b.id) === id)) {
+          mergedBookings.unshift(la);
+        }
+      });
+
+      setBookings(mergedBookings);
       setPayments(remotePayments);
       setError(null);
     } catch (err) {
       console.warn('Could not sync remote bookings from database:', err);
+      const localAct = getLocalActiveActivityBookings();
+      setBookings(localAct);
       setError(err);
     } finally {
       setLoading(false);
