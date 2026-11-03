@@ -82,8 +82,9 @@ export async function buildApplicationFormPdf(member = {}) {
 
   // Safe Applicant details — never print full Aadhaar or file
   const applicantName = member?.name || 'Member';
-  const applicantMobile = member?.mobile || '-';
-  const applicantEmail = member?.email || '-';
+  const applicantMobile = member?.mobile || member?.phone || '-';
+  const rawEmail = (member?.email || '').trim();
+  const applicantEmail = rawEmail && !rawEmail.toLowerCase().endsWith('@frcc.member') ? rawEmail : '-';
   const dob = member?.dateOfBirth || member?.dob || '-';
   const gender = member?.gender || '-';
 
@@ -432,7 +433,7 @@ export async function sendMembershipToWhatsApp(member = {}) {
   const cleanId = String(memberId).replace(/[^a-zA-Z0-9_-]/g, '');
 
   // Clean member mobile number
-  const mobileDigits = String(member?.mobile || '').replace(/\D/g, '').slice(-10);
+  const mobileDigits = String(member?.mobile || member?.phone || '').replace(/\D/g, '').slice(-10);
   const waTargetMobile = mobileDigits ? `91${mobileDigits}` : '917893616262';
 
   // 1. Dispatch through backend Twilio WhatsApp API

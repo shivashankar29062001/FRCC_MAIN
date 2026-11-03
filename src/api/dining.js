@@ -9,22 +9,37 @@ import { venues as LOCAL_VENUES } from '../data/dining.js';
 const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
 
 // In-memory and localStorage persistence for table bookings
-const STORAGE_KEY = 'frcc_table_bookings_v1';
+const BASE_STORAGE_KEY = 'frcc_table_bookings_v1';
 
-function getStoredBookings() {
+// Remove legacy non-user-specific storage key on startup
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem(BASE_STORAGE_KEY);
+  }
+} catch {
+  /* ignore */
+}
+
+function getTableStorageKey(userId) {
+  return userId ? `${BASE_STORAGE_KEY}.${userId}` : `${BASE_STORAGE_KEY}.anon`;
+}
+
+function getStoredBookings(userId = null) {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const key = getTableStorageKey(userId);
+    const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveStoredBookings(items) {
+function saveStoredBookings(items, userId = null) {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    const key = getTableStorageKey(userId);
+    window.localStorage.setItem(key, JSON.stringify(items));
   } catch {
     /* ignore storage errors */
   }
@@ -118,9 +133,17 @@ export async function createTableBooking(payload) {
     bookingDate = `${yyyy}-${mm}-${dd}`;
   }
 
+  let sessionUserId = null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    sessionUserId = sessionData?.session?.user?.id || null;
+  } catch (_) {}
+
+  const currentUserId = payload.userId || payload.user_id || sessionUserId;
+
   // 1. Mock mode handling
   if (isMock) {
-    const stored = getStoredBookings();
+    const stored = getStoredBookings(currentUserId);
     const existing = stored.find((b) => b.client_request_id === clientRequestId);
     if (existing) {
       return existing;
@@ -139,7 +162,8 @@ export async function createTableBooking(payload) {
       bookingId: bookingRef,
       category: 'dining',
       service: 'dining',
-      user_id: payload.userId || payload.user_id || null,
+      user_id: currentUserId,
+      userId: currentUserId,
       venue_id: venue.id,
       venue_name: venue.name,
       venueName: venue.name,
@@ -160,7 +184,7 @@ export async function createTableBooking(payload) {
     };
 
     stored.push(mockBooking);
-    saveStoredBookings(stored);
+    saveStoredBookings(stored, currentUserId);
     return mockBooking;
   }
 
@@ -177,6 +201,7 @@ export async function createTableBooking(payload) {
     p_email: payload.email || payload.guestEmail || payload.guest_email || '',
     p_notes: payload.notes || payload.specialRequest || null,
     p_age_confirmed: Boolean(payload.ageConfirmed || payload.age_confirmed),
+    p_user_id: currentUserId || null,
   };
 
   const { data, error } = await supabase.rpc('create_table_booking', rpcParams);
@@ -191,16 +216,20 @@ export async function createTableBooking(payload) {
   }
 
   const venue = LOCAL_VENUES.find((v) => v.id === data.venue_id) || { name: data.venue_id };
+  const effectiveUserId = data.user_id || currentUserId;
 
   const formattedBooking = {
     id: data.id,
+    uuid: data.id,
+    rawId: data.id,
     client_request_id: data.client_request_id,
     booking_ref: data.booking_ref,
     bookingRef: data.booking_ref,
     bookingId: data.booking_ref,
     category: 'dining',
     service: 'dining',
-    user_id: data.user_id,
+    user_id: effectiveUserId,
+    userId: effectiveUserId,
     venue_id: data.venue_id,
     venue_name: venue.name,
     venueName: venue.name,
@@ -221,9 +250,9 @@ export async function createTableBooking(payload) {
   };
 
   // Keep a local cached copy for offline viewing
-  const stored = getStoredBookings();
+  const stored = getStoredBookings(effectiveUserId);
   stored.push(formattedBooking);
-  saveStoredBookings(stored);
+  saveStoredBookings(stored, effectiveUserId);
 
   return formattedBooking;
 }
@@ -232,22 +261,18 @@ export async function createTableBooking(payload) {
  * Fetch table bookings for the given user ID or signed-in user.
  */
 export async function getMyTableBookings(userId = null) {
-  if (isMock) {
-    const localList = getStoredBookings();
-    if (userId) {
-      return localList
-        .filter((b) => !b.user_id || b.user_id === userId)
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }
-    return [...localList].reverse();
-  }
-
-  // Real Database read from table_bookings
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = userId || sessionData?.session?.user?.id;
 
   if (!uid) {
     return [];
+  }
+
+  if (isMock) {
+    const localList = getStoredBookings(uid);
+    return localList
+      .filter((b) => b.user_id === uid)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
   const { data, error } = await supabase
@@ -268,12 +293,15 @@ export async function getMyTableBookings(userId = null) {
 
     return {
       id: b.id,
+      uuid: b.id,
+      rawId: b.id,
       booking_ref: b.booking_ref,
       bookingRef: b.booking_ref,
       bookingId: b.booking_ref,
       category: 'dining',
       service: 'dining',
       user_id: b.user_id,
+      userId: b.user_id,
       venue_id: b.venue_id,
       venue_name: venueName,
       venueName,

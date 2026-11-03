@@ -129,7 +129,7 @@ export function DiningLandingPage() {
 
             <div>
               <label htmlFor="bar-date" className="label">Date (DD/MM/YYYY)</label>
-              <div className="relative">
+              <div className="relative date-input-wrapper">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <CalendarIcon className="h-4 w-4" />
                 </span>
@@ -140,7 +140,7 @@ export function DiningLandingPage() {
                   value={barDate}
                   onClick={openBarPicker}
                   onChange={(e) => setBarDate(e.target.value)}
-                  className="field h-11 w-full !pl-10 !pr-10 text-sm cursor-pointer"
+                  className="field date-picker-field h-11 w-full !pl-10 !pr-2 text-sm cursor-pointer"
                 />
                 <input
                   ref={barPickerRef}
@@ -148,21 +148,10 @@ export function DiningLandingPage() {
                   value={barIsoValue}
                   min={todayISO()}
                   onChange={handleBarPickerChange}
-                  className="sr-only"
+                  className="date-picker-native-overlay"
                   tabIndex={-1}
                   aria-hidden="true"
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openBarPicker();
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
-                  aria-label="Select date"
-                >
-                  <CalendarIcon className="h-4 w-4" />
-                </button>
               </div>
             </div>
 

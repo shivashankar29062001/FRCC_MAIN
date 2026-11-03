@@ -192,14 +192,11 @@ export function MembershipJoinPage() {
     const initialPlanId = matchedPlan ? matchedPlan.id : (saved?.formData?.planId || 'frcc-membership');
 
     let initialFullName = user?.name || '';
-    let initialEmail = '';
-    let initialMobile = '';
-    const contact = user?.emailOrPhone || user?.email || user?.mobile || '';
-    if (contact.includes('@')) {
-      initialEmail = contact.trim();
-    } else if (contact) {
-      initialMobile = contact.replace(/\D/g, '').slice(-10);
-    }
+    const rawEmail = (user?.email || (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '')).trim();
+    const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
+    let initialEmail = isSynthetic ? '' : rawEmail;
+    const rawMobile = user?.phone || user?.mobile || (isSynthetic ? rawEmail.replace(/@frcc\.member$/i, '') : (!rawEmail.includes('@') ? user?.emailOrPhone : '')) || '';
+    let initialMobile = rawMobile ? rawMobile.replace(/\D/g, '').slice(-10) : '';
 
     const initialFormData = {
       planId: initialPlanId,
@@ -1622,7 +1619,17 @@ export function MembershipJoinPage() {
                     type="checkbox"
                     id="fam-consent"
                     checked={formData.familyConsent}
-                    onChange={(e) => updateForm({ familyConsent: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      updateForm({ familyConsent: checked });
+                      if (checked) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.familyConsent;
+                          return next;
+                        });
+                      }
+                    }}
                     className="mt-1 h-4 w-4 rounded border-slate-300 text-navy-900 accent-navy-900 cursor-pointer"
                   />
                   <span className="text-sm font-medium text-slate-800">

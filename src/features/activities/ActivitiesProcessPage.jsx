@@ -10,8 +10,8 @@ import { Reveal } from '../../components/ui/motion.jsx';
 import { IMAGES, gameSlot } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
-import { getSlots } from './availability.service.js';
-import { saveActivityBooking } from './bookings.store.js';
+import { getSlots, getSlotAvailability } from './availability.service.js';
+import { saveActivityBooking, createActivityBookingRemote } from './bookings.store.js';
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
@@ -122,13 +122,13 @@ function QrPlaceholder({ seed = 'frcc' }) {
 const STORAGE_KEY = 'frcc_activities_booking_draft';
 
 function blankDraft(gameId, user) {
-  const looksPhone = user?.emailOrPhone && !user.emailOrPhone.includes('@');
+  const prefilledMobile = user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
   return {
     gameId: gameId || '',
     date: '',
     slot: '',
     name: user?.name || '',
-    mobile: looksPhone ? sanitizeMobileInput(user.emailOrPhone) : '',
+    mobile: prefilledMobile ? prefilledMobile.replace(/\D/g, '').slice(-10) : '',
     players: '',
     equipment: false,
     extras: {},
@@ -142,16 +142,12 @@ export function ActivitiesProcessPage() {
   const paramGame = params.get('game') || params.get('item') || '';
   const paramValid = Boolean(paramGame && gameById(paramGame));
 
-  const [confirmed, setConfirmed] = useState(() => {
-    try {
-      const raw = window.sessionStorage.getItem('frcc_activities_confirmed');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [confirmed, setConfirmed] = useState(null);
 
   const [draft, setDraft] = useState(() => {
+    if (paramValid) {
+      return blankDraft(paramGame, user);
+    }
     let saved = null;
     try {
       const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -159,20 +155,16 @@ export function ActivitiesProcessPage() {
     } catch {
       /* ignore */
     }
-    const initialGame = paramValid ? paramGame : (saved?.gameId || '');
-    const base = blankDraft(initialGame, user);
-    if (saved) {
+    if (saved && saved.step < 5) {
       return {
-        ...base,
+        ...blankDraft(saved.gameId || '', user),
         ...saved,
-        gameId: initialGame || saved.gameId || '',
       };
     }
-    return base;
+    return blankDraft('', user);
   });
 
   const [step, setStep] = useState(() => {
-    if (confirmed) return 5;
     if (paramValid) return 1;
     let saved = null;
     try {
@@ -188,10 +180,55 @@ export function ActivitiesProcessPage() {
   const [errors, setErrors] = useState({});
   const [paying, setPaying] = useState(false);
 
-  // Sync draft and step to sessionStorage for refresh safety
+  // Reset flow when query param changes to a different game
+  useEffect(() => {
+    if (paramValid && paramGame && paramGame !== draft.gameId) {
+      setDraft(blankDraft(paramGame, user));
+      setStep(1);
+      setConfirmed(null);
+      setErrors({});
+      try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem('frcc_activities_confirmed');
+      } catch (_) {}
+    }
+  }, [paramGame, paramValid, user]);
+
+  // Purge past confirmation receipt if user changes or logs out
+  useEffect(() => {
+    if (confirmed) {
+      const matches = user?.id && (confirmed.userId === user.id || confirmed.user_id === user.id || confirmed.userId === user.userId);
+      if (!matches) {
+        setConfirmed(null);
+        setStep(paramValid ? 1 : 0);
+        try {
+          window.sessionStorage.removeItem('frcc_activities_confirmed');
+        } catch (_) {}
+      }
+    }
+  }, [user?.id, user?.userId, confirmed, paramValid]);
+
+  // Prefill name and mobile from user when available
+  useEffect(() => {
+    if (!user) return;
+    setDraft((prev) => {
+      const updates = {};
+      if (!prev.name && user.name) updates.name = user.name;
+      const userPhone = user.phone || user.mobile || (user.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
+      if (!prev.mobile && userPhone) updates.mobile = userPhone.replace(/\D/g, '').slice(-10);
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+    });
+  }, [user]);
+
+  // Sync draft and step to sessionStorage for refresh safety during active flow (steps 0-4)
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, step }));
+      if (step < 5) {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...draft, step }));
+      } else {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem('frcc_activities_confirmed');
+      }
     } catch {
       /* ignore */
     }
@@ -207,10 +244,10 @@ export function ActivitiesProcessPage() {
     setErrors({});
   };
 
-  // Slots load per game + date (mock latency + error/retry states).
-  const slotsQuery = useMockQuery(() => getSlots(draft.gameId, draft.date), {
+  // Slots load per game + date from database RPC get_slot_availability
+  const slotsQuery = useMockQuery(() => getSlotAvailability(draft.gameId, draft.date), {
     deps: [draft.gameId, draft.date],
-    delay: 450,
+    delay: 200,
   });
   const slots = slotsQuery.data || [];
   const fullyBooked = !slotsQuery.loading && !slotsQuery.error && slots.length > 0 && slots.every((s) => s.booked);
@@ -239,14 +276,20 @@ export function ActivitiesProcessPage() {
       return Boolean(draft.date && draft.date >= todayISO());
     }
     if (step === 2) {
-      return Boolean(draft.slot && !slots.find((s) => s.time === draft.slot)?.booked);
+      const s = slots.find((item) => item.time === draft.slot);
+      return Boolean(draft.slot && !s?.booked && (s?.remaining === undefined || s.remaining > 0));
     }
     if (step === 3) {
       const g = gameById(draft.gameId);
       const n = Number(draft.players);
       const nameOk = draft.name.trim().length >= 2;
-      const mobileOk = isValidIndianMobile(draft.mobile);
-      const playersOk = Boolean(draft.players) && Number.isFinite(n) && n >= 1 && (!g || n <= g.maxPlayers);
+      const cleanMobile = draft.mobile.replace(/\D/g, '');
+      const mobileOk = cleanMobile.length === 10 || MOBILE_RE.test(draft.mobile.trim());
+      const selectedSlot = slots.find((s) => s.time === draft.slot);
+      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
+        ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)
+        : (g?.maxPlayers || 99);
+      const playersOk = Boolean(draft.players) && Number.isFinite(n) && n >= 1 && n <= maxAllowed;
       if (!nameOk || !mobileOk || !playersOk) return false;
       if (g?.extraFields) {
         for (const f of g.extraFields) {
@@ -289,7 +332,10 @@ export function ActivitiesProcessPage() {
     }
     if (target === 2) {
       if (!draft.slot) return fail({ slot: 'Pick an available slot.' });
-      if (slots.find((s) => s.time === draft.slot)?.booked) return fail({ slot: 'That slot just got booked — pick another.' });
+      const s = slots.find((item) => item.time === draft.slot);
+      if (s?.booked || (s?.remaining !== undefined && s.remaining <= 0)) {
+        return fail({ slot: 'This slot is no longer available' });
+      }
       return true;
     }
     if (target === 3) {
@@ -298,8 +344,18 @@ export function ActivitiesProcessPage() {
       if (draft.name.trim().length < 2) next.name = 'Enter the booker’s full name.';
       if (!isValidIndianMobile(draft.mobile)) next.mobile = INDIAN_MOBILE_MESSAGE;
       const n = Number(draft.players);
-      if (!draft.players || !Number.isFinite(n) || n < 1) next.players = 'Enter how many are playing.';
-      else if (g && n > g.maxPlayers) next.players = `Max ${g.maxPlayers} for ${g.name}.`;
+      const selectedSlot = slots.find((s) => s.time === draft.slot);
+      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
+        ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)
+        : (g?.maxPlayers || 99);
+
+      if (!draft.players || !Number.isFinite(n) || n < 1) {
+        next.players = 'Enter how many are playing.';
+      } else if (n > maxAllowed) {
+        next.players = selectedSlot && selectedSlot.remaining !== undefined
+          ? `Only ${selectedSlot.remaining} spot${selectedSlot.remaining > 1 ? 's' : ''} available for this slot.`
+          : `Max ${g?.maxPlayers} for ${g?.name}.`;
+      }
       if (g) {
         for (const f of g.extraFields) {
           const v = draft.extras[f.id];
@@ -327,8 +383,25 @@ export function ActivitiesProcessPage() {
     return true;
   }
 
-  function goNext() {
+  async function goNext() {
     if (!validate(step)) return;
+    if (step === 3) {
+      // Re-check slot availability before proceeding to Review & Payment
+      try {
+        const freshSlots = await getSlotAvailability(draft.gameId, draft.date);
+        const freshSlot = freshSlots.find((s) => s.time === draft.slot);
+        const reqPlayers = Number(draft.players || 1);
+        if (!freshSlot || freshSlot.booked || (freshSlot.remaining !== undefined && freshSlot.remaining < reqPlayers)) {
+          pushToast('This slot is no longer available', 'error');
+          setErrors({ slot: 'This slot is no longer available' });
+          slotsQuery.retry();
+          setStep(2); // Return to slot selection step
+          return;
+        }
+      } catch (err) {
+        console.warn('Slot pre-check warning:', err);
+      }
+    }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
@@ -342,65 +415,65 @@ export function ActivitiesProcessPage() {
     setErrors({});
   }
 
-  function pay() {
+  async function pay() {
+    if (paying) return;
     if (!draft.paymentMethod) {
       pushToast('Choose a payment method.', 'error');
       setErrors({ paymentMethod: 'Choose a payment method.' });
       return;
     }
     setPaying(true);
+    setErrors({});
 
-    // TODO(Razorpay): Real payment gateway integration
-    // 1. const order = await createRazorpayOrder({ amount: quote.total, currency: 'INR' });
-    // 2. Open Razorpay modal with order.id
-    // 3. await verifyRazorpayPayment(response);
-
-    setTimeout(() => {
-      setPaying(false);
-      const atVenue = draft.paymentMethod === 'pay_at_venue';
-      const pricing = calculateTotal(quote.subtotal, isMember);
-      const year = new Date().getFullYear();
-      const random6 = String(Math.floor(100000 + Math.random() * 900000));
-      const bookingId = `FRCC-ACT-${year}-${random6}`;
-
-      const record = {
-        bookingId,
-        userId: user?.userId || 'guest',
-        game: draft.gameId,
-        gameName: game?.name || draft.gameId,
+    try {
+      const created = await createActivityBookingRemote({
+        gameId: draft.gameId,
         date: draft.date,
         slot: draft.slot,
-        players: draft.players,
-        extras: { ...draft.extras, equipment: draft.equipment || undefined },
-        subtotal: pricing.subtotal,
-        discount: pricing.discount,
-        amount: pricing.total,
-        isMember,
-        status: atVenue ? 'Pending' : 'Confirmed',
-        paymentMethod: draft.paymentMethod,
+        players: Number(draft.players || 1),
         userName: draft.name,
         mobile: draft.mobile,
-      };
-      const { booking } = saveActivityBooking({
-        booking: record,
-        payment: {
-          method: draft.paymentMethod,
-          amount: pricing.total,
-          status: atVenue ? 'Pending' : 'Success',
+        email: user?.email || user?.user_metadata?.email || null,
+        paymentMethod: draft.paymentMethod,
+        details: {
+          ...draft.extras,
+          equipment: draft.equipment,
+          gameName: game?.name,
         },
       });
 
-      try {
-        window.sessionStorage.setItem('frcc_activities_confirmed', JSON.stringify(booking));
-        window.sessionStorage.removeItem(STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
+      const confirmedRecord = {
+        ...created,
+        bookingId: created.booking_id,
+        id: created.booking_id,
+        game: created.game_id || draft.gameId,
+        gameName: created.title || game?.name,
+        userId: created.user_id,
+        user_id: created.user_id,
+      };
 
-      setConfirmed(booking);
+      try {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        window.sessionStorage.removeItem('frcc_activities_confirmed');
+      } catch (_) {}
+
+      setConfirmed(confirmedRecord);
       setStep(5);
-      pushToast(atVenue ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
-    }, 1500);
+      pushToast(draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
+    } catch (err) {
+      const msg = err?.message || String(err);
+      if (msg.includes('SLOT_FULL') || msg.includes('no longer available') || msg.includes('ALREADY_BOOKED')) {
+        pushToast('This slot is no longer available', 'error');
+        setErrors({ slot: 'This slot is no longer available', alreadyBooked: 'This slot is no longer available' });
+        slotsQuery.retry();
+        setStep(2); // Return to Available Slot step
+      } else {
+        pushToast(msg || 'Failed to complete booking. Please try again.', 'error');
+        setErrors({ submit: msg });
+      }
+    } finally {
+      setPaying(false);
+    }
   }
 
   function downloadReceipt() {
@@ -440,7 +513,7 @@ export function ActivitiesProcessPage() {
     } catch {
       /* ignore */
     }
-    const keepGame = draft.gameId;
+    const keepGame = paramValid ? paramGame : '';
     setDraft({ ...blankDraft(keepGame, user) });
     setConfirmed(null);
     setErrors({});
@@ -660,6 +733,7 @@ export function ActivitiesProcessPage() {
                       loading={slotsQuery.loading}
                       error={slotsQuery.error}
                       onRetry={slotsQuery.retry}
+                      isGroup={game.id === 'swimming-pool' || game.id === 'kids-play-area' || game.id === 'luxury-gym'}
                     />
                     {fullyBooked && (
                       <div className="mt-4">
@@ -684,29 +758,25 @@ export function ActivitiesProcessPage() {
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
-                    <Input
-                      label="Mobile"
-                      name="mobile"
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[6-9][0-9]{9}"
-                      maxLength={10}
-                      placeholder={INDIAN_MOBILE_PLACEHOLDER}
-                      value={draft.mobile}
-                      onChange={(e) => patch({ mobile: sanitizeMobileInput(e.target.value) })}
-                      autoComplete="tel"
-                      error={errors.mobile}
-                    />
-                    <Input
-                      label={`${game.playerLabel} (max ${game.maxPlayers})`}
-                      name="players"
-                      type="number"
-                      min={1}
-                      max={game.maxPlayers}
-                      value={draft.players}
-                      onChange={(e) => patch({ players: e.target.value })}
-                      error={errors.players}
-                    />
+                    <Input label="Mobile" name="mobile" type="tel" value={draft.mobile} onChange={(e) => patch({ mobile: e.target.value })} autoComplete="tel" error={errors.mobile} />
+                    {(() => {
+                      const selectedSlot = slots.find((s) => s.time === draft.slot);
+                      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
+                        ? Math.min(game.maxPlayers, selectedSlot.remaining)
+                        : game.maxPlayers;
+                      return (
+                        <Input
+                          label={`${game.playerLabel} (max ${maxAllowed})`}
+                          name="players"
+                          type="number"
+                          min={1}
+                          max={maxAllowed}
+                          value={draft.players}
+                          onChange={(e) => patch({ players: e.target.value })}
+                          error={errors.players}
+                        />
+                      );
+                    })()}
                     {game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
                       <Select
                         label="Number of Sessions (₹1,500 per session) *"
@@ -809,11 +879,31 @@ export function ActivitiesProcessPage() {
                     </div>
                   )}
 
+                  {errors.alreadyBooked && (
+                    <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" role="alert">
+                      <p className="font-semibold">{errors.alreadyBooked}</p>
+                      <p className="mt-1 text-xs text-amber-800">
+                        You already have an active booking for this slot. Check your bookings in your profile.
+                      </p>
+                      <div className="mt-3">
+                        <Link
+                          to="/profile/bookings"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-navy-900 px-4 py-2 text-xs font-semibold text-white hover:bg-navy-800 transition"
+                        >
+                          View My Bookings →
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                  {errors.submit && (
+                    <p role="alert" className="field-error mt-3">{errors.submit}</p>
+                  )}
+
                   <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500">
                     <ShieldIcon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
                     Secure payment. A receipt is issued to your account once payment is complete.
                   </p>
-                  <LoadingButton loading={paying} onClick={pay} className="mt-4 w-full px-6 py-3 bg-navy-900 text-white hover:bg-navy-800">
+                  <LoadingButton loading={paying} disabled={paying || Boolean(errors.alreadyBooked)} onClick={pay} className="mt-4 w-full px-6 py-3 bg-navy-900 text-white hover:bg-navy-800">
                     {draft.paymentMethod === 'pay_at_venue' ? `Reserve for ${formatINR(quote.total)}` : `Pay ${formatINR(quote.total)}`}
                   </LoadingButton>
                 </Card>
@@ -922,8 +1012,8 @@ export function ActivitiesProcessPage() {
                         View My Bookings →
                       </Link>
                       <span className="text-slate-300">·</span>
-                      <Link to="/home" className="text-slate-600 hover:text-navy-900 transition">
-                        Back to Home
+                      <Link to="/activities" className="text-slate-600 hover:text-navy-900 transition">
+                        Back to Activities
                       </Link>
                     </div>
                   </Card>
