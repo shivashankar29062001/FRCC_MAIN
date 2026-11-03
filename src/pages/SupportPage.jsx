@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../app/store/AppContext.jsx';
 import { Input, Select, TextArea, LoadingButton } from '../components/ui/controls.jsx';
 import { Card, SectionHeading } from '../components/ui/feedback.jsx';
@@ -46,9 +46,33 @@ const FAQ = [
 ];
 
 export function SupportPage() {
-  const { pushToast } = useApp();
+  const { user, pushToast } = useApp();
   const [headlineDone, setHeadlineDone] = useState(false);
-  const [contact, setContact] = useState({ name: '', email: '', message: '' });
+  const [contact, setContact] = useState(() => {
+    const rawEmail = (user?.email || '').trim();
+    const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
+    const realEmail = isSynthetic ? '' : rawEmail;
+    const phone = user?.phone || user?.mobile || '';
+    return {
+      name: user?.name || '',
+      email: realEmail || phone,
+      message: '',
+    };
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setContact((prev) => {
+      const rawEmail = (user.email || '').trim();
+      const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
+      const realEmail = isSynthetic ? '' : rawEmail;
+      const phone = user.phone || user.mobile || '';
+      const updates = {};
+      if (!prev.name && user.name) updates.name = user.name;
+      if (!prev.email && (realEmail || phone)) updates.email = realEmail || phone;
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+    });
+  }, [user]);
   const [ticket, setTicket] = useState({ category: '', priority: 'Normal', subject: '', details: '' });
   const [contactErr, setContactErr] = useState({});
   const [ticketErr, setTicketErr] = useState({});
@@ -454,8 +478,7 @@ export function SupportPage() {
                 </ul>
 
                 <div className="mt-6 border-t border-slate-100 pt-5">
-                  <p className="eyebrow">Follow the club</p>
-                  <div className="mt-3 flex gap-2">
+                  <div className="flex gap-2">
                     {getActiveSocialLinks().map((s) => (
                       <a
                         key={s.key}

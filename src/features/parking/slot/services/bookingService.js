@@ -109,6 +109,8 @@ export function generateBookingReference() {
  */
 export function createBooking({
   bookingReference,
+  userId = null,
+  user_id = null,
   parkingSlot,
   vehicleType,
   vehicleNumber,
@@ -132,6 +134,8 @@ export function createBooking({
     // Reference (bookingId kept for backward compatibility with older views)
     bookingReference: reference,
     bookingId: reference,
+    userId: userId || user_id || null,
+    user_id: user_id || userId || null,
 
     // Slot & vehicle
     parkingSlot,
@@ -219,7 +223,7 @@ export function getBookingApiEndpoint() {
 export async function submitBookingToSupabase(booking) {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData?.session?.user?.id || null;
+    const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
 
     const payload = {
       booking_reference: booking.bookingReference || booking.bookingId,

@@ -90,8 +90,8 @@ function DiningHeroCard() {
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label htmlFor="hero-dining-date" className="booking-label">Date (DD/MM/YYYY)</label>
-            <div className="relative">
-              <span aria-hidden className="booking-field-icon">
+            <div className="relative date-input-wrapper">
+              <span aria-hidden className="booking-field-icon pointer-events-none">
                 <CalendarIcon className="h-4 w-4" />
               </span>
               <input
@@ -101,7 +101,7 @@ function DiningHeroCard() {
                 value={date}
                 onClick={openPicker}
                 onChange={(e) => setDate(e.target.value)}
-                className="booking-field w-full text-sm cursor-pointer pr-8"
+                className="booking-field date-picker-field w-full text-sm cursor-pointer !pr-2"
               />
               <input
                 ref={pickerRef}
@@ -109,21 +109,10 @@ function DiningHeroCard() {
                 value={isoValue}
                 min={todayISO()}
                 onChange={handlePickerChange}
-                className="sr-only"
+                className="date-picker-native-overlay"
                 tabIndex={-1}
                 aria-hidden="true"
               />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openPicker();
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-gold-500 transition cursor-pointer p-1"
-                aria-label="Select date"
-              >
-                <CalendarIcon className="h-4 w-4" />
-              </button>
             </div>
           </div>
           <div>

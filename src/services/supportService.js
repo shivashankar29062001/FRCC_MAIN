@@ -42,7 +42,7 @@ export async function createTicket({ category, priority = 'Normal', subject, det
  * Send contact message to Supabase.
  */
 export async function sendContactMessage({ name, email, message }) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('contact_messages')
     .insert([
       {
@@ -51,15 +51,13 @@ export async function sendContactMessage({ name, email, message }) {
         message,
         status: 'Unread',
       },
-    ])
-    .select()
-    .single();
+    ]);
 
   if (error) {
     console.error('Error sending message:', error);
     throw error;
   }
-  return data;
+  return { success: true };
 }
 
 /**

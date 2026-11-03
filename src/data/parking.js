@@ -1,14 +1,15 @@
 // ---------------------------------------------------------------------------
 // /src/data/parking.js — FRCC Parking Areas & Zones Data
-// Single Location: Vijayawada
+// Locations: Vijayawada and Hyderabad
 // ---------------------------------------------------------------------------
 
-// The club has ONE location, Vijayawada. (Array kept so it can grow later)
 export const areas = [
   { id: 'vja', name: 'Vijayawada' },
+  { id: 'hyd', name: 'Hyderabad' },
 ];
 
 export const zones = [
+  // --- Vijayawada Zones ---
   {
     id: 'vja-multi-level',
     areaId: 'vja',
@@ -17,7 +18,7 @@ export const zones = [
     vehicleTypes: ['car', 'bike'],
     isFree: true, // Client: every zone price 0, isFree true
     price: 0,
-    spots: 340, // SAMPLE
+    spots: 150, // FIXED: was 340
     prices: { hour: 0, day: 0, month: 0 },
     description: '4-level automated parking facility with EV charging and complimentary club parking',
     features: ['Complimentary Parking', 'EV Charging (20 points)', 'Car Wash', 'CCTV', 'ANPR Entry', 'App Booking'],
@@ -25,8 +26,8 @@ export const zones = [
     paymentMethods: ['Complimentary Pass'],
     monthlyPass: { car: 0, bike: 0 },
     vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 200, available: 150 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 140, available: 110 },
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
     },
   },
   {
@@ -37,7 +38,7 @@ export const zones = [
     vehicleTypes: ['car', 'bike'],
     isFree: true, // Client: every zone price 0, isFree true
     price: 0,
-    spots: 180, // SAMPLE
+    spots: 150, // FIXED: was 180
     prices: { hour: 0, day: 0, month: 0 },
     description: 'Open surface parking with Krishna River views and direct walkway to campus',
     features: ['Complimentary Parking', 'River View', 'Solar Canopy (50%)', 'CCTV', 'Walking Trail'],
@@ -45,8 +46,8 @@ export const zones = [
     paymentMethods: ['Complimentary Pass'],
     monthlyPass: { car: 0, bike: 0 },
     vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 100, available: 70 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 80, available: 55 },
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
     },
   },
   {
@@ -57,7 +58,7 @@ export const zones = [
     vehicleTypes: ['car', 'bike'],
     isFree: true, // Client: every zone price 0, isFree true
     price: 0,
-    spots: 130, // SAMPLE
+    spots: 150, // FIXED: was 130
     prices: { hour: 0, day: 0, month: 0 },
     description: 'Convenient basement parking with EV points and 24/7 security',
     features: ['Complimentary Parking', 'Direct Campus Access', 'CCTV', 'EV Charging (8 points)', '24/7 Security'],
@@ -65,8 +66,70 @@ export const zones = [
     paymentMethods: ['Complimentary Pass'],
     monthlyPass: { car: 0, bike: 0 },
     vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 80, available: 45 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 50, available: 35 },
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+    },
+  },
+
+  // --- Hyderabad Zones ---
+  {
+    id: 'hyd-multi-level',
+    areaId: 'hyd',
+    locationId: 'hyd',
+    name: 'Multi-Level Parking - Hyderabad',
+    vehicleTypes: ['car', 'bike'],
+    isFree: true, // Client: every zone price 0, isFree true
+    price: 0,
+    spots: 150, // NEW: 150 slots
+    prices: { hour: 0, day: 0, month: 0 },
+    description: '4-level automated parking facility with EV charging and complimentary club parking',
+    features: ['Complimentary Parking', 'EV Charging (20 points)', 'Car Wash', 'CCTV', 'ANPR Entry', 'App Booking'],
+    operatingHours: '24x7',
+    paymentMethods: ['Complimentary Pass'],
+    monthlyPass: { car: 0, bike: 0 },
+    vehicleTypeDetails: {
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+    },
+  },
+  {
+    id: 'hyd-riverfront',
+    areaId: 'hyd',
+    locationId: 'hyd',
+    name: 'Riverfront Parking - Hyderabad',
+    vehicleTypes: ['car', 'bike'],
+    isFree: true, // Client: every zone price 0, isFree true
+    price: 0,
+    spots: 150, // NEW: 150 slots
+    prices: { hour: 0, day: 0, month: 0 },
+    description: 'Open surface parking with scenic views and direct walkway to campus',
+    features: ['Complimentary Parking', 'River View', 'Solar Canopy (50%)', 'CCTV', 'Walking Trail'],
+    operatingHours: '6 AM - 10 PM',
+    paymentMethods: ['Complimentary Pass'],
+    monthlyPass: { car: 0, bike: 0 },
+    vehicleTypeDetails: {
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+    },
+  },
+  {
+    id: 'hyd-city-center',
+    areaId: 'hyd',
+    locationId: 'hyd',
+    name: 'City Center Basement - Hyderabad',
+    vehicleTypes: ['car', 'bike'],
+    isFree: true, // Client: every zone price 0, isFree true
+    price: 0,
+    spots: 150, // NEW: 150 slots
+    prices: { hour: 0, day: 0, month: 0 },
+    description: 'Convenient basement parking with EV points and 24/7 security',
+    features: ['Complimentary Parking', 'Direct Campus Access', 'CCTV', 'EV Charging (8 points)', '24/7 Security'],
+    operatingHours: '24x7',
+    paymentMethods: ['Complimentary Pass'],
+    monthlyPass: { car: 0, bike: 0 },
+    vehicleTypeDetails: {
+      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
+      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
     },
   },
 ];

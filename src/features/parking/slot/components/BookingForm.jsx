@@ -112,13 +112,13 @@ export default function BookingForm({
                   <input
                     type="date"
                     id="booking-date-input"
-                    className={`form-input ${errors.date ? 'input-error' : ''}`}
+                    className={`form-input date-picker-field ${errors.date ? 'input-error' : ''}`}
                     value={formData.date || ''}
                     min={todayStr}
                     onChange={(e) => handleInputChange('date', e.target.value)}
                     disabled={isSubmitting}
                   />
-                  <Calendar size={16} className="input-right-icon" />
+                  <Calendar size={16} className="input-right-icon pointer-events-none" />
                 </div>
                 {errors.date && <span className="field-error-text">{errors.date}</span>}
               </div>
@@ -249,6 +249,7 @@ export default function BookingForm({
                 value={formData.vehicleNumber || ''}
                 onChange={handleVehicleNumberChange}
                 disabled={isSubmitting}
+                maxLength={10}
               />
               {errors.vehicleNumber && <span className="field-error-text">{errors.vehicleNumber}</span>}
             </div>

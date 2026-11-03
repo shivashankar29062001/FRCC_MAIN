@@ -293,10 +293,10 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
           onClose();
         }
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-between p-4 sm:p-6 bg-[#0a1730]/95 backdrop-blur-sm select-none"
+      className="fixed inset-0 z-50 flex flex-col justify-between p-3 sm:p-6 bg-[#0a1730]/95 backdrop-blur-sm select-none overflow-y-auto overscroll-contain min-h-screen"
     >
       {/* Top Bar: Counter, Zoom Controls, Close Button */}
-      <div className="flex items-center justify-between w-full max-w-7xl mx-auto z-20 gap-3">
+      <div className="flex items-center justify-between w-full max-w-7xl mx-auto z-20 gap-3 shrink-0 mb-2">
         <span className="text-sm font-semibold font-mono tracking-wider text-slate-300">
           {currentIndex + 1} of {items.length}
         </span>
@@ -348,7 +348,7 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
 
       {/* Main View Area: Prev Button, Image, Next Button */}
       <div
-        className="relative flex-1 flex items-center justify-center min-h-0 w-full max-w-7xl mx-auto my-2 overflow-hidden"
+        className={`relative flex-1 flex flex-col items-center justify-center min-h-0 w-full max-w-7xl mx-auto my-2 ${zoom > 1 ? 'overflow-hidden' : 'overflow-y-auto overscroll-contain py-2'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -367,14 +367,14 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
             onPrev();
           }}
           aria-label="Previous photo"
-          className="absolute left-0 sm:left-2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
+          className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
         >
           <ChevronLeftIcon className="h-7 w-7 sm:h-8 sm:w-8" />
         </button>
 
         {/* Large Image & Caption */}
         <div
-          className="flex flex-col items-center justify-center max-h-full max-w-full px-12 sm:px-16"
+          className="flex flex-col items-center justify-center w-full max-w-full px-10 sm:px-16 my-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -389,10 +389,10 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
               transition: isDragging || isReducedMotion ? 'none' : 'transform 150ms ease-out',
               transformOrigin: 'center center',
             }}
-            className="max-h-[76vh] max-w-full object-contain rounded-lg shadow-lift select-none"
+            className="max-h-[58vh] sm:max-h-[62vh] md:max-h-[66vh] max-w-full object-contain rounded-lg shadow-lift select-none shrink-0"
             draggable={false}
           />
-          <p className="mt-3 text-center text-sm sm:text-base font-semibold text-slate-100 px-4 max-w-2xl">
+          <p className="mt-3 text-center text-sm sm:text-base font-semibold text-slate-100 px-4 max-w-2xl shrink-0">
             {currentItem.title || currentItem.caption}
           </p>
           {currentItem.credit && (
@@ -412,14 +412,14 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
             onNext();
           }}
           aria-label="Next photo"
-          className="absolute right-0 sm:right-2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
+          className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
         >
           <ChevronRightIcon className="h-7 w-7 sm:h-8 sm:w-8" />
         </button>
       </div>
 
       {/* Bottom hint */}
-      <div className="text-center text-xs text-slate-400 z-10 py-1">
+      <div className="text-center text-xs text-slate-400 z-10 py-2 shrink-0 mt-auto">
         <span>Tip: Use arrow keys, swipe, or double-click to zoom</span>
       </div>
     </div>
@@ -483,7 +483,7 @@ export function GalleryPage() {
   return (
     <div>
       {/* Page title & one-line subtitle */}
-      <div className="container-x section-top pb-16">
+      <div className="container-x section-top pb-20 sm:pb-24 min-h-[calc(100vh-140px)]">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Gallery' }]} />
 
         <div className="mt-3">

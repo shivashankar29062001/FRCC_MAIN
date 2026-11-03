@@ -12,6 +12,7 @@ export const ROUTES = Object.freeze({
   events: '/events',
   gallery: '/gallery',
   leadership: '/leadership',
+  applicationForm: '/membership/join',
   support: '/support',
   profile: '/profile',
   profileBookings: '/profile/bookings',
@@ -33,6 +34,7 @@ export const membership = ROUTES.membership;
 export const events = ROUTES.events;
 export const gallery = ROUTES.gallery;
 export const leadership = ROUTES.leadership;
+export const applicationForm = ROUTES.applicationForm;
 export const support = ROUTES.support;
 
 export default ROUTES;

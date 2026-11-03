@@ -41,7 +41,7 @@ function getPublicFallback(pathname) {
 }
 
 export function ProtectedRoute({ children, forceGated = false }) {
-  const { user, authLoading } = useApp();
+  const { user, authLoading, isPasswordRecovery } = useApp();
   const loc = useLocation();
   const { openAuthPrompt } = useAuthModal();
 
@@ -64,6 +64,11 @@ export function ProtectedRoute({ children, forceGated = false }) {
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-500 border-t-transparent" />
       </div>
     );
+  }
+
+  // Password recovery session is strictly limited to the Change Password screen
+  if (isPasswordRecovery && loc.pathname !== '/profile') {
+    return <Navigate to="/profile?tab=password" replace />;
   }
 
   if (!user && isGated) {

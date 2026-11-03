@@ -114,6 +114,7 @@ export default function App() {
                     <Route path="/membership" element={<MembershipLandingPage />} />
                     <Route path="/book/membership" element={<Navigate to="/membership" replace />} />
                     <Route path="/membership/join" element={<RequireAuth forceGated><MembershipJoinPage /></RequireAuth>} />
+                    <Route path="/application-form" element={<RequireAuth forceGated><MembershipJoinPage /></RequireAuth>} />
                     <Route path="/membership/dashboard" element={<RequireAuth forceGated><MembershipDashboardPage /></RequireAuth>} />
 
                     {/* Events */}

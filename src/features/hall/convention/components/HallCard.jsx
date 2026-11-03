@@ -90,7 +90,7 @@ export default function HallCard({ hall, onSelect, selected, actionLabel = 'Sele
           </div>
         )}
         <span className="absolute top-2 left-2 bg-gold text-navy text-xs font-semibold rounded px-2 py-0.5">
-          {hall.type === 'NON_AC' ? 'Non-AC' : hall.type === 'BOARD_ROOM' ? 'Board Room' : 'AC'}
+          {hall.cooling === 'NON_AC' ? 'Non-AC' : 'AC'}
         </span>
         {fits && (
           <span className="absolute top-2 right-2 bg-green-700 text-white text-xs font-semibold rounded px-2 py-0.5">✓ Fits your group</span>

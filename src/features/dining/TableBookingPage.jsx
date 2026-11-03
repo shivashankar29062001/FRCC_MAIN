@@ -15,6 +15,7 @@ import { useApp } from '../../app/store/AppContext.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatDMY, parseDMY } from '../../utils/dates.js';
 import { todayISO } from '../../utils/helpers.js';
+import { normalizeMobile, isValidMobile } from '../../utils/phone.js';
 import {
   PrinterIcon,
   CheckCircleIcon,
@@ -70,9 +71,9 @@ export function TableBookingPage() {
   useEffect(() => {
     if (user) {
       if (!guestName && user.name) setGuestName(user.name);
-      if (!guestEmail && user.email) setGuestEmail(user.email);
-      const userPhone = user.mobile || user.phone || (!user.emailOrPhone?.includes('@') ? user.emailOrPhone : '');
-      if (!guestMobile && userPhone) setGuestMobile(userPhone);
+      if (!guestEmail && user.email && !user.email.toLowerCase().endsWith('@frcc.member')) setGuestEmail(user.email);
+      const userPhone = user.phone || user.mobile || (!user.emailOrPhone?.includes('@') ? user.emailOrPhone : '');
+      if (!guestMobile && userPhone) setGuestMobile(userPhone.replace(/\D/g, '').slice(-10));
     }
   }, [user]);
 
@@ -132,21 +133,57 @@ export function TableBookingPage() {
   // Step 2 validation
   function validateDetails() {
     const errs = {};
-    if (!guestName.trim()) errs.name = 'Full name is required.';
-    const cleanPhone = guestMobile.replace(/\D/g, '');
-    if (cleanPhone.length < 10) errs.mobile = 'Enter a valid 10-digit mobile number.';
-    if (!guestEmail.trim() || !guestEmail.includes('@')) errs.email = 'Valid email is required.';
+    if (!guestName.trim()) {
+      errs.name = 'Full name is required.';
+    }
+    const cleanPhone = normalizeMobile(guestMobile);
+    if (!cleanPhone) {
+      errs.mobile = 'Mobile number is required.';
+    } else if (!isValidMobile(cleanPhone)) {
+      errs.mobile = 'Enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.';
+    }
+    const cleanEmail = guestEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      errs.email = 'Valid email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      errs.email = 'Enter a valid email address.';
+    }
     if (venue.minAge > 0 && !ageConfirmed) {
-      errs.age = 'You must confirm that you are 21 or older.';
+      errs.age = `You must confirm that you are ${venue.minAge} or older to book at ${venue.name}.`;
     }
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+
+    if (Object.keys(errs).length > 0) {
+      const firstFieldId = errs.name
+        ? 'details-name'
+        : errs.mobile
+        ? 'details-mobile'
+        : errs.email
+        ? 'details-email'
+        : errs.age
+        ? 'details-age-confirm'
+        : null;
+      if (firstFieldId) {
+        setTimeout(() => {
+          const el = document.getElementById(firstFieldId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus();
+          }
+        }, 10);
+      }
+      return false;
+    }
+    return true;
   }
 
   async function handleConfirmBooking() {
+    if (submitting) return;
     if (!validateDetails()) return;
     setSubmitting(true);
+    setErrors({});
     try {
+      const cleanMob = normalizeMobile(guestMobile);
       const payload = {
         clientRequestId: clientRequestIdRef.current,
         userId: user?.id || null,
@@ -155,9 +192,10 @@ export function TableBookingPage() {
         time: selectedSlot,
         guests: guestsCount,
         name: guestName.trim(),
-        mobile: guestMobile.trim(),
-        email: guestEmail.trim(),
+        mobile: cleanMob,
+        email: guestEmail.trim().toLowerCase(),
         notes: notes.trim(),
+        ageConfirmed: Boolean(ageConfirmed),
       };
       const booking = await createTableBooking(payload);
       setConfirmedBooking(booking);
@@ -394,7 +432,10 @@ export function TableBookingPage() {
                 type="text"
                 placeholder="e.g. Ramesh Kumar"
                 value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
+                onChange={(e) => {
+                  setGuestName(e.target.value);
+                  if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+                }}
                 className={`field h-11 w-full text-sm ${errors.name ? 'border-rose-400' : ''}`}
               />
               {errors.name && <p className="field-error mt-1">{errors.name}</p>}
@@ -408,7 +449,10 @@ export function TableBookingPage() {
                   type="tel"
                   placeholder="10-digit number"
                   value={guestMobile}
-                  onChange={(e) => setGuestMobile(e.target.value)}
+                  onChange={(e) => {
+                    setGuestMobile(e.target.value);
+                    if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: null }));
+                  }}
                   className={`field h-11 w-full text-sm ${errors.mobile ? 'border-rose-400' : ''}`}
                 />
                 {errors.mobile && <p className="field-error mt-1">{errors.mobile}</p>}
@@ -421,7 +465,10 @@ export function TableBookingPage() {
                   type="email"
                   placeholder="name@example.com"
                   value={guestEmail}
-                  onChange={(e) => setGuestEmail(e.target.value)}
+                  onChange={(e) => {
+                    setGuestEmail(e.target.value);
+                    if (errors.email) setErrors((prev) => ({ ...prev, email: null }));
+                  }}
                   className={`field h-11 w-full text-sm ${errors.email ? 'border-rose-400' : ''}`}
                 />
                 {errors.email && <p className="field-error mt-1">{errors.email}</p>}
@@ -443,23 +490,46 @@ export function TableBookingPage() {
             {/* Min Age requirement checkbox */}
             {venue.minAge > 0 && (
               <div className="pt-2">
-                <label className="flex items-start gap-3 cursor-pointer select-none rounded-xl border border-amber-300 bg-amber-50/60 p-4">
+                <label
+                  htmlFor="details-age-confirm"
+                  className={`flex items-start gap-3 cursor-pointer select-none rounded-xl border p-4 transition ${
+                    errors.age ? 'border-rose-400 bg-rose-50/50' : 'border-amber-300 bg-amber-50/60'
+                  }`}
+                >
                   <input
                     type="checkbox"
+                    id="details-age-confirm"
                     checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-amber-400 text-gold-600 focus:ring-gold-500"
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAgeConfirmed(checked);
+                      if (checked) {
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.age;
+                          if (next.form && next.form.toLowerCase().includes('older')) {
+                            delete next.form;
+                          }
+                          return next;
+                        });
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-amber-400 text-gold-600 focus:ring-gold-500 cursor-pointer"
                   />
                   <div className="text-xs text-amber-950">
                     <span className="font-semibold block">
-                      I confirm I am 21 or older and will carry a valid photo ID *
+                      I confirm I am {venue.minAge} or older and will carry a valid photo ID *
                     </span>
                     <span className="text-amber-800 text-[11px] block mt-0.5">
-                      Entry to {venue.name} requires government-issued photo identification verifying age 21+.
+                      Entry to {venue.name} requires government-issued photo identification verifying age {venue.minAge}+.
                     </span>
                   </div>
                 </label>
-                {errors.age && <p className="field-error mt-1">{errors.age}</p>}
+                {errors.age && (
+                  <p id="details-age-err" className="field-error mt-1.5" role="alert">
+                    {errors.age}
+                  </p>
+                )}
               </div>
             )}
 
@@ -470,7 +540,26 @@ export function TableBookingPage() {
               </p>
             </div>
 
-            {errors.form && <p className="field-error mt-2">{errors.form}</p>}
+            {errors.form && (
+              <div
+                id="details-form-err"
+                className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-800 flex items-start justify-between gap-3"
+                role="alert"
+              >
+                <div>
+                  <p className="font-semibold text-sm">Reservation Failed</p>
+                  <p className="mt-0.5">{errors.form}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConfirmBooking}
+                  disabled={submitting}
+                  className="btn-base px-3.5 py-1.5 bg-rose-700 text-white hover:bg-rose-800 text-xs font-semibold rounded-lg shrink-0 transition"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-8 flex justify-between border-t border-slate-100 pt-5">
@@ -485,9 +574,16 @@ export function TableBookingPage() {
               type="button"
               disabled={submitting}
               onClick={handleConfirmBooking}
-              className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-2.5 font-bold text-sm inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-2.5 font-bold text-sm inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition shadow-sm"
             >
-              {submitting ? 'Confirming…' : 'Confirm reservation'}
+              {submitting ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-navy-950 border-t-transparent" />
+                  Confirming…
+                </>
+              ) : (
+                'Confirm reservation'
+              )}
             </button>
           </div>
         </Card>

@@ -1,20 +1,10 @@
 // ---------------------------------------------------------------------------
-// Slot availability for Activities/Games — ONE FILE.
-// Generates per-game, per-date slots from games.config.js (hours + slot
-// length) with a deterministic booked subset, so the grid is stable across
-// reloads for the same game + date.
+// /features/activities/availability.service.js — Slot availability for Activities
+// Authoritative slot availability from Supabase RPC get_slot_availability(game_id, date).
 // ---------------------------------------------------------------------------
 
 import { gameById } from './games.config.js';
-
-function hashString(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i += 1) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
+import { supabase } from '../../services/supabase.js';
 
 function toMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -40,16 +30,56 @@ export function slotRange(gameId, startHHMM) {
 }
 
 /**
+ * Fetch authoritative slot availability from database RPC get_slot_availability.
  * @param {string} gameId
  * @param {string} dateISO 'YYYY-MM-DD'
- * @returns {Array<{ time: string, booked: boolean }>}
+ * @returns {Promise<Array<{ time: string, range: string, capacity: number, bookedCount: number, remaining: number, status: string, booked: boolean }>>}
+ */
+export async function getSlotAvailability(gameId, dateISO) {
+  if (!gameId || !dateISO) return [];
+
+  try {
+    const { data, error } = await supabase.rpc('get_slot_availability', {
+      p_game_id: gameId,
+      p_date: dateISO,
+    });
+
+    if (error) {
+      console.warn('get_slot_availability RPC returned error:', error);
+      throw error;
+    }
+
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((s) => ({
+        time: s.slot,
+        range: s.slot_range || slotRange(gameId, s.slot),
+        capacity: Number(s.capacity ?? 1),
+        bookedCount: Number(s.booked_count ?? 0),
+        remaining: Number(s.remaining ?? 0),
+        status: s.status || (Number(s.remaining ?? 0) <= 0 ? 'full' : 'available'),
+        booked: Number(s.remaining ?? 0) <= 0 || s.status === 'full',
+      }));
+    }
+  } catch (err) {
+    console.warn('Database slot availability fetch failed, falling back to local slots:', err);
+    return getSlots(gameId, dateISO);
+  }
+
+  return getSlots(gameId, dateISO);
+}
+
+/**
+ * Offline / local slot fallback based on game operating hours.
+ * @param {string} gameId
+ * @param {string} dateISO 'YYYY-MM-DD'
+ * @returns {Array<{ time: string, range: string, capacity: number, bookedCount: number, remaining: number, status: string, booked: boolean }>}
  */
 export function getSlots(gameId, dateISO) {
   const game = gameById(gameId);
   if (!game || !dateISO) return [];
-  const { open, close } = game.hours;
-  const len = game.slotMinutes;
-  const seed = hashString(`${gameId}|${dateISO}`);
+  const { open, close } = game.hours || { open: 6, close: 22 };
+  const len = game.slotMinutes || 60;
+  const capacity = game.id === 'swimming-pool' ? 20 : game.id === 'kids-play-area' ? 15 : (game.maxPlayers || 4);
 
   const today = new Date();
   const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -57,13 +87,22 @@ export function getSlots(gameId, dateISO) {
   const isToday = dateISO === todayISO;
 
   const slots = [];
-  let i = 0;
-  for (let m = open * 60; m + len <= close * 60; m += len, i += 1) {
+  for (let m = open * 60; m + len <= close * 60; m += len) {
     const time = toHHMM(m);
-    // Deterministic: ~1 in 3 slots reads as booked for this game + date.
-    const mockBooked = (seed + i * 7 + Math.floor(seed / (i + 3))) % 10 < 3;
-    const past = isToday && m <= nowMinutes + 30; // 30-min booking buffer
-    slots.push({ time, booked: mockBooked || past });
+    const past = isToday && m <= nowMinutes + 15; // 15-min buffer
+    const remaining = past ? 0 : capacity;
+    const booked = past;
+    const status = booked ? 'full' : 'available';
+
+    slots.push({
+      time,
+      range: slotRange(gameId, time),
+      capacity,
+      bookedCount: past ? capacity : 0,
+      remaining,
+      status,
+      booked,
+    });
   }
   return slots;
 }

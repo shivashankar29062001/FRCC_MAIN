@@ -7,9 +7,10 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useRef } from 'react';
+import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
-import BookingConfirmation from './components/BookingConfirmation.jsx';
+import BookingConfirmation, { getMaskedContactDetails } from './components/BookingConfirmation.jsx';
 import {
   createBooking,
   generateBookingReference,
@@ -36,24 +37,35 @@ const generateInitialSlots = () => {
 
 const INITIAL_SLOTS = generateInitialSlots();
 
-const CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
+const BASE_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc_parking_confirmed_bookings_v1';
+const LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
 
-const retainConfirmedBooking = (booking) => {
+// Remove legacy un-namespaced keys on startup
+try {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.removeItem(LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY);
+    window.sessionStorage.removeItem(BASE_CONFIRMED_BOOKINGS_STORAGE_KEY);
+  }
+} catch (_) {}
+
+const getConfirmedBookingsKey = (userId = null) =>
+  userId ? `${BASE_CONFIRMED_BOOKINGS_STORAGE_KEY}.${userId}` : BASE_CONFIRMED_BOOKINGS_STORAGE_KEY;
+
+const retainConfirmedBooking = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
-    window.sessionStorage.setItem(
-      CONFIRMED_BOOKINGS_STORAGE_KEY,
-      JSON.stringify([...existing, booking])
-    );
+    window.sessionStorage.setItem(key, JSON.stringify([...existing, booking]));
   } catch (_) {
     // Storage unavailable
   }
 };
 
-const updateRetainedBookingStatus = (booking) => {
+const updateRetainedBookingStatus = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
     const reference = booking.bookingReference || booking.bookingId;
     const updated = existing.map((b) => {
@@ -68,7 +80,7 @@ const updateRetainedBookingStatus = (booking) => {
       }
       return b;
     });
-    window.sessionStorage.setItem(CONFIRMED_BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
+    window.sessionStorage.setItem(key, JSON.stringify(updated));
   } catch (_) {
     // Storage unavailable
   }
@@ -82,10 +94,8 @@ const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
 export default function ParkingBookingPage() {
+  const { user } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
-  const [slots, setSlots] = useState(INITIAL_SLOTS);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [step, setStep] = useState(STEP_CITY);
 
   const [formData, setFormData] = useState({
     city: '',
@@ -95,6 +105,25 @@ export default function ParkingBookingPage() {
     vehicleType: '',
     vehicleNumber: ''
   });
+
+// Slot statuses tracked independently per city (Vijayawada and Hyderabad).
+// Each city has its own 150-slot inventory (Blocks A-C, slots 01-50).
+const [slotStatuses, setSlotStatuses] = useState(() => ({
+  vja: generateInitialSlots(),
+  hyd: generateInitialSlots(),
+}));
+
+// Derive the currently displayed slots based on the selected city.
+// Defaults to Vijayawada ('vja') when the city is unspecified.
+const slots = useMemo(
+  () => {
+    const cityKey = formData.city === 'Vijayawada' ? 'vja' : formData.city === 'Hyderabad' ? 'hyd' : 'vja';
+    return slotStatuses[cityKey];
+  },
+  [slotStatuses, formData.city]
+);
+const [selectedSlot, setSelectedSlot] = useState(null);
+  const [step, setStep] = useState(STEP_CITY);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,6 +136,17 @@ export default function ParkingBookingPage() {
   const pendingBookingRef = useRef(null);
 
   const apiConfigured = isBookingApiConfigured();
+
+  // Reset confirmation receipt if active user changes or logs out
+  useEffect(() => {
+    if (confirmedBooking) {
+      const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
+      if (!matches) {
+        setConfirmedBooking(null);
+        setStep(STEP_CITY);
+      }
+    }
+  }, [user?.id, user?.userId, confirmedBooking]);
 
   // Auto-advance step based on form completion
   useEffect(() => {
@@ -149,6 +189,13 @@ export default function ParkingBookingPage() {
       setStep(STEP_PAYMENT);
     }
   }, [formData.vehicleType, formData.vehicleNumber, step]);
+
+  // Clear selected slot when the city changes, since the slot inventory
+  // is independent per campus. The previously selected slot belongs to
+  // the old city and must not interfere with the new city's inventory.
+  useEffect(() => {
+    setSelectedSlot(null);
+  }, [formData.city]);
 
   const pricePerDay =
     formData.vehicleType === 'Two Wheeler'
@@ -212,6 +259,15 @@ export default function ParkingBookingPage() {
       newErrors.vehicleNumber = 'Please enter your vehicle registration number.';
     } else if (formData.vehicleNumber.trim().length < 4) {
       newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP01AB1234).';
+    } else {
+      // Format validation for Indian vehicle registration numbers
+      // Pattern: 2 uppercase letters + 1-2 digits + 0-2 uppercase letters + 4 digits
+      // Examples: AP02AB1234, TS09CD5678
+      const normalized = formData.vehicleNumber.trim().toUpperCase();
+      const vehicleNumberRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/;
+      if (!vehicleNumberRegex.test(normalized)) {
+        newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP02AB1234).';
+      }
     }
 
     if (!numberOfDays || numberOfDays < 1 || numberOfDays > 7) {
@@ -222,16 +278,32 @@ export default function ParkingBookingPage() {
   };
 
   const commitConfirmedBooking = (booking) => {
-    setSlots((prevSlots) =>
-      prevSlots.map((s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s))
-    );
+    setSlotStatuses((prevStatuses) => {
+      // Map full city names to slotStatuses keys ('vja'/'hyd')
+      const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
+      const city = cityMap[booking.city || formData.city] || 'vja';
+      const cityStatuses = prevStatuses[city];
+      const updatedCityStatuses = cityStatuses.map(
+        (s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s)
+      );
+      return {
+        ...prevStatuses,
+        [city]: updatedCityStatuses,
+      };
+    });
 
-    retainConfirmedBooking(booking);
+    retainConfirmedBooking(booking, user?.id);
     setConfirmedBooking(booking);
     setIsSubmitting(false);
     submittingRef.current = false;
     pendingBookingRef.current = null;
     setStep(STEP_CONFIRMATION);
+
+    // Show booking confirmation notification with user's contact details
+    if (!confirmedBooking && pushToast) {
+      const { message } = getMaskedContactDetails(user, null, booking);
+      pushToast(message);
+    }
 
     setTimeout(() => {
       const el = document.getElementById('booking-confirmation-section');
@@ -246,6 +318,8 @@ export default function ParkingBookingPage() {
 
     const booking = createBooking({
       bookingReference: generateBookingReference(),
+      userId: user?.id || user?.userId || null,
+      user_id: user?.id || null,
       parkingSlot: selectedSlot,
       vehicleType: formData.vehicleType,
       vehicleNumber: formData.vehicleNumber.trim(),
@@ -325,11 +399,21 @@ export default function ParkingBookingPage() {
     setIsCancelling(true);
 
     const booking = confirmedBooking;
+    // Map full city names to slotStatuses keys ('vja'/'hyd')
+    const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
+    const city = cityMap[booking.city || formData.city] || 'vja';
     const releasedSlot = booking.parkingSlot;
 
-    setSlots((prevSlots) =>
-      prevSlots.map((s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s))
-    );
+    setSlotStatuses((prevStatuses) => {
+      const cityStatuses = prevStatuses[city];
+      const updatedCityStatuses = cityStatuses.map(
+        (s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s)
+      );
+      return {
+        ...prevStatuses,
+        [city]: updatedCityStatuses,
+      };
+    });
 
     const cancelledBooking = {
       ...booking,
@@ -338,7 +422,7 @@ export default function ParkingBookingPage() {
       cancelledAt: new Date().toISOString()
     };
     setConfirmedBooking(cancelledBooking);
-    updateRetainedBookingStatus(cancelledBooking);
+    updateRetainedBookingStatus(cancelledBooking, user?.id);
 
     if (isBookingCancelApiConfigured()) {
       setCancelSyncState({ status: 'syncing', error: '' });
@@ -461,6 +545,7 @@ export default function ParkingBookingPage() {
           {confirmedBooking ? (
             <BookingConfirmation
               booking={confirmedBooking}
+              user={user}
               apiStatus={submissionState.status}
               onDone={handleDone}
               onBookAnother={handleBookAnotherSlot}
