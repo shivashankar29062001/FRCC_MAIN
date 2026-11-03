@@ -682,7 +682,6 @@ export function Navbar() {
 
 const FOOTER_LINKS = [
   { to: ROUTES.homeHub, label: 'Home' },
-  { to: '/#facilities', label: 'Facilities' },
   { to: ROUTES.activities, label: 'Book an activity' },
   { to: ROUTES.membership, label: 'Membership' },
   { to: ROUTES.gallery, label: 'Gallery' },

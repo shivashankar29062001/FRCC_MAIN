@@ -208,7 +208,13 @@ export function TableBookingPage() {
       setStep(3);
     } catch (err) {
       console.error('Failed to create table booking:', err);
-      setErrors({ form: err?.message || 'Unable to reserve table. Please try again.' });
+      const msg = err?.message || 'Unable to reserve table. Please try again.';
+      if (msg.toLowerCase().includes('capacity') || msg.toLowerCase().includes('seat') || msg.toLowerCase().includes('not available')) {
+        setStep(1); // Return to Date & Time selection
+        setErrors({ slot: msg, form: msg });
+      } else {
+        setErrors({ form: msg });
+      }
     } finally {
       setSubmitting(false);
     }

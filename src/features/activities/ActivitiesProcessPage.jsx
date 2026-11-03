@@ -462,9 +462,21 @@ export function ActivitiesProcessPage() {
       pushToast(draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
     } catch (err) {
       const msg = err?.message || String(err);
-      if (msg.includes('SLOT_FULL') || msg.includes('no longer available') || msg.includes('ALREADY_BOOKED')) {
-        pushToast('This slot is no longer available', 'error');
-        setErrors({ slot: 'This slot is no longer available', alreadyBooked: 'This slot is no longer available' });
+      const isSlotConflict =
+        msg.includes('SLOT_FULL') ||
+        msg.includes('no longer available') ||
+        msg.includes('ALREADY_BOOKED') ||
+        msg.includes('already booked') ||
+        msg.includes('duplicate') ||
+        msg.includes('23505') ||
+        msg.includes('unique constraint');
+
+      if (isSlotConflict) {
+        pushToast('This slot is no longer available. Please select another slot.', 'error');
+        setErrors({
+          slot: 'This slot is no longer available. Please select another slot.',
+          alreadyBooked: 'This slot is no longer available. Please select another slot.',
+        });
         slotsQuery.retry();
         setStep(2); // Return to Available Slot step
       } else {

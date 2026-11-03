@@ -119,6 +119,27 @@ async function fallbackCreateActivityBooking({
     email: email || sessionUser?.email || null,
   };
 
+  // 1. Pre-check if slot is already occupied by an active booking
+  try {
+    const { data: existingSlots } = await supabase
+      .from('bookings')
+      .select('id, booking_id, status')
+      .eq('category', 'activity')
+      .or(`game_id.eq.${gameId},title.ilike.%${gameTitle}%`)
+      .eq('date', String(date))
+      .eq('slot', String(slot))
+      .in('status', ['Confirmed', 'Pending', 'confirmed', 'pending'])
+      .limit(1);
+
+    if (existingSlots && existingSlots.length > 0) {
+      throw new Error('This slot is no longer available');
+    }
+  } catch (checkErr) {
+    if (String(checkErr?.message).includes('no longer available')) {
+      throw checkErr;
+    }
+  }
+
   let inserted = null;
   try {
     const { data: insData, error: insErr } = await supabase
@@ -129,6 +150,9 @@ async function fallbackCreateActivityBooking({
     if (!insErr && insData) {
       inserted = insData;
     } else {
+      if (insErr && (insErr.code === '23505' || String(insErr.message).includes('duplicate') || String(insErr.message).includes('idx_unique_active_activity_slot_booking'))) {
+        throw new Error('This slot is no longer available');
+      }
       const minimalPayload = {
         booking_id: bookingRef,
         user_id: currentUserId,
@@ -141,14 +165,20 @@ async function fallbackCreateActivityBooking({
         status,
         payment_method: paymentMethod || 'upi',
       };
-      const { data: minData } = await supabase
+      const { data: minData, error: minErr } = await supabase
         .from('bookings')
         .insert([minimalPayload])
         .select()
         .maybeSingle();
+      if (minErr && (minErr.code === '23505' || String(minErr.message).includes('duplicate') || String(minErr.message).includes('idx_unique_active_activity_slot_booking'))) {
+        throw new Error('This slot is no longer available');
+      }
       if (minData) inserted = minData;
     }
   } catch (err) {
+    if (String(err?.message).includes('no longer available')) {
+      throw err;
+    }
     console.warn('[bookings.store] Direct bookings insert error:', err);
   }
 
@@ -225,10 +255,20 @@ export async function createActivityBookingRemote({
     rpcError = err;
   }
 
-  // If slot was full or already booked, re-throw business error directly
-  const errMsg = String(rpcError?.message || '');
-  if (errMsg.includes('SLOT_FULL') || errMsg.includes('no longer available') || errMsg.includes('ALREADY_BOOKED')) {
-    throw rpcError;
+  // If slot was full, already booked, or rejected by unique constraint, re-throw business error directly
+  const errMsg = String(rpcError?.message || rpcError?.details || '');
+  const errCode = String(rpcError?.code || '');
+  const isConflict =
+    errCode === '23505' ||
+    errMsg.includes('SLOT_FULL') ||
+    errMsg.includes('no longer available') ||
+    errMsg.includes('ALREADY_BOOKED') ||
+    errMsg.includes('already booked') ||
+    errMsg.includes('duplicate') ||
+    errMsg.includes('unique constraint');
+
+  if (isConflict) {
+    throw new Error('This slot is no longer available');
   }
 
   console.warn('create_activity_booking RPC unavailable in schema cache; using direct booking fallback:', rpcError);
