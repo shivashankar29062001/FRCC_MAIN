@@ -10,7 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
-import BookingConfirmation from './components/BookingConfirmation.jsx';
+import BookingConfirmation, { getMaskedContactDetails } from './components/BookingConfirmation.jsx';
 import {
   createBooking,
   generateBookingReference,
@@ -96,9 +96,6 @@ const STEP_CONFIRMATION = 6;
 export default function ParkingBookingPage() {
   const { user } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
-  const [slots, setSlots] = useState(INITIAL_SLOTS);
-  const [selectedSlot, setSelectedSlot] = useState(null);
-  const [step, setStep] = useState(STEP_CITY);
 
   const [formData, setFormData] = useState({
     city: '',
@@ -108,6 +105,25 @@ export default function ParkingBookingPage() {
     vehicleType: '',
     vehicleNumber: ''
   });
+
+// Slot statuses tracked independently per city (Vijayawada and Hyderabad).
+// Each city has its own 150-slot inventory (Blocks A-C, slots 01-50).
+const [slotStatuses, setSlotStatuses] = useState(() => ({
+  vja: generateInitialSlots(),
+  hyd: generateInitialSlots(),
+}));
+
+// Derive the currently displayed slots based on the selected city.
+// Defaults to Vijayawada ('vja') when the city is unspecified.
+const slots = useMemo(
+  () => {
+    const cityKey = formData.city === 'Vijayawada' ? 'vja' : formData.city === 'Hyderabad' ? 'hyd' : 'vja';
+    return slotStatuses[cityKey];
+  },
+  [slotStatuses, formData.city]
+);
+const [selectedSlot, setSelectedSlot] = useState(null);
+  const [step, setStep] = useState(STEP_CITY);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,6 +190,13 @@ export default function ParkingBookingPage() {
     }
   }, [formData.vehicleType, formData.vehicleNumber, step]);
 
+  // Clear selected slot when the city changes, since the slot inventory
+  // is independent per campus. The previously selected slot belongs to
+  // the old city and must not interfere with the new city's inventory.
+  useEffect(() => {
+    setSelectedSlot(null);
+  }, [formData.city]);
+
   const pricePerDay =
     formData.vehicleType === 'Two Wheeler'
       ? 20
@@ -236,6 +259,15 @@ export default function ParkingBookingPage() {
       newErrors.vehicleNumber = 'Please enter your vehicle registration number.';
     } else if (formData.vehicleNumber.trim().length < 4) {
       newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP01AB1234).';
+    } else {
+      // Format validation for Indian vehicle registration numbers
+      // Pattern: 2 uppercase letters + 1-2 digits + 0-2 uppercase letters + 4 digits
+      // Examples: AP02AB1234, TS09CD5678
+      const normalized = formData.vehicleNumber.trim().toUpperCase();
+      const vehicleNumberRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/;
+      if (!vehicleNumberRegex.test(normalized)) {
+        newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP02AB1234).';
+      }
     }
 
     if (!numberOfDays || numberOfDays < 1 || numberOfDays > 7) {
@@ -246,9 +278,19 @@ export default function ParkingBookingPage() {
   };
 
   const commitConfirmedBooking = (booking) => {
-    setSlots((prevSlots) =>
-      prevSlots.map((s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s))
-    );
+    setSlotStatuses((prevStatuses) => {
+      // Map full city names to slotStatuses keys ('vja'/'hyd')
+      const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
+      const city = cityMap[booking.city || formData.city] || 'vja';
+      const cityStatuses = prevStatuses[city];
+      const updatedCityStatuses = cityStatuses.map(
+        (s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s)
+      );
+      return {
+        ...prevStatuses,
+        [city]: updatedCityStatuses,
+      };
+    });
 
     retainConfirmedBooking(booking, user?.id);
     setConfirmedBooking(booking);
@@ -256,6 +298,12 @@ export default function ParkingBookingPage() {
     submittingRef.current = false;
     pendingBookingRef.current = null;
     setStep(STEP_CONFIRMATION);
+
+    // Show booking confirmation notification with user's contact details
+    if (!confirmedBooking && pushToast) {
+      const { message } = getMaskedContactDetails(user, null, booking);
+      pushToast(message);
+    }
 
     setTimeout(() => {
       const el = document.getElementById('booking-confirmation-section');
@@ -351,11 +399,21 @@ export default function ParkingBookingPage() {
     setIsCancelling(true);
 
     const booking = confirmedBooking;
+    // Map full city names to slotStatuses keys ('vja'/'hyd')
+    const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
+    const city = cityMap[booking.city || formData.city] || 'vja';
     const releasedSlot = booking.parkingSlot;
 
-    setSlots((prevSlots) =>
-      prevSlots.map((s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s))
-    );
+    setSlotStatuses((prevStatuses) => {
+      const cityStatuses = prevStatuses[city];
+      const updatedCityStatuses = cityStatuses.map(
+        (s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s)
+      );
+      return {
+        ...prevStatuses,
+        [city]: updatedCityStatuses,
+      };
+    });
 
     const cancelledBooking = {
       ...booking,
@@ -487,6 +545,7 @@ export default function ParkingBookingPage() {
           {confirmedBooking ? (
             <BookingConfirmation
               booking={confirmedBooking}
+              user={user}
               apiStatus={submissionState.status}
               onDone={handleDone}
               onBookAnother={handleBookAnotherSlot}

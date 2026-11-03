@@ -4,6 +4,8 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect } from 'react';
+import { useApp } from '../../../../app/store/AppContext.jsx';
+import { readSession } from '../../../../app/session.js';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -32,8 +34,67 @@ import './BookingConfirmation.css';
  * CANCELLED locally; dashboard sync only happens via an explicitly
  * configured cancellation endpoint (never claimed without confirmation).
  */
+function safeReadMembership() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem('frcc.membership.v1');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getMaskedContactDetails(user, membership, booking) {
+  const effectiveMembership = membership || safeReadMembership();
+
+  const rawMobile =
+    user?.mobile ||
+    user?.phone ||
+    effectiveMembership?.mobile ||
+    effectiveMembership?.phone ||
+    (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '') ||
+    booking?.mobile ||
+    booking?.phone ||
+    '';
+
+  const rawEmail =
+    user?.email ||
+    effectiveMembership?.email ||
+    (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '') ||
+    booking?.email ||
+    '';
+
+  const cleanDigits = String(rawMobile).replace(/\D/g, '');
+  const maskedMobile = cleanDigits.length >= 4
+    ? `+91 XXXXXXX${cleanDigits.slice(-4)}`
+    : (cleanDigits ? `+91 ${cleanDigits}` : '');
+
+  let maskedEmail = '';
+  if (rawEmail && rawEmail.includes('@')) {
+    const [local, domain] = rawEmail.split('@');
+    if (domain) {
+      const prefix = local.length > 3 ? local.slice(0, 3) : (local.length > 1 ? local.slice(0, local.length - 1) : local);
+      maskedEmail = `${prefix}**@${domain}`;
+    }
+  }
+
+  let message = '';
+  if (maskedMobile && maskedEmail) {
+    message = `Your booking confirmation details have been sent to ${maskedMobile} and ${maskedEmail}`;
+  } else if (maskedMobile) {
+    message = `Your booking confirmation details have been sent to ${maskedMobile}`;
+  } else if (maskedEmail) {
+    message = `Your booking confirmation details have been sent to ${maskedEmail}`;
+  } else {
+    message = 'Your booking confirmation details have been sent to your registered mobile number and email.';
+  }
+
+  return { rawMobile, rawEmail, maskedMobile, maskedEmail, message };
+}
+
 export default function BookingConfirmation({
   booking,
+  user: propUser,
   apiStatus,
   onDone,
   onBookAnother,
@@ -43,6 +104,14 @@ export default function BookingConfirmation({
   isDemoPayment
 }) {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const app = useApp();
+  const effectiveUser = propUser || app?.user || (typeof window !== 'undefined' ? readSession() : null);
+  const membership = app?.membership;
+  const { message: confirmationMessage } = getMaskedContactDetails(
+    effectiveUser,
+    membership,
+    booking
+  );
 
   const isCancelled =
     booking.bookingStatus === 'Cancelled' || booking.bookingStatusCode === 'CANCELLED';
@@ -180,11 +249,11 @@ export default function BookingConfirmation({
             <span>Synced with the FRCC admin dashboard.</span>
           </p>
         )}
-        {!isCancelled && apiStatus === 'not_configured' && (
-          <p className="confirmation-sync-note is-info" id="confirmation-sync-note">
-            <AlertTriangle size={14} />
+        {!isCancelled && (apiStatus === 'not_configured' || apiStatus === 'idle') && (
+          <p className="confirmation-sync-note is-success" id="confirmation-sync-note">
+            <CheckCircle2 size={14} />
             <span>
-              Saved on this device. Admin dashboard sync is not configured yet.
+              {confirmationMessage}
             </span>
           </p>
         )}

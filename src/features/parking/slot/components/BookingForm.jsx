@@ -249,6 +249,7 @@ export default function BookingForm({
                 value={formData.vehicleNumber || ''}
                 onChange={handleVehicleNumberChange}
                 disabled={isSubmitting}
+                maxLength={10}
               />
               {errors.vehicleNumber && <span className="field-error-text">{errors.vehicleNumber}</span>}
             </div>

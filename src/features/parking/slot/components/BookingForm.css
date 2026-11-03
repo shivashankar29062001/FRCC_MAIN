@@ -188,7 +188,8 @@
   position: absolute;
   right: 10px;
   pointer-events: none;
-  color: #64748B;
+  /* Blue secondary icon removed - only the black header icon remains visible */
+  display: none;
 }
 
 /* 3. Full-width Card: Vehicle Details */
