@@ -13,7 +13,18 @@ export const areas = [
 export const checkInTime = '12:00 PM'; // SAMPLE
 export const checkOutTime = '11:00 AM'; // SAMPLE
 export const maxNights = 30; // Maximum duration for stay bookings
-export const cancellationPolicy = 'Free cancellation up to 48 hours before check-in. Cancellations within 48 hours are subject to a 1-night retention fee.'; // SAMPLE
+export const cancellationPolicy = 'Free cancellation up to 24 hours before check-in. Late cancellation: 1-night charge. No-show: Non-refundable.';
+
+export const STAY_CANCELLATION_POLICY = {
+  FREE_WINDOW_HOURS: 24,
+  LATE_FEE: '1_NIGHT',
+  TEXT: 'Free cancellation up to 24 hours before check-in. Late cancellation: 1-night charge. No-show: Non-refundable.',
+  RULES: [
+    'Free cancellation up to 24 hours before check-in',
+    'Late cancellation: 1-night charge',
+    'No-show: Non-refundable',
+  ],
+};
 
 /**
  * Price per night.

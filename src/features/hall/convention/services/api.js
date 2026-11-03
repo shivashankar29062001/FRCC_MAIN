@@ -1,3 +1,4 @@
+import { readSession } from '../../../../app/session.js';
 import { getAuthToken } from './auth';
 import { supabase } from '../../../../services/supabase.js';
 import {
@@ -148,17 +149,27 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
         userId = sessionData?.session?.user?.id || null;
       } catch (_) {}
     }
+    if (!userId) {
+      try {
+        const sess = readSession();
+        userId = sess?.id || sess?.userId || null;
+      } catch (_) {}
+    }
 
     const hallCharge = Number(b.hallCharge) || 0;
     const gst = Math.round(hallCharge * 0.18);
     const fee = Number(b.convenienceFee) || 0;
-    const totalAmount = hallCharge + gst + fee;
+    const totalAmount = b.amount ? Number(b.amount) : (hallCharge + gst + fee);
 
     const record = {
       id: bookingId,
+      booking_id: bookingId,
       user_id: userId,
       hall_id: b.hallId || 'VH33',
       hall_name: b.hallName || 'Grand Convention Hall',
+      venue_name: b.venueName || 'Hyderabad Club',
+      city_name: b.cityName || 'Hyderabad',
+      area_name: b.areaName || 'City Centre',
       date: b.date || new Date().toISOString().split('T')[0],
       start_time: b.startTime || '09:00',
       end_time: b.endTime || '18:00',
@@ -177,17 +188,60 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
       balance_due: b.balanceDue != null ? Number(b.balanceDue) : 0,
       payment_method: b.paymentMethod || 'UPI',
       status: 'CONFIRMED',
+      created_at: new Date().toISOString(),
     };
 
+    // 1. Primary insert to convention_bookings table in Supabase
     try {
       await supabase.from('convention_bookings').insert(record);
-      // Asynchronously trigger confirmation notifications
       supabase.functions.invoke('send-booking-confirmation', {
         body: { booking_id: bookingId, service_type: 'hall' },
       }).catch(() => {});
     } catch (err) {
-      console.warn('[conventionApi] Supabase insert notice:', err);
+      console.warn('[conventionApi] Supabase convention_bookings insert error:', err);
     }
+
+    // 2. Dual-write to public.bookings table for unified booking history
+    try {
+      await supabase.from('bookings').insert([{
+        booking_id: bookingId,
+        user_id: userId,
+        category: 'hall',
+        title: record.hall_name,
+        date: record.date,
+        slot: `${record.start_time} - ${record.end_time}`,
+        guests: `${record.guests} guests`,
+        amount: totalAmount,
+        subtotal: hallCharge,
+        status: 'CONFIRMED',
+        payment_method: b.paymentMethod || 'UPI',
+        user_name: record.organizer_name,
+        mobile: record.phone,
+        email: record.email,
+        details: {
+          hallId: record.hall_id,
+          venueName: record.venue_name,
+          cityName: record.city_name,
+          areaName: record.area_name,
+          eventType: record.event_type,
+          eventDetails: record.event_details,
+          specialRequests: record.special_requests,
+        },
+      }]);
+    } catch (err2) {
+      console.warn('[conventionApi] Supabase bookings insert error:', err2);
+    }
+
+    // 3. Persist to localStorage for client-side resilience
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const key = 'frcc_convention_bookings';
+        const existing = JSON.parse(window.localStorage.getItem(key) || '[]');
+        const updated = [record, ...existing.filter((item) => item.id !== bookingId)];
+        window.localStorage.setItem(key, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: record }));
+      }
+    } catch (_) {}
 
     return {
       ok: true,
@@ -204,9 +258,17 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
 
   // 4. User's convention bookings: GET /api/bookings/my
   if (pathname === '/bookings/my') {
+    let allBookings = [];
+    const seen = new Set();
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const sess = typeof window !== 'undefined' ? readSession() : null;
+      const userId = sessionData?.session?.user?.id || sess?.id || sess?.userId;
+      const userPhone = (sess?.phone || sess?.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (sess?.email || '').trim().toLowerCase();
+
+      // 1. Supabase convention_bookings
       if (userId) {
         const { data, error } = await supabase
           .from('convention_bookings')
@@ -215,22 +277,46 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
           .order('created_at', { ascending: false });
 
         if (!error && Array.isArray(data)) {
-          return {
-            bookings: data.map((b) => ({
-              ...b,
-              startTime: b.start_time,
-              endTime: b.end_time,
-              hallName: b.hall_name,
-              refundPercent: b.refund_percent,
-              refundAmount: b.refund_amount,
-              refundStatus: b.refund_status,
-              cancelledAt: b.cancelled_at,
-            })),
-          };
+          data.forEach((b) => {
+            if (!seen.has(b.id)) {
+              seen.add(b.id);
+              allBookings.push(b);
+            }
+          });
         }
       }
+
+      // 2. Local storage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const local = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
+        local.forEach((l) => {
+          const lPhone = (l.phone || '').replace(/\D/g, '').slice(-10);
+          const lEmail = (l.email || '').trim().toLowerCase();
+          const matches =
+            (userId && (l.user_id === userId || l.userId === userId)) ||
+            (userPhone && lPhone === userPhone) ||
+            (userEmail && lEmail === userEmail);
+
+          if (matches && !seen.has(l.id)) {
+            seen.add(l.id);
+            allBookings.push(l);
+          }
+        });
+      }
     } catch (_) {}
-    return { bookings: [] };
+
+    return {
+      bookings: allBookings.map((b) => ({
+        ...b,
+        startTime: b.start_time || b.startTime,
+        endTime: b.end_time || b.endTime,
+        hallName: b.hall_name || b.hallName,
+        refundPercent: b.refund_percent,
+        refundAmount: b.refund_amount,
+        refundStatus: b.refund_status,
+        cancelledAt: b.cancelled_at,
+      })),
+    };
   }
 
   // 5. Locations hierarchy: GET /api/locations

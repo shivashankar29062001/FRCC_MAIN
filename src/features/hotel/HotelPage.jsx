@@ -16,7 +16,7 @@ import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, ca
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
-import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE } from '../../utils/mobile.js';
+import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE, INDIAN_MOBILE_PLACEHOLDER, sanitizeMobileInput } from '../../utils/mobile.js';
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
@@ -1135,7 +1135,7 @@ export function HotelPage() {
                     autoComplete="tel-national"
                     value={draft.mobile}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      const val = sanitizeMobileInput(e.target.value);
                       updateDraft({ mobile: val });
                       if (val.length === 10 || !val) setMobileTouched(true);
                     }}
@@ -1373,7 +1373,11 @@ export function HotelPage() {
               {/* Cancellation Policy */}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 space-y-1">
                 <p className="font-semibold text-navy-900">Cancellation Policy</p>
-                <p>{cancellationPolicy}</p>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                  <li>Free cancellation up to 24 hours before check-in</li>
+                  <li>Late cancellation: 1-night charge</li>
+                  <li>No-show: Non-refundable</li>
+                </ul>
               </div>
 
               {/* Required Terms Checkbox */}
@@ -1570,7 +1574,11 @@ export function HotelPage() {
             {/* Cancellation Policy */}
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-left text-xs text-slate-600">
               <span className="font-semibold text-navy-900 block mb-0.5">Cancellation Policy</span>
-              <p>{cancellationPolicy}</p>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>Free cancellation up to 24 hours before check-in</li>
+                <li>Late cancellation: 1-night charge</li>
+                <li>No-show: Non-refundable</li>
+              </ul>
             </div>
 
             {/* Action Buttons (no-print) */}

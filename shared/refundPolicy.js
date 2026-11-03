@@ -1,4 +1,4 @@
-// Single source of truth for convention-hall cancellation/refund rules.
+// Single source of truth for cancellation/refund rules.
 // Used by the API, the UI, receipts and notification messages.
 // Times are interpreted as IST (Asia/Kolkata, UTC+05:30); India has no DST.
 
@@ -36,9 +36,9 @@ export function getRefundMethod(paymentMethod) {
 }
 
 /**
- * Calculate the cancellation/refund outcome from the event start and a clock.
+ * Calculate convention hall cancellation/refund outcome from event start and a clock.
  * @param {object} booking booking record (date, startTime, amountPaid, paymentMethod)
- * @param {Date|string|number} [now] server clock; defaults to the current time
+ * @param {Date|string|number} [now] server clock; defaults to current time
  * @returns {{allowed:boolean, refundPercent:number, refundAmount:number,
  *   hoursUntilStart:number, reason:string, refundMethod:string, policyText:string}}
  */
@@ -86,5 +86,85 @@ export function getRefundPolicy(booking, now = new Date()) {
     reason: `${refundPercent}% refund applies if cancelled now.`,
     refundMethod,
     policyText: CANCELLATION_POLICY_TEXT,
+  };
+}
+
+export const STAY_CANCELLATION_POLICY_TEXT =
+  'Free cancellation up to 24 hours before check-in. Late cancellation: 1-night charge. No-show: Non-refundable.';
+
+/**
+ * Calculate stay cancellation/refund outcome according to policy:
+ * - Free cancellation up to 24 hours before check-in (100% refund)
+ * - Late cancellation (< 24 hours before check-in until checkout): 1-night charge
+ * - No-show (after checkout): Non-refundable (0% refund)
+ */
+export function calculateStayRefund(booking, now = new Date()) {
+  const clock = now instanceof Date ? now : new Date(now);
+  const totalPaid = Math.max(0, Number(booking?.total ?? booking?.amount ?? booking?.amountPaid ?? 0) || 0);
+  const nights = Math.max(1, Number(booking?.nights || 1));
+  const rooms = Math.max(1, Number(booking?.rooms || 1));
+  const pricePerNight = Number(booking?.price_per_night || booking?.pricePerNight) || Math.round(totalPaid / nights);
+  const oneNightCharge = Math.min(totalPaid, pricePerNight * rooms);
+
+  const checkinDate = booking?.check_in || booking?.checkin || booking?.date;
+  const checkoutDate = booking?.check_out || booking?.checkout || checkinDate;
+
+  if (!checkinDate) {
+    return {
+      allowed: false,
+      refundPercent: 0,
+      refundAmount: 0,
+      nonRefundableAmount: totalPaid,
+      reason: 'Invalid check-in date',
+      policyText: STAY_CANCELLATION_POLICY_TEXT,
+    };
+  }
+
+  const checkinDt = new Date(`${String(checkinDate).slice(0, 10)}T12:00:00+05:30`);
+  const checkoutDt = new Date(`${String(checkoutDate).slice(0, 10)}T11:00:00+05:30`);
+  const hoursUntilCheckin = (checkinDt.getTime() - clock.getTime()) / 3600000;
+  const isPastCheckout = checkoutDt.getTime() < clock.getTime();
+
+  if (isPastCheckout) {
+    return {
+      allowed: false,
+      isNoShow: true,
+      refundPercent: 0,
+      refundAmount: 0,
+      nonRefundableAmount: totalPaid,
+      reason: 'Check-out date has passed. No-show bookings are non-refundable.',
+      policyText: STAY_CANCELLATION_POLICY_TEXT,
+    };
+  }
+
+  if (hoursUntilCheckin >= 24) {
+    return {
+      allowed: true,
+      isLateCancellation: false,
+      hoursUntilCheckin,
+      refundPercent: 100,
+      refundAmount: totalPaid,
+      retentionAmount: 0,
+      nonRefundableAmount: 0,
+      refundStatus: totalPaid > 0 ? 'PENDING' : 'NONE',
+      statusText: totalPaid > 0 ? 'Refund pending' : 'Full refund',
+      policyText: STAY_CANCELLATION_POLICY_TEXT,
+    };
+  }
+
+  // Late cancellation (< 24 hours)
+  const refundAmount = Math.max(0, totalPaid - oneNightCharge);
+  const refundPercent = totalPaid > 0 ? Math.round((refundAmount / totalPaid) * 100) : 0;
+  return {
+    allowed: true,
+    isLateCancellation: true,
+    hoursUntilCheckin,
+    refundPercent,
+    refundAmount,
+    retentionAmount: oneNightCharge,
+    nonRefundableAmount: oneNightCharge,
+    refundStatus: refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE',
+    statusText: refundAmount > 0 ? 'Refund pending' : 'No refund due (1-night charge applied)',
+    policyText: STAY_CANCELLATION_POLICY_TEXT,
   };
 }

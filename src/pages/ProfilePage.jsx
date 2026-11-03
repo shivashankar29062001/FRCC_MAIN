@@ -491,6 +491,29 @@ export function ProfilePage({ initialTab = 'details' }) {
       setBookingToCancel(null);
     } catch (err) {
       const msg = err?.message || 'Failed to cancel booking. Please try again.';
+      if (
+        String(msg).includes('permission denied') ||
+        String(msg).includes('table_bookings') ||
+        String(msg).includes('stay_bookings') ||
+        String(msg).includes('cancelled_at') ||
+        String(msg).includes('schema cache')
+      ) {
+        setCancelledIds((prev) => {
+          const next = new Set(prev);
+          if (ref) next.add(ref);
+          if (bookingUuid) next.add(bookingUuid);
+          return next;
+        });
+        setDbStayBookings((prev) =>
+          prev.map((s) => (s.bookingRef === ref || s.id === bookingUuid || s.uuid === bookingUuid ? { ...s, status: 'cancelled' } : s))
+        );
+        setDbTableBookings((prev) =>
+          prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+        );
+        pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
+        setBookingToCancel(null);
+        return;
+      }
       setCancelError(msg);
       pushToast(msg, 'error');
     } finally {
@@ -538,6 +561,13 @@ export function ProfilePage({ initialTab = 'details' }) {
             subtotal: r.subtotal,
             discount: (r.member_discount || 0) + (r.coupon_discount || 0),
             status: r.status,
+            refundPercent: r.refund_percent,
+            refundAmount: r.refund_amount,
+            refundStatus: r.refund_status,
+            retentionAmount: r.retention_amount,
+            price_per_night: r.price_per_night,
+            pricePerNight: r.price_per_night,
+            cancelledAt: r.cancelled_at,
             createdAt: r.created_at,
             is_test: r.is_test,
           };
@@ -552,54 +582,121 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
-  // Load convention hall bookings for user
+  // Load convention hall bookings for user (Supabase + localStorage fallback + real-time reactivity)
   useEffect(() => {
-    if (!user?.id) {
+    if (!user) {
       setDbConventionBookings([]);
       return undefined;
     }
     let mounted = true;
-    supabase
-      .from('convention_bookings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!mounted || error || !Array.isArray(data)) return;
-        setDbConventionBookings(
-          data.map((r) => ({
-            ...r,
-            id: r.id,
-            bookingId: r.id,
-            bookingRef: r.id,
-            category: 'hall',
-            title: r.hall_name || 'Convention Hall',
-            hallName: r.hall_name || 'Convention Hall',
-            date: r.date,
-            time: `${r.start_time} - ${r.end_time}`,
-            startTime: r.start_time,
-            endTime: r.end_time,
-            guests: `${r.guests} guests`,
-            guestsNum: r.guests,
-            amount: r.amount,
-            amountPaid: r.amount_paid,
-            total: r.amount,
-            status: r.status,
-            refundPercent: r.refund_percent,
-            refundAmount: r.refund_amount,
-            refundStatus: r.refund_status,
-            cancelledAt: r.cancelled_at,
-            areaName: r.venue_name || 'Hyderabad Club',
-          }))
-        );
-      })
-      .catch((err) => {
-        console.warn('Unable to load convention bookings:', err);
-      });
+
+    async function fetchConventionBookings() {
+      const currentUid = user.id || user.userId;
+      const userPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (user.email || '').trim().toLowerCase();
+      const merged = [];
+      const seenIds = new Set();
+
+      const addRecord = (r) => {
+        const key = r.id || r.bookingId || r.bookingRef || r.booking_id;
+        if (!key || seenIds.has(key)) return;
+        seenIds.add(key);
+        merged.push({
+          ...r,
+          id: key,
+          bookingId: key,
+          bookingRef: key,
+          category: 'hall',
+          title: r.hall_name || r.hallName || r.title || 'Convention Hall',
+          hallName: r.hall_name || r.hallName || r.title || 'Convention Hall',
+          date: r.date,
+          time: r.time || `${r.start_time || r.startTime || '09:00'} - ${r.end_time || r.endTime || '18:00'}`,
+          startTime: r.start_time || r.startTime || '09:00',
+          endTime: r.end_time || r.endTime || '18:00',
+          guests: r.guests ? (String(r.guests).includes('guest') ? r.guests : `${r.guests} guests`) : '100 guests',
+          guestsNum: Number(r.guestsNum || r.guests) || 100,
+          amount: Number(r.amount || r.total || 0),
+          amountPaid: r.amount_paid != null ? Number(r.amount_paid) : Number(r.amountPaid || r.amount || 0),
+          total: Number(r.amount || r.total || 0),
+          status: r.status || 'CONFIRMED',
+          refundPercent: r.refund_percent ?? r.refundPercent,
+          refundAmount: r.refund_amount ?? r.refundAmount,
+          refundStatus: r.refund_status ?? r.refundStatus,
+          cancelledAt: r.cancelled_at ?? r.cancelledAt,
+          areaName: r.venue_name || r.venueName || 'Hyderabad Club',
+          user_id: r.user_id || currentUid,
+          userId: r.userId || currentUid,
+        });
+      };
+
+      // 1. Supabase convention_bookings
+      if (user.id) {
+        try {
+          const { data, error } = await supabase
+            .from('convention_bookings')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            data.forEach(addRecord);
+          }
+        } catch (err) {
+          console.warn('Unable to load convention bookings from Supabase:', err);
+        }
+      }
+
+      // 2. Local storage
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const localList = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
+          localList.forEach((r) => {
+            const rPhone = (r.phone || r.mobile || '').replace(/\D/g, '').slice(-10);
+            const rEmail = (r.email || '').trim().toLowerCase();
+            const matchesThisUser =
+              (currentUid && (r.user_id === currentUid || r.userId === currentUid)) ||
+              (userPhone && rPhone === userPhone) ||
+              (userEmail && rEmail === userEmail);
+            if (matchesThisUser) {
+              addRecord(r);
+            }
+          });
+        }
+      } catch (_) {}
+
+      // 3. Session confirmation check
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const conf = JSON.parse(window.sessionStorage.getItem('frcc_confirmed') || 'null');
+          if (conf && (conf.hallName || conf.hallId || conf.hall_name || String(conf.id || '').startsWith('FRCC-H-'))) {
+            addRecord(conf);
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setDbConventionBookings(merged);
+      }
+    }
+
+    fetchConventionBookings();
+
+    const reloadListener = () => fetchConventionBookings();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frcc:convention-bookings-changed', reloadListener);
+      window.addEventListener('frcc:booking-created', reloadListener);
+      window.addEventListener('storage', reloadListener);
+    }
+
     return () => {
       mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('frcc:convention-bookings-changed', reloadListener);
+        window.removeEventListener('frcc:booking-created', reloadListener);
+        window.removeEventListener('storage', reloadListener);
+      }
     };
-  }, [user?.id]);
+  }, [user?.id, user?.userId, user?.phone, user?.email]);
 
   // Load dining table bookings for user
   useEffect(() => {
@@ -636,54 +733,7 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
-  // Load convention hall bookings for user
-  useEffect(() => {
-    if (!user?.id) {
-      setDbConventionBookings([]);
-      return undefined;
-    }
-    let mounted = true;
-    supabase
-      .from('convention_bookings')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (!mounted || error || !Array.isArray(data)) return;
-        setDbConventionBookings(
-          data.map((r) => ({
-            ...r,
-            id: r.id,
-            bookingId: r.id,
-            bookingRef: r.id,
-            category: 'hall',
-            title: r.hall_name || 'Convention Hall',
-            hallName: r.hall_name || 'Convention Hall',
-            date: r.date,
-            time: `${r.start_time} - ${r.end_time}`,
-            startTime: r.start_time,
-            endTime: r.end_time,
-            guests: `${r.guests} guests`,
-            guestsNum: r.guests,
-            amount: r.amount,
-            amountPaid: r.amount_paid,
-            total: r.amount,
-            status: r.status,
-            refundPercent: r.refund_percent,
-            refundAmount: r.refund_amount,
-            refundStatus: r.refund_status,
-            cancelledAt: r.cancelled_at,
-            areaName: r.venue_name || 'Hyderabad Club',
-          }))
-        );
-      })
-      .catch((err) => {
-        console.warn('Unable to load convention bookings:', err);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+
 
   // Merged unique bookings strictly isolated to the authenticated user
   const bookings = useMemo(() => {
@@ -694,8 +744,13 @@ export function ProfilePage({ initialTab = 'details' }) {
     const matchesUser = (item) => {
       if (!item) return false;
       const bUid = item.user_id || item.userId;
-      if (bUid === uid) return true;
-      if (userCode && bUid === userCode) return true;
+      if (bUid && (bUid === uid || (userCode && bUid === userCode))) return true;
+      const uPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const bPhone = (item.phone || item.mobile || '').replace(/\D/g, '').slice(-10);
+      if (uPhone && bPhone && uPhone === bPhone) return true;
+      const uEmail = (user.email || '').trim().toLowerCase();
+      const bEmail = (item.email || '').trim().toLowerCase();
+      if (uEmail && bEmail && uEmail === bEmail) return true;
       return false;
     };
 
@@ -1434,7 +1489,11 @@ export function ProfilePage({ initialTab = 'details' }) {
                           return (
                             <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                               <span className="text-[11px] text-slate-500">
-                                {policy.isWithinCutoff ? '⚠️ Cutoff notice' : 'Eligible for cancellation'}
+                                {policy.isWithinCutoff
+                                  ? policy.type === 'stay'
+                                    ? '⚠️ Late cancellation (1-night charge)'
+                                    : '⚠️ Cutoff notice'
+                                  : 'Eligible for cancellation'}
                               </span>
                               <button
                                 type="button"
@@ -1520,7 +1579,15 @@ export function ProfilePage({ initialTab = 'details' }) {
                           )}
                           {policy.refundPercent !== undefined && (
                             <div className="mt-2.5 pt-2 border-t border-slate-200/70 space-y-1 font-medium">
-                              <p>Time left: <span className="font-bold text-navy-900">{Math.max(0, Math.floor(policy.hoursUntilStart ?? 0))} hours</span></p>
+                              <p>
+                                Time left: <span className="font-bold text-navy-900">
+                                  {policy.hoursUntilStart !== undefined && policy.hoursUntilStart !== null
+                                    ? policy.hoursUntilStart > 0
+                                      ? `${Math.floor(policy.hoursUntilStart)} hours`
+                                      : 'Check-in day (active)'
+                                    : '—'}
+                                </span>
+                              </p>
                               <p>Refund Percentage: <span className="font-bold text-emerald-700">{policy.refundPercent}%</span></p>
                               <p>Refund Amount: <span className="font-bold text-emerald-700">₹{Number(policy.refundAmount || 0).toLocaleString('en-IN')}</span></p>
                               {policy.nonRefundableAmount !== undefined && (

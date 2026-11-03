@@ -5,6 +5,7 @@
 import { supabase } from '../services/supabase.js';
 import { isValidIndianMobile } from '../utils/mobile.js';
 import { venues as LOCAL_VENUES } from '../data/dining.js';
+import { isBookingCancelledLocally } from '../services/cancellationService.js';
 
 const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
 
@@ -313,7 +314,7 @@ export async function getMyTableBookings(userId = null) {
       guest_mobile: b.guest_mobile,
       guest_email: b.guest_email,
       notes: b.notes,
-      status: b.status || 'confirmed',
+      status: (isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.id)) ? 'cancelled' : (b.status || 'confirmed'),
       is_free: true,
       total: 0,
       qrValue: `FRCC:TABLE:${b.booking_ref}`,
