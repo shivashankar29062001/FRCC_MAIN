@@ -439,10 +439,6 @@ export function Navbar() {
       'transition-colors duration-150 py-0.5 whitespace-nowrap',
       isActive ? cx('text-gold-400 font-semibold', topUnderline) : 'text-slate-300 hover:text-gold-400',
     );
-  const isApplicationForm =
-    location.pathname === '/application-form' ||
-    location.pathname === '/membership/join' ||
-    location.pathname.startsWith('/membership/join');
   const mobileRow = 'block rounded-xl px-3 py-2.5 font-medium text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900';
   const mobileRowActive = ({ isActive }) => cx(mobileRow, isActive && 'bg-navy-50 text-navy-900');
 
@@ -473,12 +469,15 @@ export function Navbar() {
             <div className="flex items-center gap-3 border-l border-white/20 pl-3">
               <NavLink to={ROUTES.gallery} className={topNavLink}>Gallery</NavLink>
               <NavLink to={ROUTES.leadership} className={topNavLink}>Leadership</NavLink>
-              <NavLink
-                to={ROUTES.applicationForm || '/membership/join'}
-                className={({ isActive }) => topNavLink({ isActive: isActive || isApplicationForm })}
+              <a
+                href="/FRCC-Membership-Application-Form.pdf"
+                download="FRCC-Membership-Application-Form.pdf"
+                onClick={(e) => downloadOfficialApplicationForm(e)}
+                className="transition-colors duration-150 py-0.5 whitespace-nowrap text-slate-300 hover:text-gold-400 cursor-pointer"
+                title="Download official FRCC Membership Application Form PDF"
               >
                 Application Form
-              </NavLink>
+              </a>
             </div>
           </div>
         </div>
@@ -632,13 +631,18 @@ export function Navbar() {
                   </NavLink>
                 </li>
                 <li>
-                  <NavLink
-                    to={ROUTES.applicationForm || '/membership/join'}
-                    onClick={closeAll}
-                    className={({ isActive }) => mobileRowActive({ isActive: isActive || isApplicationForm })}
+                  <a
+                    href="/FRCC-Membership-Application-Form.pdf"
+                    download="FRCC-Membership-Application-Form.pdf"
+                    onClick={(e) => {
+                      closeAll();
+                      downloadOfficialApplicationForm(e);
+                    }}
+                    className="block rounded-xl px-3 py-2.5 font-medium text-slate-700 transition-colors duration-150 hover:bg-navy-50 hover:text-navy-900 cursor-pointer"
+                    title="Download official FRCC Membership Application Form PDF"
                   >
                     Application Form
-                  </NavLink>
+                  </a>
                 </li>
               </ul>
 
