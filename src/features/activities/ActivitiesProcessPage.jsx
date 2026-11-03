@@ -544,6 +544,7 @@ export function ActivitiesProcessPage() {
           inputMode="numeric"
           pattern="[6-9][0-9]{9}"
           maxLength={10}
+          autoComplete="tel-national"
           value={value}
           onChange={(e) => patchExtra(f.id, sanitizeMobileInput(e.target.value))}
           placeholder={f.placeholder || INDIAN_MOBILE_PLACEHOLDER}
@@ -758,7 +759,19 @@ export function ActivitiesProcessPage() {
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
-                    <Input label="Mobile" name="mobile" type="tel" value={draft.mobile} onChange={(e) => patch({ mobile: e.target.value })} autoComplete="tel" error={errors.mobile} />
+                    <Input
+                      label="Mobile"
+                      name="mobile"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[6-9][0-9]{9}"
+                      maxLength={10}
+                      autoComplete="tel-national"
+                      placeholder={INDIAN_MOBILE_PLACEHOLDER}
+                      value={draft.mobile}
+                      onChange={(e) => patch({ mobile: sanitizeMobileInput(e.target.value) })}
+                      error={errors.mobile}
+                    />
                     {(() => {
                       const selectedSlot = slots.find((s) => s.time === draft.slot);
                       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined

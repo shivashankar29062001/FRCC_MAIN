@@ -7,6 +7,13 @@
  * - Display as: +91 XXXXX XXXXX
  */
 
+export {
+  sanitizeMobileInput,
+  isValidIndianMobile,
+  formatIndianMobileDisplay,
+  normalizeIndianMobile,
+} from './mobile.js';
+
 /**
  * Strips whitespace, dashes, "+91", leading "91" (if 12 digits), or leading "0" (if 11 digits).
  * Returns the normalized numeric digit string.
@@ -21,7 +28,7 @@ export function normalizeMobile(raw) {
   } else if (digits.length === 11 && digits.startsWith('0')) {
     digits = digits.slice(1);
   }
-  return digits;
+  return digits.slice(0, 10);
 }
 
 /**
@@ -57,4 +64,3 @@ export function formatMobileDisplay(raw) {
 export function isLegacySyntheticEmail(email) {
   return Boolean(email && String(email).trim().toLowerCase().endsWith('@frcc.member'));
 }
-

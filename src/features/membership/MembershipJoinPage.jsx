@@ -10,6 +10,7 @@ import {
   INDIAN_MOBILE_MESSAGE,
   INDIAN_MOBILE_PLACEHOLDER,
   isValidIndianMobile,
+  sanitizeMobileInput,
 } from '../../utils/mobile.js';
 import { IMAGES } from '../../config/images.js';
 import {
@@ -1019,12 +1020,12 @@ export function MembershipJoinPage() {
                     type="tel"
                     inputMode="numeric"
                     pattern="[6-9][0-9]{9}"
-                    autoComplete="tel"
+                    autoComplete="tel-national"
                     maxLength="10"
                     placeholder={INDIAN_MOBILE_PLACEHOLDER}
                     value={formData.mobile}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      const val = sanitizeMobileInput(e.target.value);
                       updateForm({ mobile: val });
                       if (isValidIndianMobile(val)) {
                         setFieldErrors((prev) => ({ ...prev, mobile: null }));
@@ -1214,12 +1215,12 @@ export function MembershipJoinPage() {
                         type="tel"
                         inputMode="numeric"
                         pattern="[6-9][0-9]{9}"
-                        autoComplete="tel"
+                        autoComplete="tel-national"
                         maxLength="10"
                         placeholder={INDIAN_MOBILE_PLACEHOLDER}
                         value={formData.emergencyMobile}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          const val = sanitizeMobileInput(e.target.value);
                           updateForm({ emergencyMobile: val });
                           if (isValidIndianMobile(val)) {
                             setFieldErrors((prev) => ({ ...prev, emergencyMobile: null }));
@@ -1370,11 +1371,11 @@ export function MembershipJoinPage() {
                           type="tel"
                           inputMode="numeric"
                           pattern="[6-9][0-9]{9}"
-                          autoComplete="tel"
+                          autoComplete="tel-national"
                           maxLength="10"
                           placeholder={INDIAN_MOBILE_PLACEHOLDER}
                           value={formData.spouseMobile}
-                          onChange={(e) => updateForm({ spouseMobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                          onChange={(e) => updateForm({ spouseMobile: sanitizeMobileInput(e.target.value) })}
                           aria-invalid={Boolean(formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile))}
                           className="field !border-0 !rounded-none focus:!ring-0 w-full"
                         />

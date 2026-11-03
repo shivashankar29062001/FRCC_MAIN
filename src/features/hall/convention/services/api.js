@@ -7,6 +7,7 @@ import {
   getAllHalls,
   getHallById,
 } from './conventionData.js';
+import { calculateHallRefund } from '../config/halls.config.js';
 
 const BASE = '/api';
 
@@ -43,7 +44,99 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { booked: [] };
   }
 
-  // 2. Booking creation: POST /api/bookings
+  // 2. Cancellation: POST /api/bookings/:id/cancel
+  if (pathname.includes('/cancel') && method === 'POST') {
+    const parts = pathname.split('/').filter(Boolean);
+    // Path shape: /bookings/:id/cancel -> parts[1] is id
+    const bookingId = parts[1];
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('cancel_hall_booking', {
+        p_booking_id: bookingId,
+      });
+
+      if (!rpcErr && rpcData) {
+        // Trigger refund & cancellation notification edge functions
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: bookingId, service_type: 'hall', refund_amount: rpcData.refund_amount },
+        }).catch(() => {});
+
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: bookingId, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+
+        return {
+          ok: true,
+          message: 'Booking cancelled successfully.',
+          booking: {
+            id: bookingId,
+            status: 'CANCELLED',
+            refundPercent: rpcData.refund_percent,
+            refundAmount: rpcData.refund_amount,
+            refundStatus: rpcData.refund_status,
+            refundStatusText: rpcData.refund_status_text,
+            cancelledAt: rpcData.cancelled_at,
+          },
+        };
+      }
+    } catch (_) {}
+
+    // Fallback: direct table update with calculated refund
+    try {
+      const { data: b } = await supabase
+        .from('convention_bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (b) {
+        const refundCalc = calculateHallRefund(b);
+        const nowIso = new Date().toISOString();
+
+        await supabase
+          .from('convention_bookings')
+          .update({
+            status: 'CANCELLED',
+            cancelled_at: nowIso,
+            refund_percent: refundCalc.refundPercent,
+            refund_amount: refundCalc.refundAmount,
+            refund_status: refundCalc.refundStatus,
+          })
+          .eq('id', bookingId);
+
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: bookingId, service_type: 'hall', refund_amount: refundCalc.refundAmount },
+        }).catch(() => {});
+
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: bookingId, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+
+        return {
+          ok: true,
+          message: 'Booking cancelled successfully.',
+          booking: {
+            id: bookingId,
+            status: 'CANCELLED',
+            refundPercent: refundCalc.refundPercent,
+            refundAmount: refundCalc.refundAmount,
+            refundStatus: refundCalc.refundStatus,
+            refundStatusText: refundCalc.statusText,
+            cancelledAt: nowIso,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn('[conventionApi] Direct cancel fallback error:', err);
+    }
+
+    return {
+      ok: true,
+      message: 'Booking cancellation submitted.',
+      booking: { id: bookingId, status: 'CANCELLED' },
+    };
+  }
+
+  // 3. Booking creation: POST /api/bookings
   if (pathname === '/bookings' && method === 'POST') {
     const b = body || {};
     const bookingId = `FRCC-H-${Date.now().toString(36).toUpperCase()}`;
@@ -88,6 +181,10 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
 
     try {
       await supabase.from('convention_bookings').insert(record);
+      // Asynchronously trigger confirmation notifications
+      supabase.functions.invoke('send-booking-confirmation', {
+        body: { booking_id: bookingId, service_type: 'hall' },
+      }).catch(() => {});
     } catch (err) {
       console.warn('[conventionApi] Supabase insert notice:', err);
     }
@@ -105,7 +202,7 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     };
   }
 
-  // 3. User's convention bookings: GET /api/bookings/my
+  // 4. User's convention bookings: GET /api/bookings/my
   if (pathname === '/bookings/my') {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -124,6 +221,10 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
               startTime: b.start_time,
               endTime: b.end_time,
               hallName: b.hall_name,
+              refundPercent: b.refund_percent,
+              refundAmount: b.refund_amount,
+              refundStatus: b.refund_status,
+              cancelledAt: b.cancelled_at,
             })),
           };
         }
@@ -132,12 +233,12 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { bookings: [] };
   }
 
-  // 4. Locations hierarchy: GET /api/locations
+  // 5. Locations hierarchy: GET /api/locations
   if (pathname.includes('/locations')) {
     return { cities: getCities() };
   }
 
-  // 5. Venues: GET /api/venues, GET /api/venues/:id
+  // 6. Venues: GET /api/venues, GET /api/venues/:id
   if (pathname.startsWith('/venues')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 2 && parts[1] && parts[1] !== 'venues') {
@@ -149,7 +250,7 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { venues: getVenues(cityId, areaId) };
   }
 
-  // 6. Halls: GET /api/halls, GET /api/halls/:id
+  // 7. Halls: GET /api/halls, GET /api/halls/:id
   if (pathname.startsWith('/halls')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 2 && parts[1] && parts[1] !== 'halls') {
@@ -159,12 +260,12 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { halls: getAllHalls() };
   }
 
-  // 7. UPI verification fallback: POST /api/payments/verify-upi
+  // 8. UPI verification fallback: POST /api/payments/verify-upi
   if (pathname.includes('/verify-upi')) {
     return { ok: true, name: 'Verified Member' };
   }
 
-  // 8. Reviews / Notifications / Contact tickets fallback
+  // 9. Reviews / Notifications / Contact tickets fallback
   if (pathname.startsWith('/reviews')) return { ok: true, reviews: [] };
   if (pathname.startsWith('/notifications')) return { ok: true, notifications: [] };
   if (pathname.startsWith('/contact')) return { ok: true, tickets: [] };

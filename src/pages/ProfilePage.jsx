@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getMyStayBookings } from '../api/stay.js';
+import { supabase } from '../services/supabase.js';
 import { getMyTableBookings } from '../api/dining.js';
 import { useActivityBookings } from '../features/activities/bookings.store.js';
 import { formatINR } from '../features/activities/games.config.js';
@@ -36,6 +37,7 @@ import {
   isValidMobile,
   formatMobileDisplay,
   isLegacySyntheticEmail,
+  sanitizeMobileInput,
 } from '../utils/phone.js';
 import {
   canCancelBooking,
@@ -185,14 +187,16 @@ function PersonalDetails({ user, membership, pushToast }) {
           <Input
             id="profile-mobile"
             name="mobile"
+            inputMode="numeric"
+            maxLength={10}
             type="tel"
             value={mobile}
             placeholder="10-digit mobile number"
             onChange={(e) => {
-              setMobile(e.target.value);
+              setMobile(sanitizeMobileInput(e.target.value));
               if (mobileErr) setMobileErr('');
             }}
-            autoComplete="tel"
+            autoComplete="tel-national"
             error={mobileErr}
           />
           <p className="caption mt-1 text-slate-500">
@@ -435,6 +439,7 @@ export function ProfilePage({ initialTab = 'details' }) {
   const [bookingFilter, setBookingFilter] = useState('all');
   const [dbStayBookings, setDbStayBookings] = useState([]);
   const [dbTableBookings, setDbTableBookings] = useState([]);
+  const [dbConventionBookings, setDbConventionBookings] = useState([]);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
@@ -478,6 +483,9 @@ export function ProfilePage({ initialTab = 'details' }) {
       );
       setDbTableBookings((prev) =>
         prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+      );
+      setDbConventionBookings((prev) =>
+        prev.map((c) => (c.bookingRef === ref || c.id === bookingUuid || c.id === ref ? { ...c, status: 'CANCELLED' } : c))
       );
       pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
       setBookingToCancel(null);
@@ -544,6 +552,55 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
+  // Load convention hall bookings for user
+  useEffect(() => {
+    if (!user?.id) {
+      setDbConventionBookings([]);
+      return undefined;
+    }
+    let mounted = true;
+    supabase
+      .from('convention_bookings')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!mounted || error || !Array.isArray(data)) return;
+        setDbConventionBookings(
+          data.map((r) => ({
+            ...r,
+            id: r.id,
+            bookingId: r.id,
+            bookingRef: r.id,
+            category: 'hall',
+            title: r.hall_name || 'Convention Hall',
+            hallName: r.hall_name || 'Convention Hall',
+            date: r.date,
+            time: `${r.start_time} - ${r.end_time}`,
+            startTime: r.start_time,
+            endTime: r.end_time,
+            guests: `${r.guests} guests`,
+            guestsNum: r.guests,
+            amount: r.amount,
+            amountPaid: r.amount_paid,
+            total: r.amount,
+            status: r.status,
+            refundPercent: r.refund_percent,
+            refundAmount: r.refund_amount,
+            refundStatus: r.refund_status,
+            cancelledAt: r.cancelled_at,
+            areaName: r.venue_name || 'Hyderabad Club',
+          }))
+        );
+      })
+      .catch((err) => {
+        console.warn('Unable to load convention bookings:', err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
   // Load dining table bookings for user
   useEffect(() => {
     if (!user?.id) {
@@ -579,6 +636,55 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
+  // Load convention hall bookings for user
+  useEffect(() => {
+    if (!user?.id) {
+      setDbConventionBookings([]);
+      return undefined;
+    }
+    let mounted = true;
+    supabase
+      .from('convention_bookings')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!mounted || error || !Array.isArray(data)) return;
+        setDbConventionBookings(
+          data.map((r) => ({
+            ...r,
+            id: r.id,
+            bookingId: r.id,
+            bookingRef: r.id,
+            category: 'hall',
+            title: r.hall_name || 'Convention Hall',
+            hallName: r.hall_name || 'Convention Hall',
+            date: r.date,
+            time: `${r.start_time} - ${r.end_time}`,
+            startTime: r.start_time,
+            endTime: r.end_time,
+            guests: `${r.guests} guests`,
+            guestsNum: r.guests,
+            amount: r.amount,
+            amountPaid: r.amount_paid,
+            total: r.amount,
+            status: r.status,
+            refundPercent: r.refund_percent,
+            refundAmount: r.refund_amount,
+            refundStatus: r.refund_status,
+            cancelledAt: r.cancelled_at,
+            areaName: r.venue_name || 'Hyderabad Club',
+          }))
+        );
+      })
+      .catch((err) => {
+        console.warn('Unable to load convention bookings:', err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
   // Merged unique bookings strictly isolated to the authenticated user
   const bookings = useMemo(() => {
     if (!user?.id) return [];
@@ -597,6 +703,7 @@ export function ProfilePage({ initialTab = 'details' }) {
     const userActivityBookings = (activityBookings || []).filter(matchesUser);
     const userStayBookings = (dbStayBookings || []).filter(matchesUser);
     const userTableBookings = (dbTableBookings || []).filter(matchesUser);
+    const userConventionBookings = (dbConventionBookings || []).filter(matchesUser);
 
     const bookingsByRef = new Map();
     const idToRef = new Map();
@@ -667,6 +774,15 @@ export function ProfilePage({ initialTab = 'details' }) {
         };
         bookingsByRef.set(ref, normalized);
         registerKeys(ref, act);
+      }
+    });
+
+    // 3b. Convention hall bookings
+    userConventionBookings.forEach((conv) => {
+      const ref = conv.bookingRef || conv.bookingId || conv.id;
+      if (ref && !bookingsByRef.has(ref)) {
+        bookingsByRef.set(ref, conv);
+        registerKeys(ref, conv);
       }
     });
 
@@ -800,7 +916,7 @@ export function ProfilePage({ initialTab = 'details' }) {
       const timeB = new Date(b.createdAt || b.created_at || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings]);
+  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings]);
 
   // Merged unique payments strictly isolated to the authenticated user
   const payments = useMemo(() => {
@@ -856,7 +972,10 @@ export function ProfilePage({ initialTab = 'details' }) {
             !b.bookingRef?.includes('STAY') &&
             !b.bookingId?.includes('TAB') &&
             !b.bookingRef?.includes('TAB') &&
-            b.category !== 'dining')
+            b.category !== 'dining' &&
+            b.category !== 'hall' &&
+            !b.bookingId?.startsWith('FRCC-H-') &&
+            !b.bookingRef?.startsWith('FRCC-H-'))
       );
     }
     if (bookingFilter === 'dining') {
@@ -865,6 +984,14 @@ export function ProfilePage({ initialTab = 'details' }) {
           b.category === 'dining' ||
           Boolean(b.bookingId?.includes('TAB')) ||
           Boolean(b.bookingRef?.includes('TAB'))
+      );
+    }
+    if (bookingFilter === 'halls') {
+      return bookings.filter(
+        (b) =>
+          b.category === 'hall' ||
+          b.bookingId?.startsWith('FRCC-H-') ||
+          b.bookingRef?.startsWith('FRCC-H-')
       );
     }
     return bookings;
@@ -1073,7 +1200,8 @@ export function ProfilePage({ initialTab = 'details' }) {
                     { id: 'all', label: `All Bookings (${bookings.length})` },
                     { id: 'stay', label: `Stays (${bookings.filter((b) => b.category === 'hotel' || b.category === 'stay' || b.checkin || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY')).length})` },
                     { id: 'dining', label: `Dining (${bookings.filter((b) => b.category === 'dining' || b.bookingId?.includes('TAB') || b.bookingRef?.includes('TAB')).length})` },
-                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining')).length})` },
+                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining' && b.category !== 'hall')).length})` },
+                    { id: 'halls', label: `Halls (${bookings.filter((b) => b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-')).length})` },
                   ].map((filter) => {
                     const active = (bookingFilter || 'all') === filter.id;
                     return (
@@ -1103,6 +1231,8 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'No dining reservations yet'
                       : bookingFilter === 'activities'
                       ? 'No activity bookings yet'
+                      : bookingFilter === 'halls'
+                      ? 'No convention hall bookings yet'
                       : 'No bookings yet'
                   }
                   body={
@@ -1112,6 +1242,8 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'Table reservations booked at FRCC dining outlets will appear here with their status.'
                       : bookingFilter === 'activities'
                       ? 'Sports, courts and recreational bookings will appear here with their status.'
+                      : bookingFilter === 'halls'
+                      ? 'Convention halls and banquet spaces reserved will appear here with their status.'
                       : 'Stays, dining reservations and sports activities booked will appear here with their status.'
                   }
                   icon={CalendarIcon}
@@ -1123,6 +1255,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                     ) : bookingFilter === 'dining' ? (
                       <Link to="/dining" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
                         Reserve a table <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
+                    ) : bookingFilter === 'halls' ? (
+                      <Link to="/convention/book" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                        Book a hall <ArrowRightIcon className="h-4 w-4" />
                       </Link>
                     ) : bookingFilter === 'activities' ? (
                       <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
@@ -1146,14 +1282,19 @@ export function ProfilePage({ initialTab = 'details' }) {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {filteredBookings.map((b) => {
-                    const isDining = b.category === 'dining' || Boolean(b.bookingId?.includes('TAB'));
-                    const isStay = !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
+                    const isHall = b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-');
+                    const isDining = !isHall && (b.category === 'dining' || Boolean(b.bookingId?.includes('TAB')));
+                    const isStay = !isHall && !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
                     return (
                       <Card key={b.bookingRef || b.bookingId || b.id} className="card-hover">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-1.5 mb-1">
-                              {isDining ? (
+                              {isHall ? (
+                                <span className="inline-block rounded bg-indigo-100 text-indigo-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                  Hall
+                                </span>
+                              ) : isDining ? (
                                 <span className="inline-block rounded bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                                   Dining
                                 </span>
@@ -1174,7 +1315,32 @@ export function ProfilePage({ initialTab = 'details' }) {
                         </div>
                         <p className="mt-2 font-mono text-xs text-slate-500">{b.bookingRef || b.bookingId}</p>
                         <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-                          {isDining ? (
+                          {isHall ? (
+                            <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Date</dt>
+                                <dd className="font-medium text-navy-900">{formatDMY(b.date)}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Time</dt>
+                                <dd className="font-medium text-navy-900">{b.time || `${b.startTime || ''} - ${b.endTime || ''}`}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Guests</dt>
+                                <dd className="font-medium text-navy-900">{b.guests}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Venue</dt>
+                                <dd className="font-medium text-navy-900">{b.areaName || 'FRCC Club'}</dd>
+                              </div>
+                              {b.refundAmount > 0 && (
+                                <div className="flex justify-between gap-3 text-emerald-700">
+                                  <dt>Refund</dt>
+                                  <dd className="font-semibold">{formatINR(b.refundAmount)} ({b.refundStatus === 'PROCESSED' ? 'Processed' : 'Pending'})</dd>
+                                </div>
+                              )}
+                            </>
+                          ) : isDining ? (
                             <>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
@@ -1351,6 +1517,19 @@ export function ProfilePage({ initialTab = 'details' }) {
                           <p>{policy.policyText}</p>
                           {policy.warningText && (
                             <p className="mt-1 font-semibold text-amber-800">{policy.warningText}</p>
+                          )}
+                          {policy.refundPercent !== undefined && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/70 space-y-1 font-medium">
+                              <p>Time left: <span className="font-bold text-navy-900">{Math.max(0, Math.floor(policy.hoursUntilStart ?? 0))} hours</span></p>
+                              <p>Refund Percentage: <span className="font-bold text-emerald-700">{policy.refundPercent}%</span></p>
+                              <p>Refund Amount: <span className="font-bold text-emerald-700">₹{Number(policy.refundAmount || 0).toLocaleString('en-IN')}</span></p>
+                              {policy.nonRefundableAmount !== undefined && (
+                                <p>Non-refundable Amount: <span className="font-bold text-slate-700">₹{Number(policy.nonRefundableAmount || 0).toLocaleString('en-IN')}</span></p>
+                              )}
+                              <p className="text-[11px] text-slate-500 pt-1">
+                                Refund Status: <strong>{policy.refundStatusText || (policy.refundAmount > 0 ? 'Refund pending' : 'No refund due')}</strong> &bull; {policy.timingNote || 'Refund will be credited as per your payment method timeline'}.
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}

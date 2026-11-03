@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr } from '../utils/format';
+import { HALL_CANCELLATION_POLICY_TEXT } from '../config/halls.config.js';
 import {
   INDIAN_MOBILE_MESSAGE,
   INDIAN_MOBILE_PLACEHOLDER,
@@ -35,11 +36,14 @@ export default function ConventionDetails() {
     if (!booking.eventType) return setError('Please select an event type.');
     if (!booking.guests || Number(booking.guests) < 30) return setError('Enter a guest count of at least 30.');
     if (Number(booking.guests) > 10000) return setError('Guest count cannot exceed 10,000.');
-    if (hall && Number(booking.guests) > hall.capacity) return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
+    if (hall && Number(booking.guests) > hall.capacity) {
+      return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
+    }
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
     if (!isValidIndianMobile(booking.phone)) return setError(INDIAN_MOBILE_MESSAGE);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(booking.email)) return setError('Enter a valid email address.');
-    setError(''); navigate('/convention/payment');
+    setError('');
+    navigate('/convention/payment');
   };
 
   const inputClass = "border rounded p-2 w-full";
@@ -62,39 +66,25 @@ export default function ConventionDetails() {
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">Phone
               <input
-              className={inputClass}
-              value={booking.phone}
-              onChange={e => {
-                const digits = e.target.value.replace(/\D/g, '');
-                updateBooking({ phone: digits.slice(0, 10) });
-              }}
-              onBlur={e => {
-                const phone = booking.phone;
-                const trimmed = phone.trim();
-                if (!trimmed) return setError('Phone number is required');
-                if (!/^[6-9][0-9]{9}$/.test(trimmed)) {
-                  return setError('Enter a valid 10-digit mobile number');
-                }
-                setError('');
-              }}
-              onKeyUp={e => {
-                if (e.key === 'Enter') next();
-              }}
-              onBlur={e => {
-                const phone = booking.phone;
-                if (!phone.trim()) setError('Phone number is required');
-                else if (!/^[6-9][0-9]{9}$/.test(phone)) setError('Enter a valid 10-digit mobile number');
-                else setError('');
-              }}
-              onFocus={e => {
-                if (error) setError('');
-              }}
-              placeholder="98XXXXXXXX"
-              type="tel"
-              inputMode="numeric"
-              maxLength={10}
-              autoComplete="tel-national"
-            /></label>
+                className={inputClass}
+                value={booking.phone || ''}
+                onChange={e => {
+                  const cleaned = sanitizeMobileInput(e.target.value);
+                  updateBooking({ phone: cleaned });
+                  if (error && isValidIndianMobile(cleaned)) setError('');
+                }}
+                onBlur={() => {
+                  if (booking.phone && !isValidIndianMobile(booking.phone)) {
+                    setError(INDIAN_MOBILE_MESSAGE);
+                  }
+                }}
+                placeholder="98XXXXXXXX"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                autoComplete="tel-national"
+              />
+            </label>
             <label className="block">Email
               <input className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
           </div>
@@ -125,6 +115,10 @@ export default function ConventionDetails() {
             <div className="flex justify-between text-gray-600"><span>GST (18%)</span><span>{inr(gst)}</span></div>
             <hr className="my-2" />
             <div className="flex justify-between font-bold text-navy"><span>Total</span><span>{inr(hallCharge + gst)}</span></div>
+            <div className="mt-6 pt-4 border-t text-xs text-gray-500">
+              <p className="font-semibold text-gray-700 mb-1">Cancellation Policy:</p>
+              <p>{HALL_CANCELLATION_POLICY_TEXT}</p>
+            </div>
           </>
         ) : <p className="text-gray-500">Select a hall first.</p>}
       </aside>

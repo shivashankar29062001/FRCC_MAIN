@@ -6,7 +6,7 @@ import { Reveal } from '../components/ui/motion.jsx';
 import { Logo } from '../components/Logo.jsx';
 import { ArrowRightIcon } from '../components/ui/icons.jsx';
 import { IMAGES } from '../config/images.js';
-import { isValidMobile, normalizeMobile, formatMobileDisplay } from '../utils/phone.js';
+import { isValidMobile, normalizeMobile, formatMobileDisplay, sanitizeMobileInput } from '../utils/phone.js';
 
 // ---------------------------------------------------------------------------
 // /signin & /signup — Public auth routes. Split-screen layout on desktop,
@@ -196,9 +196,11 @@ export function SignupPage() {
             label="Mobile Number *"
             name="mobile"
             type="tel"
-            autoComplete="tel"
+            inputMode="numeric"
+            maxLength={10}
+            autoComplete="tel-national"
             value={form.mobile}
-            onChange={(e) => handleFieldChange('mobile', e.target.value)}
+            onChange={(e) => handleFieldChange('mobile', sanitizeMobileInput(e.target.value))}
             placeholder="10-digit mobile number"
             hint={isValidMobile(form.mobile) ? `Display: ${formatMobileDisplay(form.mobile)}` : 'Accepts spaces, +91 or leading 0'}
             error={errors.mobile}

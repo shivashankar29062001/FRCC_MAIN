@@ -71,12 +71,18 @@ export default function HallCard({ hall, onSelect, selected, actionLabel = 'Sele
   const fits = countActive && !tooSmall;
   const handleImgError = useCallback(() => setFailed(f => ({ ...f, [idx]: true })), [idx]);
   const loadedCount = imgs.reduce((n, _, i) => n + (failed[i] ? 0 : 1), 0);
+
+  const coolingLabel = hall.cooling === 'NON_AC' ? 'Non-AC' : 'AC';
+  const displayName = hall.name?.includes('(')
+    ? hall.name
+    : `${hall.roomType || hall.name} (${coolingLabel})`;
+
   return (
-    <div className={`bg-white rounded-lg shadow overflow-hidden border-2 transition ${tooSmall ? 'opacity-60' : ''} ${selected ? 'border-gold' : 'border-transparent'}`}>
+    <div className={`bg-white rounded-lg shadow overflow-hidden border-2 transition ${tooSmall ? 'opacity-50' : ''} ${selected ? 'border-gold' : 'border-transparent'}`}>
       <div className="relative">
         <SmartImage
           src={imgs[idx]}
-          alt={hall.imageAlts && hall.imageAlts[idx] ? hall.imageAlts[idx] : `${hall.name} – photo ${idx + 1} of ${imgs.length}`}
+          alt={hall.imageAlts && hall.imageAlts[idx] ? hall.imageAlts[idx] : `${displayName} – photo ${idx + 1} of ${imgs.length}`}
           className="aspect-video"
           eager={eager}
           onError={handleImgError}
@@ -84,32 +90,53 @@ export default function HallCard({ hall, onSelect, selected, actionLabel = 'Sele
         {loadedCount > 1 && (
           <div className="flex justify-center gap-1 py-1">
             {imgs.map((im, i) => failed[i] ? null : (
-              <button key={im} onClick={() => setIdx(i)} aria-label={`Show photo ${i + 1} of ${hall.name}`}
+              <button key={im} onClick={() => setIdx(i)} aria-label={`Show photo ${i + 1} of ${displayName}`}
                 className={`w-2.5 h-2.5 rounded-full ${i === idx ? 'bg-gold' : 'bg-navy/40 hover:bg-navy/60'}`} />
             ))}
           </div>
         )}
-        <span className="absolute top-2 left-2 bg-gold text-navy text-xs font-semibold rounded px-2 py-0.5">
-          {hall.cooling === 'NON_AC' ? 'Non-AC' : 'AC'}
+        <span className="absolute top-2 left-2 bg-gold text-navy text-xs font-semibold rounded px-2 py-0.5 shadow-sm">
+          {coolingLabel}
         </span>
         {fits && (
-          <span className="absolute top-2 right-2 bg-green-700 text-white text-xs font-semibold rounded px-2 py-0.5">✓ Fits your group</span>
+          <span className="absolute top-2 right-2 bg-green-700 text-white text-xs font-semibold rounded px-2 py-0.5 shadow-sm">
+            ✓ Fits your group
+          </span>
+        )}
+        {tooSmall && (
+          <span className="absolute top-2 right-2 bg-red-600 text-white text-xs font-semibold rounded px-2 py-0.5 shadow-sm">
+            Too small for your group
+          </span>
         )}
       </div>
       <div className="p-4">
-        <h3 className="text-lg font-bold">{hall.name}</h3>
+        <h3 className="text-lg font-bold">{displayName}</h3>
         <p className="text-sm text-gray-600">{hall.venueName || hall.areaName || hall.area} • {hall.cityName || hall.city || ''} • Capacity: up to {cap.toLocaleString('en-IN')} guests</p>
-        {tooSmall && <p className="mt-1 text-xs font-semibold text-red-600">Max {cap.toLocaleString('en-IN')} guests</p>}
+        {tooSmall && (
+          <p className="mt-1 text-xs font-semibold text-red-600">
+            Too small for your group (Holds up to {cap.toLocaleString('en-IN')} guests)
+          </p>
+        )}
         <p className="mt-1 font-semibold text-navy">
-          {hall.displayPricePerHour || inr(hall.pricePerHour)} <span className="text-gray-500 font-normal">• {hall.displayPricePerDay || inr(hall.pricePerDay)}</span>
+          Rs. {Number(hall.pricePerHour).toLocaleString('en-IN')}/hr <span className="text-gray-500 font-normal">• Rs. {Number(hall.pricePerDay).toLocaleString('en-IN')}/day</span>
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
           {hall.amenities.slice(0, 4).map(a => <span key={a} className="text-xs bg-navy-100 text-navy rounded-full px-2 py-0.5">{a}</span>)}
         </div>
         {onSelect && (
-          <button onClick={() => onSelect(hall)} disabled={tooSmall}
-            className={`mt-3 w-full rounded py-2 font-semibold ${tooSmall ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : selected ? 'bg-gold text-navy' : 'bg-navy text-gold hover:bg-navy-800'}`}>
-            {tooSmall ? `Max ${cap.toLocaleString('en-IN')} guests` : selected ? '✓ Selected' : actionLabel}
+          <button
+            type="button"
+            onClick={() => !tooSmall && onSelect(hall)}
+            disabled={tooSmall}
+            className={`mt-3 w-full rounded py-2 font-semibold transition ${
+              tooSmall
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                : selected
+                  ? 'bg-gold text-navy'
+                  : 'bg-navy text-gold hover:bg-navy-800'
+            }`}
+          >
+            {tooSmall ? 'Too small for your group' : selected ? '✓ Selected' : actionLabel}
           </button>
         )}
       </div>

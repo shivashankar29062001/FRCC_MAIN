@@ -4,6 +4,7 @@ import { useBooking } from '../context/BookingContext';
 import { api } from '../services/api';
 import Stepper from '../components/Stepper';
 import HallCard from '../components/HallCard';
+import { GUEST_COUNT_CHIPS, HALL_TYPES, COOLING_OPTIONS } from '../config/halls.config.js';
 
 export default function ConventionBook() {
   const { booking, updateBooking } = useBooking();
@@ -26,8 +27,12 @@ export default function ConventionBook() {
       api('/locations', { auth: false }).then(d => (Array.isArray(d?.cities) ? d.cities : [])).catch(() => []),
       api('/halls', { auth: false }).then(d => (Array.isArray(d?.halls) ? d.halls : [])).catch(() => []),
     ]).then(([cities, hallsData]) => {
-      setCitiesData(Array.isArray(cities) ? cities : []);
+      const validCities = Array.isArray(cities) ? cities : [];
+      setCitiesData(validCities);
       setHalls(Array.isArray(hallsData) ? hallsData : []);
+      if (!booking.cityId && validCities.length > 0) {
+        setCityId(validCities[0].id);
+      }
       setLoading(false);
     }).catch(e => {
       setError(e?.message || '');
@@ -35,7 +40,7 @@ export default function ConventionBook() {
       setHalls([]);
       setLoading(false);
     });
-  }, []);
+  }, [booking.cityId]);
 
   // Areas for the chosen city (from cities hierarchy)
   const areas = useMemo(() => {
@@ -45,8 +50,7 @@ export default function ConventionBook() {
     return city.areas.map(a => ({ id: a.id, name: a.name, rating: a.rating }));
   }, [cityId, citiesData]);
 
-  // Clubs (venues) for the chosen city, from the same hierarchy — no extra request.
-  // Each city currently has exactly one club, which is auto-selected below.
+  // Clubs (venues) for the chosen city, from the same hierarchy
   const venues = useMemo(() => {
     if (!cityId) return [];
     const city = citiesData.find(c => c.id === cityId);
@@ -56,7 +60,7 @@ export default function ConventionBook() {
     })));
   }, [cityId, citiesData]);
 
-  // Single-area cities (one club per city): auto-select the only area and hide the dropdown
+  // Single-area cities (one club per city): auto-select the only area
   useEffect(() => {
     if (!cityId || areas.length !== 1) return;
     const only = areas[0];
@@ -76,30 +80,35 @@ export default function ConventionBook() {
     }
   }, [loading, cityId, venues, venueId, updateBooking]);
 
-  // Number of guests / capacity — saved in booking.guests (the same field the Details step uses)
+  // Number of guests / capacity
   const guestsNum = Number(booking.guests) || 0;
-  const GUEST_CHIPS = [30, 50, 100, 250, 500, 1000];
   const selectedHall = useMemo(() => halls.find(h => h.id === booking.hallId) || null, [halls, booking.hallId]);
   const selectedVenue = useMemo(() => venues.find(v => v.id === venueId) || null, [venues, venueId]);
   const hallTooSmall = selectedHall && guestsNum > selectedHall.capacity;
   const setGuests = (val) => updateBooking({ guests: val === '' ? '' : String(val) });
   const stepGuests = (d) => setGuests(Math.min(10000, Math.max(30, (guestsNum || 30) + d)));
 
-  // Room types present in the hall data, in the order the API returns them
+  // Room types list from config with fallback to data
   const roomTypes = useMemo(() => {
-    const seen = [];
-    for (const h of halls) if (h.roomType && !seen.includes(h.roomType)) seen.push(h.roomType);
-    return seen;
+    const list = [...HALL_TYPES];
+    for (const h of halls) {
+      if (h.roomType && !list.includes(h.roomType)) list.push(h.roomType);
+    }
+    return list;
   }, [halls]);
 
-  // Filtered + sorted hall list (from already-loaded halls)
+  // Filtered + sorted hall list
   const sortedHalls = useMemo(() => {
     if (!cityId || !Array.isArray(halls)) return [];
     let list = halls.filter(h => String(h.cityId) === String(cityId));
     if (areaId && areaId !== 'ALL') list = list.filter(h => String(h.areaId) === String(areaId));
     if (venueId) list = list.filter(h => h.venueId === venueId);
-    if (roomType !== 'ALL') list = list.filter(h => h.roomType === roomType);
-    if (cooling !== 'ALL') list = list.filter(h => h.cooling === cooling);
+    if (roomType !== 'ALL') {
+      list = list.filter(h => (h.roomType === roomType || h.name.startsWith(roomType)));
+    }
+    if (cooling !== 'ALL') {
+      list = list.filter(h => h.cooling === cooling);
+    }
     list = [...list];
     if (sortBy === 'price-asc') list.sort((a, b) => a.pricePerHour - b.pricePerHour);
     if (sortBy === 'price-desc') list.sort((a, b) => b.pricePerHour - a.pricePerHour);
@@ -122,12 +131,13 @@ export default function ConventionBook() {
       areaId: hall.areaId, areaName: hall.areaName,
       venueId: hall.venueId, venueName: hall.venueName,
       hallId: hall.id, hallName: hall.name,
+      cooling: hall.cooling,
+      capacity: hall.capacity,
     });
     navigate('/convention/date');
   };
 
-  // Clear stale booking state if the saved club/hall is gone (after data has loaded,
-  // so a refreshed draft — including one saved by the old venue step — is not wiped early)
+  // Clear stale booking state if the saved club/hall is gone
   useEffect(() => {
     if (loading) return;
     if (booking.venueId && venues.length && !venues.some(v => v.id === booking.venueId)) {
@@ -138,16 +148,10 @@ export default function ConventionBook() {
     }
   }, [loading, venues, halls, booking.venueId, booking.hallId, updateBooking]);
 
-  // City and club names for display
   const cityName = useMemo(() => {
     const c = Array.isArray(citiesData) ? citiesData.find(c => c.id === cityId) : null;
     return c ? c.name : '';
   }, [cityId, citiesData]);
-
-  const areaName = useMemo(() => {
-    const a = Array.isArray(areas) ? areas.find(a => a.id === areaId) : null;
-    return a ? a.name : '';
-  }, [areaId, areas]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -166,7 +170,6 @@ export default function ConventionBook() {
           {Array.isArray(citiesData) && citiesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
-        {/* Hidden when the city has a single club area — auto-selected instead */}
         {areas.length > 1 && (
           <select className="border rounded p-2 w-full sm:flex-1" value={areaId} disabled={!cityId}
             onChange={e => {
@@ -235,7 +238,7 @@ export default function ConventionBook() {
               className="border border-navy text-navy rounded-r px-3 py-2 font-bold hover:bg-navy hover:text-gold">+</button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {GUEST_CHIPS.map(n => (
+            {GUEST_COUNT_CHIPS.map(n => (
               <button key={n} type="button" onClick={() => setGuests(n)}
                 className={`text-sm rounded-full px-3 py-1 border ${guestsNum === n ? 'bg-gold text-navy border-gold font-semibold' : 'border-navy text-navy hover:bg-navy hover:text-gold'}`}>
                 {n.toLocaleString('en-IN')}
@@ -264,7 +267,7 @@ export default function ConventionBook() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {sortedHalls.map((h, i) => (
           <HallCard key={h.id} hall={h} selected={booking.hallId === h.id} guests={guestsNum} eager={i < 3}
-            onSelect={(hall) => updateBooking({ hallId: hall.id, hallName: hall.name })} />
+            onSelect={(hall) => updateBooking({ hallId: hall.id, hallName: hall.name, cooling: hall.cooling, capacity: hall.capacity })} />
         ))}
       </div>
 

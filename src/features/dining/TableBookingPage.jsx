@@ -456,12 +456,12 @@ export function TableBookingPage() {
                   type="tel"
                   inputMode="numeric"
                   pattern="[6-9][0-9]{9}"
-                  autoComplete="tel"
+                  autoComplete="tel-national"
                   maxLength={10}
                   placeholder={INDIAN_MOBILE_PLACEHOLDER}
                   value={guestMobile}
                   onChange={(e) => {
-                    setGuestMobile(e.target.value);
+                    setGuestMobile(sanitizeMobileInput(e.target.value));
                     if (errors.mobile) setErrors((prev) => ({ ...prev, mobile: null }));
                   }}
                   className={`field h-11 w-full text-sm ${errors.mobile ? 'border-rose-400' : ''}`}

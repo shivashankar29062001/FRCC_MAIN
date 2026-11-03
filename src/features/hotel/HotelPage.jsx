@@ -1132,7 +1132,7 @@ export function HotelPage() {
                     type="tel"
                     inputMode="numeric"
                     pattern="[6-9][0-9]{9}"
-                    autoComplete="tel"
+                    autoComplete="tel-national"
                     value={draft.mobile}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 10);

@@ -75,7 +75,7 @@ export function getRefundPolicy(booking, now = new Date()) {
   }
 
   // Exactly 48 hours counts as "within 48 hours" (50%).
-  const refundPercent = hoursUntilStart <= CANCELLATION_WINDOW_HOURS ? 50 : 100;
+  const refundPercent = hoursUntilStart >= CANCELLATION_WINDOW_HOURS ? 100 : 50;
   const refundAmount = Math.round(amountPaid * refundPercent) / 100;
 
   return {

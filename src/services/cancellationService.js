@@ -99,7 +99,12 @@ export function canCancelBooking(booking) {
  *   policyText: string,
  *   isWithinCutoff: boolean,
  *   warningText?: string,
- *   hoursUntilStart?: number
+ *   hoursUntilStart?: number,
+ *   refundPercent?: number,
+ *   refundAmount?: number,
+ *   nonRefundableAmount?: number,
+ *   refundStatusText?: string,
+ *   timingNote?: string
  * }}
  */
 export function getCancellationPolicyInfo(booking) {
@@ -131,11 +136,11 @@ export function getCancellationPolicyInfo(booking) {
       Boolean(booking.bookingId?.includes('ACT')) ||
       Boolean(booking.bookingRef?.includes('ACT')));
 
-  const isHallOrParking =
-    !isDining &&
-    !isStay &&
-    !isActivity &&
-    (booking.category === 'hall' || booking.category === 'parking');
+  const isHall =
+    booking.category === 'hall' ||
+    Boolean(booking.bookingId?.startsWith('FRCC-H-')) ||
+    Boolean(booking.bookingRef?.startsWith('FRCC-H-')) ||
+    Boolean(booking.id?.startsWith('FRCC-H-'));
 
   const dateStr = booking.checkin || booking.date;
   const timeStr = booking.time || booking.slot || (isStay ? '12:00 PM' : null);
@@ -143,8 +148,30 @@ export function getCancellationPolicyInfo(booking) {
   const now = Date.now();
   const hoursUntil = startTime ? (startTime.getTime() - now) / (1000 * 60 * 60) : null;
 
+  if (isHall) {
+    const isWithinCutoff = hoursUntil !== null && hoursUntil < 48 && hoursUntil >= 0;
+    const amountPaid = Number(booking.amountPaid ?? booking.amount ?? 0) || 0;
+    const refundPercent = hoursUntil !== null && hoursUntil >= 48 ? 100 : hoursUntil !== null && hoursUntil > 0 ? 50 : 0;
+    const refundAmount = Math.round((amountPaid * refundPercent) / 100);
+    const nonRefundableAmount = amountPaid - refundAmount;
+    return {
+      type: 'hall',
+      policyText:
+        'Cancel 48 hours or more before start for a 100% refund. Cancel within 48 hours for a 50% refund. No cancellation after start.',
+      isWithinCutoff,
+      warningText: isWithinCutoff
+        ? 'Notice: Event starts in less than 48 hours. A 50% refund applies.'
+        : undefined,
+      hoursUntilStart: hoursUntil,
+      refundPercent,
+      refundAmount,
+      nonRefundableAmount,
+      refundStatusText: refundAmount > 0 ? 'Refund pending' : 'No refund due',
+      timingNote: 'Refund will be credited as per your payment method timeline',
+    };
+  }
+
   if (isStay) {
-    // Stay Policy: Free cancellation up to 48 hours before check-in. Within 48 hours: 1-night retention fee.
     const isWithinCutoff = hoursUntil !== null && hoursUntil < 48 && hoursUntil >= 0;
     return {
       type: 'stay',
@@ -159,7 +186,6 @@ export function getCancellationPolicyInfo(booking) {
   }
 
   if (isActivity) {
-    // Activity Policy: Free cancellation up to 6 hours before the slot.
     const isWithinCutoff = hoursUntil !== null && hoursUntil < 6 && hoursUntil >= 0;
     return {
       type: 'activity',
@@ -173,7 +199,6 @@ export function getCancellationPolicyInfo(booking) {
   }
 
   if (isDining) {
-    // Dining Policy: Complimentary reservation, cancel anytime prior to slot.
     return {
       type: 'dining',
       policyText: 'Complimentary table reservation. You may cancel at any time before your reserved slot.',
@@ -182,18 +207,9 @@ export function getCancellationPolicyInfo(booking) {
     };
   }
 
-  if (isHallOrParking) {
-    return {
-      type: booking.category || 'general',
-      policyText: 'Standard cancellation policy applies. You may cancel prior to the scheduled start time.',
-      isWithinCutoff: false,
-      hoursUntilStart: hoursUntil,
-    };
-  }
-
   return {
-    type: 'general',
-    policyText: 'You may cancel this reservation before the scheduled date.',
+    type: booking.category || 'general',
+    policyText: 'Standard cancellation policy applies. You may cancel prior to the scheduled start time.',
     isWithinCutoff: false,
     hoursUntilStart: hoursUntil,
   };
@@ -203,7 +219,7 @@ export function getCancellationPolicyInfo(booking) {
  * Cancel a booking across Stay, Dining, Activities, Halls, or Parking.
  * Executes Supabase RPC cancel_booking, with seamless fallback for offline/direct access.
  *
- * @param {{ bookingType?: string, bookingId: string }} params
+ * @param {{ bookingType?: string, bookingId: string, bookingRef?: string }} params
  * @returns {Promise<object>}
  */
 export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRef = null }) {
@@ -224,7 +240,8 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
   let type = String(bookingType || 'auto').toLowerCase();
   if (type === 'auto') {
     const hint = String(refToMatch || '');
-    if (hint.startsWith('FRCC-S-') || hint.includes('STAY')) type = 'stay';
+    if (hint.startsWith('FRCC-H-') || hint.includes('HALL') || hint.startsWith('VH')) type = 'hall';
+    else if (hint.startsWith('FRCC-S-') || hint.includes('STAY')) type = 'stay';
     else if (hint.startsWith('FRCC-TAB-') || hint.startsWith('FRCC-T-') || hint.includes('TAB')) type = 'dining';
     else if (hint.startsWith('FRCC-ACT-') || hint.includes('ACT')) type = 'activity';
   }
@@ -233,12 +250,21 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
   try {
     const { data: rpcData, error: rpcErr } = await supabase.rpc('cancel_booking', {
       p_booking_type: type,
-      p_booking_id: bookingId,
+      p_booking_id: refToMatch,
     });
 
     if (!rpcErr && rpcData) {
+      if (type === 'hall') {
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: refToMatch, service_type: 'hall', refund_amount: rpcData.refund_amount },
+        }).catch(() => {});
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+      }
+
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId, type } }));
+        window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type } }));
         window.dispatchEvent(new CustomEvent('frcc:activity-bookings-changed'));
       }
       return rpcData;
@@ -254,23 +280,70 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
     }
   }
 
-  // 1b. Try existing activity-specific RPC if activity
+  // Hall specific cancellation fallback
+  if (type === 'hall' || type === 'convention') {
+    try {
+      const { data: rpcHall, error: rpcHallErr } = await supabase.rpc('cancel_hall_booking', {
+        p_booking_id: refToMatch,
+      });
+      if (!rpcHallErr && rpcHall) {
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: refToMatch, service_type: 'hall', refund_amount: rpcHall.refund_amount },
+        }).catch(() => {});
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'hall' } }));
+        }
+        return rpcHall;
+      }
+    } catch (_) {}
+
+    // Direct table update fallback
+    const nowIso = new Date().toISOString();
+    const { calculateHallRefund } = await import('../features/hall/convention/config/halls.config.js');
+    const { data: hallRow } = await supabase.from('convention_bookings').select('*').eq('id', refToMatch).maybeSingle();
+    const refundInfo = calculateHallRefund(hallRow);
+
+    await supabase.from('convention_bookings').update({
+      status: 'CANCELLED',
+      cancelled_at: nowIso,
+      refund_percent: refundInfo.refundPercent,
+      refund_amount: refundInfo.refundAmount,
+      refund_status: refundInfo.refundStatus,
+      updated_at: nowIso,
+    }).eq('id', refToMatch);
+
+    supabase.functions.invoke('issue-refund', {
+      body: { booking_id: refToMatch, service_type: 'hall', refund_amount: refundInfo.refundAmount },
+    }).catch(() => {});
+    supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'hall' },
+    }).catch(() => {});
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'hall' } }));
+    }
+    return { success: true, booking_id: refToMatch, status: 'CANCELLED' };
+  }
+
+  // Activity fallback
   if (type === 'activity' || type === 'activities') {
     try {
       const { data: actData, error: actErr } = await supabase.rpc('cancel_activity_booking', {
-        p_booking_id: bookingId,
+        p_booking_id: refToMatch,
       });
       if (!actErr && actData) {
         if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId, type } }));
+          window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type } }));
           window.dispatchEvent(new CustomEvent('frcc:activity-bookings-changed'));
         }
-        return { success: true, booking_id: bookingId, status: 'Cancelled' };
+        return { success: true, booking_id: refToMatch, status: 'Cancelled' };
       }
     } catch (_) {}
   }
 
-  // 2. Fallback: Direct table update resilient to missing cancelled_at column
   const nowIso = new Date().toISOString();
 
   if (type === 'stay' || type === 'hotel') {
@@ -279,21 +352,21 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
       const { error } = await supabase
         .from('stay_bookings')
         .update({ status: 'cancelled', cancelled_at: nowIso, updated_at: nowIso })
-        .or(`booking_ref.eq.${bookingId},id.eq.${bookingId}`);
+        .or(`booking_ref.eq.${refToMatch},id.eq.${bookingId}`);
       if (error) throw error;
     } catch (e) {
       const { error: e2 } = await supabase
         .from('stay_bookings')
         .update({ status: 'cancelled' })
-        .or(`booking_ref.eq.${bookingId},id.eq.${bookingId}`);
+        .or(`booking_ref.eq.${refToMatch},id.eq.${bookingId}`);
       if (e2) errToThrow = e2;
     }
     if (errToThrow) throw errToThrow;
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId, type } }));
+      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type } }));
     }
-    return { success: true, booking_id: bookingId, status: 'cancelled' };
+    return { success: true, booking_id: refToMatch, status: 'cancelled' };
   }
 
   if (type === 'dining' || type === 'table') {
@@ -302,24 +375,24 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
       const { error } = await supabase
         .from('table_bookings')
         .update({ status: 'cancelled', cancelled_at: nowIso })
-        .or(`booking_ref.eq.${bookingId},id.eq.${bookingId}`);
+        .or(`booking_ref.eq.${refToMatch},id.eq.${bookingId}`);
       if (error) throw error;
     } catch (e) {
       const { error: e2 } = await supabase
         .from('table_bookings')
         .update({ status: 'cancelled' })
-        .or(`booking_ref.eq.${bookingId},id.eq.${bookingId}`);
+        .or(`booking_ref.eq.${refToMatch},id.eq.${bookingId}`);
       if (e2) errToThrow = e2;
     }
     if (errToThrow) throw errToThrow;
 
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId, type } }));
+      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type } }));
     }
-    return { success: true, booking_id: bookingId, status: 'cancelled' };
+    return { success: true, booking_id: refToMatch, status: 'cancelled' };
   }
 
-  // Activities, Halls, Parking, or general bookings
+  // Activities, Parking, or general bookings
   let errToThrow = null;
   try {
     const { error } = await supabase
@@ -328,7 +401,6 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
       .or(`id.eq.${bookingId},booking_id.eq.${refToMatch}`);
     if (error) throw error;
   } catch (e) {
-    // If cancelled_at or updated_at column is missing, update status only
     const { error: e2 } = await supabase
       .from('bookings')
       .update({ status: 'Cancelled' })
@@ -337,7 +409,6 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
   }
   if (errToThrow) throw errToThrow;
 
-  // Also update payment to cancelled if pending
   try {
     await supabase
       .from('payments')
@@ -347,10 +418,9 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
   } catch (_) {}
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId, type } }));
+    window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type } }));
     window.dispatchEvent(new CustomEvent('frcc:activity-bookings-changed'));
   }
 
-  return { success: true, booking_id: bookingId, status: 'Cancelled' };
+  return { success: true, booking_id: refToMatch, status: 'Cancelled' };
 }
-
