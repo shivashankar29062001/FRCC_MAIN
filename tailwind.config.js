@@ -5,6 +5,7 @@ export default {
     extend: {
       colors: {
         navy: {
+          DEFAULT: '#0F1F3D',
           950: '#0A1730',
           900: '#0B1D3A',
           800: '#13294D',
@@ -13,6 +14,9 @@ export default {
           50: '#EFF3FA',
         },
         gold: {
+          DEFAULT: '#C9A227',
+          light: '#E6C860',
+          dark: '#A8841A',
           600: '#A9861D',
           500: '#C9A227',
           400: '#D9BC55',
@@ -23,6 +27,7 @@ export default {
       },
       fontFamily: {
         display: ['"Fraunces", "Georgia", serif'],
+        serif: ['"Playfair Display", "Georgia", serif'],
         sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       boxShadow: {

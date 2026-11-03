@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { BookingCard } from '../components/BookingPanel.jsx';
 import { SmartImage } from '../components/ui/media.jsx';
 import { HeroImage } from '../components/HeroImage.jsx';
+import { HeroSlider } from '../components/HeroSlider.jsx';
 import { PhotoTile, FilterRow, SectionLink, ExperienceSection } from '../components/ui/explore.jsx';
 import { Lightbox } from '../components/ui/lightbox.jsx';
-import { IMAGES } from '../config/images.js';
+import { IMAGES, gameSlot } from '../config/images.js';
 import { GAMES, GAME_CATEGORIES } from '../features/activities/games.config.js';
 import { getRedirect, isPlaceholder } from '../config/redirects.js';
 import { SITE_INFO, getAddressLines } from '../config/siteInfo.js';
@@ -14,10 +16,11 @@ import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { TypeWriter } from '../components/TypeWriter.jsx';
 import { name as siteName, shortName as siteShortName, tagline as siteTagline } from '../config/site.js';
+import { ROUTES } from '../config/routes.js';
 
 // 3a · Stay feature section
 const STAY_FEATURE = {
-  to: '/stay',
+  to: ROUTES.stay,
   heading: 'Stay',
   line: '36 rooms across two wings — member rates every night.',
   image: IMAGES.staySuite,
@@ -25,7 +28,7 @@ const STAY_FEATURE = {
 
 // 3b · Halls and events feature section
 const HALLS_FEATURE = {
-  to: '/halls',
+  to: ROUTES.halls,
   heading: 'Halls and events',
   line: 'Seats 40 to 400 — weddings, conferences, celebrations.',
   image: IMAGES.hallFunction,
@@ -39,10 +42,8 @@ const ACTIVITY_TABS = [
   { value: 'water', label: GAME_CATEGORIES.water },
 ];
 
-const GAMES_URL = getRedirect('activities');
 function gameHref(gameId) {
-  if (isPlaceholder(GAMES_URL)) return '/book/activities';
-  return `${GAMES_URL}?game=${encodeURIComponent(gameId)}`;
+  return `${ROUTES.activities}?game=${encodeURIComponent(gameId)}`;
 }
 
 // 3d · Campus life gallery — 8 photos
@@ -70,14 +71,22 @@ const addressLines = getAddressLines();
 const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
 
 export function LandingPage() {
-  const { hash, state } = useLocation();
+  const { hash, state, pathname, search } = useLocation();
+  const navigate = useNavigate();
   const [activityCategory, setActivityCategory] = useState('all');
   const [photoIndex, setPhotoIndex] = useState(null);
   const [headlineDone, setHeadlineDone] = useState(false);
 
   // ProtectedRoute lands logged-out visitors here with state.from
   const pendingFrom = typeof state?.from === 'string' ? state.from : null;
-  // signinState forwarded via navbar; kept here only if a local sign-in link is added.
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (state?.authPrompt && pendingFrom) {
+      openAuthPrompt(pendingFrom);
+      navigate(pathname + search, { replace: true, state: {} });
+    }
+  }, [state?.authPrompt, pendingFrom, openAuthPrompt, navigate, pathname, search]);
 
   // Deep links jump straight to section — instant, no smooth scroll
   useEffect(() => {
@@ -100,7 +109,7 @@ export function LandingPage() {
     <div>
       {/* 1 · HERO */}
       <div className="landing-hero-wrap">
-        <HeroImage slot="hero-home">
+        <HeroSlider slotsKey="home">
           <div className="landing-hero-overlay" aria-hidden="true" />
           <div className="container-x relative z-10 h-full flex items-center">
             <div className="landing-hero-text max-w-[520px] text-white">
@@ -152,7 +161,7 @@ export function LandingPage() {
                 {/* 6 · Plain text link */}
                 <div className="mt-[18px]">
                   <Link
-                    to="/signup"
+                    to={ROUTES.membership}
                     className="landing-hero-member-link inline-flex items-center gap-1.5"
                   >
                     <span>Become a member</span>
@@ -164,7 +173,7 @@ export function LandingPage() {
 
             </div>
           </div>
-        </HeroImage>
+        </HeroSlider>
 
         {/* 1b · BOOKING CARD */}
         <div id="booking" className="landing-hero-card-wrap scroll-mt-24">
@@ -187,7 +196,11 @@ export function LandingPage() {
             <h2 className="h-section">{STAY_FEATURE.heading}</h2>
             <span className="mt-3 block text-slate-600">{STAY_FEATURE.line}</span>
             <div className="mt-6">
-              <Link to={STAY_FEATURE.to} className="btn-base bg-gold-500 text-navy-950 px-6 py-3 hover:bg-gold-400 inline-flex items-center gap-2">
+              <Link
+                to={STAY_FEATURE.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Stay", STAY_FEATURE.to); }}
+                className="btn-base bg-gold-500 text-navy-950 px-6 py-3 hover:bg-gold-400 inline-flex items-center gap-2"
+              >
                 Explore stays <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
@@ -218,7 +231,11 @@ export function LandingPage() {
             <h2 className="h-section">{HALLS_FEATURE.heading}</h2>
             <span className="mt-3 block text-slate-600">{HALLS_FEATURE.line}</span>
             <div className="mt-6">
-              <Link to={HALLS_FEATURE.to} className="btn-base bg-navy-900 text-white px-6 py-3 hover:bg-navy-800 inline-flex items-center gap-2">
+              <Link
+                to={HALLS_FEATURE.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Halls and events", HALLS_FEATURE.to); }}
+                className="btn-base bg-navy-900 text-white px-6 py-3 hover:bg-navy-800 inline-flex items-center gap-2"
+              >
                 View halls <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
@@ -247,14 +264,14 @@ export function LandingPage() {
               <PhotoTile
                 key={g.id}
                 to={gameHref(g.id)}
-                image={IMAGES[g.imageKey]}
+                image={gameSlot(g.imageKey)}
                 label={g.name}
                 aspect="4 / 3"
                 sizes="(min-width: 1024px) 23vw, (min-width: 640px) 46vw, 92vw"
               />
             ))}
           </div>
-          <SectionLink to="/activities" light>View all activities</SectionLink>
+          <SectionLink to={ROUTES.activities} light>View all activities</SectionLink>
         </div>
       </section>
 
@@ -281,7 +298,7 @@ export function LandingPage() {
                   sizes="(min-width: 1024px) 23vw, 46vw"
                   overlay
                 >
-                  <span aria-hidden className="absolute inset-x-0 bottom-0 p-3">
+                  <span aria-hidden className="absolute inset-x-0 bottom-0 p-3 pointer-events-none">
                     <span className="block text-xs font-semibold text-white transition-colors duration-150 group-hover:text-gold-400">
                       {photo.label}
                     </span>
@@ -290,7 +307,7 @@ export function LandingPage() {
               </button>
             ))}
           </div>
-          <SectionLink to="/book" light>View all booking options</SectionLink>
+          <SectionLink to={ROUTES.book} light>View all booking options</SectionLink>
         </div>
       </section>
 
@@ -312,7 +329,8 @@ export function LandingPage() {
             <span className="mt-3 block text-slate-300">One lifetime fee — member rates across the whole campus.</span>
             <div className="mt-8">
               <Link
-                to="/membership"
+                to={ROUTES.membership}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Membership", ROUTES.membership); }}
                 className="btn-base bg-gold-500 text-navy-950 px-7 py-3.5 text-lg hover:bg-gold-400 inline-flex items-center gap-2"
               >
                 Become a member
@@ -351,6 +369,14 @@ export function LandingPage() {
                       <div>
                         <span className="block font-semibold text-navy-900">{loc.title}</span>
                         <address className="not-italic text-slate-600 text-xs sm:text-sm">{loc.fullAddress}</address>
+                        {loc.phone && (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1">
+                            <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
+                            <a href={`tel:${loc.phone.replace(/\s/g, '')}`} className="transition-colors hover:text-gold-600 font-medium">
+                              {loc.phone}
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </LocationTrigger>
                   </li>

@@ -1,82 +1,56 @@
-import { useState, useMemo } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { Input, PasswordInput, LoadingButton } from '../components/ui/controls.jsx';
 import { Reveal } from '../components/ui/motion.jsx';
-import { SmartImage } from '../components/ui/media.jsx';
-import { IMAGES } from '../config/images.js';
-import {
-  CheckIcon,
-  HotelIcon,
-  GamepadIcon,
-  ArrowRightIcon,
-} from '../components/ui/icons.jsx';
 import { Logo } from '../components/Logo.jsx';
+import { ArrowRightIcon } from '../components/ui/icons.jsx';
+import { IMAGES } from '../config/images.js';
+import { isValidMobile, normalizeMobile, formatMobileDisplay } from '../utils/phone.js';
 
 // ---------------------------------------------------------------------------
-// Auth screens — split-screen: brand panel (left) + form (right) on desktop,
+// /signin & /signup — Public auth routes. Split-screen layout on desktop,
 // stacked on mobile. Inline field validation, show/hide password, loading
-// buttons and success/error toasts.
+// states, and friendly toast feedback.
 // ---------------------------------------------------------------------------
 
-function BrandPanel({ eyebrow, title, body, points, footnote, image }) {
-  return (
-    <aside className="relative overflow-hidden bg-navy-950 px-6 py-10 text-white sm:px-10 lg:py-14">
-      {image && (
-        <>
-          {/* Calm corridor/garden photo behind the brand panel + scrim for contrast */}
-          <SmartImage fill image={image} zoom={false} sizes="(min-width: 1024px) 50vw, 100vw" />
-          <span aria-hidden className="absolute inset-0 bg-navy-950/80" />
-        </>
-      )}
-      <div aria-hidden className="absolute inset-0 bg-grid-gold bg-[size:34px_34px] opacity-50" />
-      <div aria-hidden className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-gold-500/10 blur-3xl" />
-      <div className="relative flex h-full flex-col">
-        <Link to="/" className="inline-flex items-center gap-2.5" aria-label="FRCC home">
-          <Logo variant="emblem" size={40} />
-          <span className="leading-tight">
-            <span className="block font-display font-bold text-white text-lg">FRCC</span>
-            <span className="block text-[11px] tracking-[0.08em] text-slate-400">Film Recreation &amp; Cultural Centre</span>
-          </span>
-        </Link>
-
-        <div className="mt-10 max-w-md">
-          <p className="eyebrow-on-dark">{eyebrow}</p>
-          <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">{title}</h1>
-          <p className="mt-3 text-slate-300 leading-relaxed">{body}</p>
-
-          <ul className="mt-7 space-y-3 text-sm text-slate-200">
-            {points.map((p) => (
-              <li key={p} className="flex items-start gap-3">
-                <span aria-hidden className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-gold-500/20 text-gold-400">
-                  <CheckIcon className="h-3 w-3" />
-                </span>
-                {p}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-10 flex flex-wrap items-center gap-4 text-xs text-slate-400 lg:mt-auto">
-          <span className="flex items-center gap-1.5">
-            <HotelIcon className="h-4 w-4 text-gold-400" /> Hotel · Halls · Parking
-          </span>
-          <span className="flex items-center gap-1.5">
-            <GamepadIcon className="h-4 w-4 text-gold-400" /> Courts · Pool · Bowling
-          </span>
-        </div>
-        {footnote}
-      </div>
-    </aside>
-  );
-}
-
-/** Split-screen shell shared by Sign up / Sign in. */
 function AuthLayout({ brand, children }) {
   return (
-    <div className="grid lg:min-h-[calc(100vh-4rem)] lg:grid-cols-2">
-      <BrandPanel {...brand} />
-      <div className="flex items-center justify-center bg-cream px-4 py-10 sm:px-8">
+    <div className="grid min-h-[calc(100vh-64px)] lg:grid-cols-2">
+      {/* Brand panel (desktop only) */}
+      <div className="relative hidden overflow-hidden bg-navy-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <img
+          src={brand.image}
+          alt="Film Recreation and Cultural Centre"
+          className="absolute inset-0 h-full w-full object-cover opacity-25"
+        />
+        <div className="relative z-10">
+          <Logo variant="lockup" size={120} />
+          <p className="mt-8 text-xs font-semibold uppercase tracking-widest text-gold-400">
+            {brand.eyebrow}
+          </p>
+          <h1 className="mt-2 font-display text-4xl font-medium leading-tight text-white">
+            {brand.title}
+          </h1>
+          <p className="mt-4 max-w-md text-base text-slate-300">
+            {brand.body}
+          </p>
+        </div>
+
+        <div className="relative z-10 space-y-3 border-t border-white/10 pt-8">
+          {brand.points.map((pt) => (
+            <div key={pt} className="flex items-center gap-3 text-sm text-slate-200">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-gold-500/20 text-gold-400">
+                ✓
+              </span>
+              <span>{pt}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex items-center justify-center p-6 sm:p-12">
         <Reveal className="w-full max-w-md">{children}</Reveal>
       </div>
     </div>
@@ -84,20 +58,62 @@ function AuthLayout({ brand, children }) {
 }
 
 export function SignupPage() {
-  const { signup, pushToast } = useApp();
+  const { user, signup, pushToast } = useApp();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', emailOrPhone: '', password: '' });
+  const location = useLocation();
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    mobile: '',
+    password: '',
+    confirmPassword: '',
+  });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const patch = (p) => setForm((f) => ({ ...f, ...p }));
 
+  const handleFieldChange = (field, value) => {
+    patch({ [field]: value });
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      navigate('/home', { replace: true });
+    }
+  }, [user, navigate]);
+
+  if (user) return null;
+
   function validate() {
     const next = {};
-    if (!form.name.trim()) next.name = 'Please enter your name.';
-    if (!form.emailOrPhone.trim()) next.emailOrPhone = 'Enter your email or mobile number.';
-    else if (form.emailOrPhone.trim().length < 4) next.emailOrPhone = 'That looks too short — check it once.';
-    if (!form.password) next.password = 'Create a password.';
-    else if (form.password.length < 6) next.password = 'Password must be at least 6 characters.';
+    if (!form.name.trim()) {
+      next.name = 'Please enter your full name.';
+    }
+    const cleanEmail = form.email.trim();
+    if (!cleanEmail) {
+      next.email = 'Please enter your email address.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      next.email = 'Please enter a valid email address.';
+    }
+    const cleanMob = form.mobile.trim();
+    if (!cleanMob) {
+      next.mobile = 'Please enter your mobile number.';
+    } else if (!isValidMobile(cleanMob)) {
+      next.mobile = 'Enter a valid 10-digit mobile number starting with 6-9.';
+    }
+    if (!form.password) {
+      next.password = 'Create a password.';
+    } else if (form.password.length < 6) {
+      next.password = 'Password must be at least 6 characters.';
+    }
+    if (!form.confirmPassword) {
+      next.confirmPassword = 'Please confirm your password.';
+    } else if (form.confirmPassword !== form.password) {
+      next.confirmPassword = 'Passwords do not match.';
+    }
     return next;
   }
 
@@ -110,13 +126,28 @@ export function SignupPage() {
       return;
     }
     setBusy(true);
-    // TODO: POST /api/auth/signup + email/OTP verification; handle API errors below.
-    setTimeout(() => {
-      setBusy(false);
-      signup(form);
-      pushToast('Account created. Please sign in.');
-      navigate('/signin');
-    }, 600);
+    signup({
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      mobile: normalizeMobile(form.mobile),
+      password: form.password,
+    })
+      .then(() => {
+        setBusy(false);
+        pushToast('Account created successfully! Welcome to FRCC.');
+        const target = location.state?.from || '/home';
+        navigate(target, { replace: true });
+      })
+      .catch((err) => {
+        setBusy(false);
+        const msg = String(err?.message || err).toLowerCase();
+        if (msg.includes('user already registered') || msg.includes('already exists') || msg.includes('already registered')) {
+          setErrors((prev) => ({ ...prev, email: 'An account with this email already exists. Please sign in.' }));
+          pushToast('An account with this email already exists. Please sign in.', 'error');
+        } else {
+          pushToast(err?.message || 'Failed to create account. Please check your details.', 'error');
+        }
+      });
   }
 
   return (
@@ -143,31 +174,51 @@ export function SignupPage() {
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
           <Input
-            label="Name"
+            label="Full Name *"
             name="name"
             autoComplete="name"
             value={form.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder="Full name"
+            onChange={(e) => handleFieldChange('name', e.target.value)}
+            placeholder="Your full name"
             error={errors.name}
           />
           <Input
-            label="Mail / Mobile"
-            name="emailOrPhone"
-            autoComplete="username"
-            value={form.emailOrPhone}
-            onChange={(e) => patch({ emailOrPhone: e.target.value })}
-            placeholder="Email or mobile number"
-            error={errors.emailOrPhone}
+            label="Email Address *"
+            name="email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => handleFieldChange('email', e.target.value)}
+            placeholder="name@example.com"
+            error={errors.email}
+          />
+          <Input
+            label="Mobile Number *"
+            name="mobile"
+            type="tel"
+            autoComplete="tel"
+            value={form.mobile}
+            onChange={(e) => handleFieldChange('mobile', e.target.value)}
+            placeholder="10-digit mobile number"
+            hint={isValidMobile(form.mobile) ? `Display: ${formatMobileDisplay(form.mobile)}` : 'Accepts spaces, +91 or leading 0'}
+            error={errors.mobile}
           />
           <PasswordInput
-            label="Create Password"
+            label="Create Password *"
             name="password"
             autoComplete="new-password"
             hint="At least 6 characters."
             value={form.password}
-            onChange={(e) => patch({ password: e.target.value })}
+            onChange={(e) => handleFieldChange('password', e.target.value)}
             error={errors.password}
+          />
+          <PasswordInput
+            label="Confirm Password *"
+            name="confirmPassword"
+            autoComplete="new-password"
+            value={form.confirmPassword}
+            onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
+            error={errors.confirmPassword}
           />
 
           <LoadingButton type="submit" className="w-full" loading={busy} loadingLabel="Creating account…">
@@ -189,15 +240,27 @@ export function SigninPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Form state - must be at top level for hooks rules
-  const [form, setForm] = useState({ emailOrPhone: '', password: '' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const patch = (p) => setForm((f) => ({ ...f, ...p }));
 
+  const handleFieldChange = (field, value) => {
+    patch({ [field]: value });
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
   // Resolve redirect target (memoized)
   const resolvedFrom = useMemo(() => {
-    const candidates = [location.state?.from];
+    let queryFrom = null;
+    try {
+      queryFrom = new URLSearchParams(location?.search || '').get('from');
+    } catch {
+      /* ignore */
+    }
+    const candidates = [location?.state?.from, queryFrom];
     try {
       candidates.push(window.sessionStorage.getItem('frcc.postLoginRedirect.v1'));
     } catch {
@@ -217,19 +280,52 @@ export function SigninPage() {
       }
     }
     return '/home';
-  }, [location.state?.from]);
+  }, [location?.state?.from, location?.search]);
 
-  // Redirect logged-in users immediately (replace so no history entry).
+  // Redirect logged-in users safely inside useEffect (never during render)
+  useEffect(() => {
+    if (user) {
+      navigate(resolvedFrom, { replace: true });
+    }
+  }, [user, resolvedFrom, navigate]);
+
   if (user) {
-    navigate(resolvedFrom, { replace: true });
     return null;
   }
 
   function validate() {
     const next = {};
-    if (!form.emailOrPhone.trim()) next.emailOrPhone = 'Enter your email or mobile number.';
-    if (!form.password) next.password = 'Enter your password.';
+    const val = form.email.trim();
+    const allowLegacy = typeof import.meta !== 'undefined' && import.meta.env?.VITE_ENABLE_LEGACY_PHONE_LOGIN === 'true';
+    const isLegacy10Digits = allowLegacy && isValidMobile(val);
+
+    if (!val) {
+      next.email = allowLegacy ? 'Enter your email or 10-digit mobile.' : 'Enter your email address.';
+    } else if (!isLegacy10Digits && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      next.email = allowLegacy ? 'Enter a valid email address or 10-digit mobile.' : 'Enter a valid email address.';
+    }
+    if (!form.password) {
+      next.password = 'Enter your password.';
+    }
     return next;
+  }
+
+  function mapAuthError(err) {
+    if (!err) return 'An error occurred. Please try again.';
+    const msg = String(err.message || err).toLowerCase();
+    if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    if (msg.includes('user not found') || msg.includes('user_not_found')) {
+      return 'No account found with this email. Please check your email or create an account.';
+    }
+    if (msg.includes('email not confirmed')) {
+      return 'Please confirm your email address before signing in. Check your inbox for the confirmation link.';
+    }
+    if (msg.includes('rate limit') || msg.includes('too many requests')) {
+      return 'Too many login attempts. Please wait a few moments and try again.';
+    }
+    return err.message || 'Failed to sign in. Please check your credentials.';
   }
 
   function submit(e) {
@@ -241,18 +337,47 @@ export function SigninPage() {
       return;
     }
     setBusy(true);
-    // TODO: POST /api/auth/login, handle invalid credentials + lockout.
-    setTimeout(() => {
-      setBusy(false);
-      login({ name: form.emailOrPhone.split('@')[0] || 'Member', emailOrPhone: form.emailOrPhone });
-      pushToast('Signed in');
-      try {
-        window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
-      } catch {
-        /* ignore */
+    login({ email: form.email, password: form.password })
+      .then(() => {
+        setBusy(false);
+        pushToast('Welcome back to FRCC!');
+        try {
+          window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
+        } catch {
+          /* ignore */
+        }
+        navigate(resolvedFrom, { replace: true });
+      })
+      .catch((err) => {
+        setBusy(false);
+        pushToast(mapAuthError(err), 'error');
+      });
+  }
+
+  async function handleForgotPassword() {
+    const cleanEmail = form.email.trim();
+    if (!cleanEmail) {
+      pushToast('Please enter your email address above first.', 'error');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      pushToast('Please enter a valid email address to reset your password.', 'error');
+      return;
+    }
+    try {
+      const { resetPassword } = await import('../services/authService.js');
+      await resetPassword(cleanEmail);
+      const isLocalhost =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalhost && !import.meta.env.VITE_SITE_URL) {
+        pushToast('Reset link sent! Please open the email on THIS computer (localhost cannot be opened from another device).');
+      } else {
+        pushToast('Password reset instructions sent to your email.');
       }
-      navigate(resolvedFrom, { replace: true });
-    }, 600);
+    } catch (err) {
+      pushToast(err?.message || 'Failed to send reset link.', 'error');
+    }
   }
 
   return (
@@ -279,20 +404,21 @@ export function SigninPage() {
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
           <Input
-            label="Mail / Mobile"
-            name="emailOrPhone"
+            label="Email"
+            name="email"
+            type="email"
             autoComplete="username"
-            value={form.emailOrPhone}
-            onChange={(e) => patch({ emailOrPhone: e.target.value })}
-            placeholder="Email or mobile number"
-            error={errors.emailOrPhone}
+            value={form.email}
+            onChange={(e) => handleFieldChange('email', e.target.value)}
+            placeholder="name@example.com"
+            error={errors.email}
           />
           <PasswordInput
             label="Password"
             name="password"
             autoComplete="current-password"
             value={form.password}
-            onChange={(e) => patch({ password: e.target.value })}
+            onChange={(e) => handleFieldChange('password', e.target.value)}
             error={errors.password}
           />
 
@@ -305,7 +431,7 @@ export function SigninPage() {
           <button
             type="button"
             className="text-slate-500 underline underline-offset-4 hover:text-navy-900"
-            onClick={() => pushToast('Forgot password flow coming soon', 'error')}
+            onClick={handleForgotPassword}
           >
             Forgot Password?
           </button>

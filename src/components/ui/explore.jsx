@@ -3,6 +3,7 @@ import { cx } from '../../utils/helpers.js';
 import { SmartImage } from './media.jsx';
 import { ArrowRightIcon } from './icons.jsx';
 import { IMAGES } from '../../config/images.js';
+import { ROUTES } from '../../config/routes.js';
 import { getRedirect, isPlaceholder } from '../../config/redirects.js';
 
 // ---------------------------------------------------------------------------
@@ -21,15 +22,22 @@ import { getRedirect, isPlaceholder } from '../../config/redirects.js';
  */
 export function ExploreLink({ to, className, children, ...props }) {
   const internal = typeof to === 'string' && to.startsWith('/');
+  const handleClick = (e) => {
+    if (import.meta.env.DEV) {
+      const label = props['aria-label'] || (typeof children === 'string' ? children : '') || to;
+      console.info("[tile]", label, to);
+    }
+    props.onClick?.(e);
+  };
   if (internal) {
     return (
-      <Link to={to} className={className} {...props}>
+      <Link to={to} className={className} {...props} onClick={handleClick}>
         {children}
       </Link>
     );
   }
   return (
-    <a href={to} className={className} {...props}>
+    <a href={to} className={className} {...props} onClick={handleClick}>
       {children}
     </a>
   );
@@ -62,7 +70,7 @@ export function PhotoTile({ to, image, label, detail, aspect = '4 / 3', sizes, c
   return (
     <ExploreLink to={to} className={cx(tileBase, className)}>
       <SmartImage image={image} aspect={aspect} sizes={sizes} overlay>
-        <span className="absolute inset-x-0 bottom-0 block p-4">
+        <span className="absolute inset-x-0 bottom-0 block p-4 pointer-events-none">
           <span className="block font-display text-lg text-white transition-colors duration-150 group-hover:text-gold-400 sm:text-xl">
             {label}
           </span>
@@ -171,11 +179,11 @@ export function MoreToExplore({ items = [], className }) {
 }
 
 const EXPERIENCE = [
-  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', showcase: '/stay' },
-  { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', showcase: '/halls' },
-  { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', showcase: '/parking' },
-  { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', showcase: '/activities' },
-  { key: 'membership', label: 'Membership', line: 'One fee, lifetime access', imageKey: 'serviceMembership', showcase: '/membership' },
+  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', to: ROUTES.stay },
+  { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', to: ROUTES.halls },
+  { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', to: ROUTES.parking },
+  { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', to: ROUTES.activities },
+  { key: 'membership', label: 'Membership', line: 'One fee, lifetime access', imageKey: 'serviceMembership', to: ROUTES.membership },
 ];
 
 function experienceHref(key, showcase) {
@@ -191,9 +199,14 @@ export function ExperienceTiles({ className }) {
   return (
     <div className={cx('grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5', className)}>
       {EXPERIENCE.map((t) => (
-        <ExploreLink
+        <Link
           key={t.key}
-          to={experienceHref(t.key, t.showcase)}
+          to={t.to}
+          onClick={() => {
+            if (import.meta.env.DEV) {
+              console.info("[tile]", t.label, t.to);
+            }
+          }}
           aria-label={`${t.label} — Book now`}
           className="group relative block overflow-hidden rounded-2xl border border-navy-900/10 transition-colors duration-150 hover:border-gold-500 focus-visible:border-gold-500"
         >
@@ -203,7 +216,7 @@ export function ExperienceTiles({ className }) {
             sizes="(min-width: 1024px) 18vw, (min-width: 640px) 44vw, 92vw"
             overlay
           >
-            <span className="absolute inset-x-0 bottom-0 block p-5">
+            <span className="absolute inset-x-0 bottom-0 block p-5 pointer-events-none">
               <span className="block font-display text-[22px] leading-snug text-white">{t.label}</span>
               <span className="mt-1 block text-sm text-white/80">{t.line}</span>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950">
@@ -211,7 +224,7 @@ export function ExperienceTiles({ className }) {
               </span>
             </span>
           </SmartImage>
-        </ExploreLink>
+        </Link>
       ))}
     </div>
   );

@@ -20,6 +20,7 @@ import { HeroImage } from '../components/HeroImage.jsx';
 import { ServiceHero } from '../components/ServiceHero.jsx';
 import { IMAGES } from '../config/images.js';
 import { SITE_INFO } from '../config/siteInfo.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { firstNameOf, greetingFor } from '../utils/helpers.js';
 import {
@@ -69,7 +70,7 @@ const FACILITY_GRID = [
 const OFFERS = [
   { date: 'SAT 14', title: 'Lakeside Food Fest', line: 'Forty stalls and sundown music on the garden lawns.', when: 'Sat · 5–10 PM', where: 'Garden lawns', tag: 'Open to all', tone: 'tag-green', image: IMAGES.eventFestival },
   { date: 'FRI 20', title: 'Open Badminton Night', line: 'Round-robin across four courts — rackets provided.', when: 'Fri · 7–10 PM', where: 'Courts 1–4', tag: 'Members only', tone: 'tag-gold', image: IMAGES.eventSports },
-  { date: 'Ends 31', title: 'FRCC Member Privileges', line: 'Enjoy 30% discount on every booking and 20% health card savings.', when: 'All year', where: 'Membership desk', tag: 'Member offer', tone: 'tag-navy', image: IMAGES.membershipLounge },
+  { date: 'Ends 31', title: 'FRCC Member Privileges', line: `Enjoy 30% discount on every booking and ${healthCardDiscountPercent}% health card savings.`, when: 'All year', where: 'Membership desk', tag: 'Member offer', tone: 'tag-navy', image: IMAGES.membershipLounge },
 ];
 
 export function HomeHubPage() {

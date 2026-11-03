@@ -6,7 +6,7 @@
 // confirmation — all styled by ./ParkingBookingPage.css and ./components/*.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
@@ -19,7 +19,8 @@ import {
   BOOKING_STATUS,
   BOOKING_STATUS_CODE,
   cancelBookingToAdmin,
-  isBookingCancelApiConfigured
+  isBookingCancelApiConfigured,
+  fetchBookedSlotsFromSupabase
 } from './services/bookingService.js';
 
 const generateInitialSlots = () => {
@@ -36,24 +37,35 @@ const generateInitialSlots = () => {
 
 const INITIAL_SLOTS = generateInitialSlots();
 
-const CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
+const BASE_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc_parking_confirmed_bookings_v1';
+const LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
 
-const retainConfirmedBooking = (booking) => {
+// Remove legacy un-namespaced keys on startup
+try {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.removeItem(LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY);
+    window.sessionStorage.removeItem(BASE_CONFIRMED_BOOKINGS_STORAGE_KEY);
+  }
+} catch (_) {}
+
+const getConfirmedBookingsKey = (userId = null) =>
+  userId ? `${BASE_CONFIRMED_BOOKINGS_STORAGE_KEY}.${userId}` : BASE_CONFIRMED_BOOKINGS_STORAGE_KEY;
+
+const retainConfirmedBooking = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
-    window.sessionStorage.setItem(
-      CONFIRMED_BOOKINGS_STORAGE_KEY,
-      JSON.stringify([...existing, booking])
-    );
+    window.sessionStorage.setItem(key, JSON.stringify([...existing, booking]));
   } catch (_) {
     // Storage unavailable
   }
 };
 
-const updateRetainedBookingStatus = (booking) => {
+const updateRetainedBookingStatus = (booking, userId = null) => {
   try {
-    const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
+    const key = getConfirmedBookingsKey(userId);
+    const raw = window.sessionStorage.getItem(key);
     const existing = raw ? JSON.parse(raw) : [];
     const reference = booking.bookingReference || booking.bookingId;
     const updated = existing.map((b) => {
@@ -68,7 +80,7 @@ const updateRetainedBookingStatus = (booking) => {
       }
       return b;
     });
-    window.sessionStorage.setItem(CONFIRMED_BOOKINGS_STORAGE_KEY, JSON.stringify(updated));
+    window.sessionStorage.setItem(key, JSON.stringify(updated));
   } catch (_) {
     // Storage unavailable
   }
@@ -82,82 +94,7 @@ const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
 export default function ParkingBookingPage() {
-  const { user, pushToast } = useApp();
-  // ---------------------------------------------------------------------------
-  // Initialise confirmedBooking + slot availability from stored bookings on mount,
-  // so a hard refresh restores the previous state.
-  // ---------------------------------------------------------------------------
-  function readStoredBookings() {
-    if (typeof window === 'undefined') return [];
-    try {
-      const raw = window.sessionStorage.getItem(CONFIRMED_BOOKINGS_STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Initialise confirmedBooking + slot availability from stored bookings on mount,
-  // so a hard refresh restores the previous state.
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    const storedBookings = readStoredBookings();
-
-    // Set confirmedBooking to the most recent CONFIRMED booking (not CANCELLED)
-    const confirmed = storedBookings.find(
-      (b) =>
-        b.bookingStatus !== BOOKING_STATUS.CANCELLED &&
-        b.bookingStatusCode !== BOOKING_STATUS_CODE.CANCELLED
-    );
-    setConfirmedBooking(confirmed || null);
-
-    // Determine the effective city for slot availability restoration.
-    // Check stored bookings for city information.
-    // If bookings have city fields, use the first one found.
-    // If no bookings have city fields (legacy), default to 'vja'.
-    let effectiveCity = 'vja';
-    const bookingsWithCity = storedBookings.filter(
-      (b) => b.city && b.city.trim()
-    );
-    if (bookingsWithCity.length > 0) {
-      effectiveCity = bookingsWithCity[0].city;
-    }
-
-    // Initialize both cities' slot statuses independently.
-    // Start with all slots available for both campuses (150 slots each).
-    const initialVja = generateInitialSlots();
-    const initialHyd = generateInitialSlots();
-    let statusesVja = initialVja.map((s) => ({ ...s }));
-    let statusesHyd = initialHyd.map((s) => ({ ...s }));
-
-    // Map full city names to slotStatuses keys ('vja'/'hyd')
-    const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
-
-    // Apply stored bookings to the appropriate city inventories.
-    // For bookings with a city field, mark slots in that city.
-    // For legacy bookings (no city field), default to Vijayawada ('vja').
-    storedBookings.forEach((booking) => {
-      if (
-        booking.bookingStatus !== BOOKING_STATUS.CANCELLED &&
-        booking.bookingStatusCode !== BOOKING_STATUS_CODE.CANCELLED
-      ) {
-        // Map full city name to slotStatuses key
-        const cityKey = cityMap[booking.city] || 'vja';
-        const targetStatuses = cityKey === 'vja' ? statusesVja : statusesHyd;
-        const slot = targetStatuses.find((s) => s.id === booking.parkingSlot);
-        if (slot) {
-          slot.status = 'booked';
-        }
-      }
-    });
-
-    setSlotStatuses({
-      vja: statusesVja,
-      hyd: statusesHyd,
-    });
-  }, []); // run once on mount
-
+  const { user } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -200,6 +137,17 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   const apiConfigured = isBookingApiConfigured();
 
+  // Reset confirmation receipt if active user changes or logs out
+  useEffect(() => {
+    if (confirmedBooking) {
+      const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
+      if (!matches) {
+        setConfirmedBooking(null);
+        setStep(STEP_CITY);
+      }
+    }
+  }, [user?.id, user?.userId, confirmedBooking]);
+
   // Auto-advance step based on form completion
   useEffect(() => {
     if (step === STEP_CITY && formData.city && formData.city.trim()) {
@@ -212,6 +160,23 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       setStep(STEP_SLOT);
     }
   }, [formData.date, formData.time, formData.days, step]);
+
+  // Synchronize slot occupancy dynamically from Supabase
+  useEffect(() => {
+    if (formData.date) {
+      fetchBookedSlotsFromSupabase(formData.date).then((bookedIds) => {
+        if (bookedIds && bookedIds.length > 0) {
+          const bookedSet = new Set(bookedIds);
+          setSlots(INITIAL_SLOTS.map((s) => ({
+            ...s,
+            status: bookedSet.has(s.id) ? 'booked' : 'available',
+          })));
+        } else {
+          setSlots(INITIAL_SLOTS);
+        }
+      });
+    }
+  }, [formData.date]);
 
   useEffect(() => {
     if (step === STEP_SLOT && selectedSlot) {
@@ -327,7 +292,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       };
     });
 
-    retainConfirmedBooking(booking);
+    retainConfirmedBooking(booking, user?.id);
     setConfirmedBooking(booking);
     setIsSubmitting(false);
     submittingRef.current = false;
@@ -353,6 +318,8 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
     const booking = createBooking({
       bookingReference: generateBookingReference(),
+      userId: user?.id || user?.userId || null,
+      user_id: user?.id || null,
       parkingSlot: selectedSlot,
       vehicleType: formData.vehicleType,
       vehicleNumber: formData.vehicleNumber.trim(),
@@ -455,7 +422,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       cancelledAt: new Date().toISOString()
     };
     setConfirmedBooking(cancelledBooking);
-    updateRetainedBookingStatus(cancelledBooking);
+    updateRetainedBookingStatus(cancelledBooking, user?.id);
 
     if (isBookingCancelApiConfigured()) {
       setCancelSyncState({ status: 'syncing', error: '' });

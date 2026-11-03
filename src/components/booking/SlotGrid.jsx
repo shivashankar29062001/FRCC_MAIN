@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// SlotGrid — available / booked / selected slot picker with legend.
+// SlotGrid — available / almost full / full / selected slot picker with legend.
 // Native radio inputs = free keyboard navigation (arrows + tab) and
 // screen-reader announcements. Loading skeleton + error retry included.
 // ---------------------------------------------------------------------------
@@ -9,12 +9,31 @@ import { ErrorState } from '../ui/feedback.jsx';
 import { slotRange } from '../../features/activities/availability.service.js';
 
 /**
- * @param {{ gameId: string, slots?: Array<{time: string, booked: boolean}>,
- *   value?: string, onChange?: (time: string) => void,
- *   loading?: boolean, error?: string, onRetry?: () => void,
- *   dateLabel?: string, gameName?: string }} props
+ * @param {{
+ *   gameId: string,
+ *   slots?: Array<{ time: string, range?: string, capacity?: number, bookedCount?: number, remaining?: number, status?: string, booked: boolean }>,
+ *   value?: string,
+ *   onChange?: (time: string) => void,
+ *   loading?: boolean,
+ *   error?: string,
+ *   onRetry?: () => void,
+ *   dateLabel?: string,
+ *   gameName?: string,
+ *   isGroup?: boolean
+ * }} props
  */
-export function SlotGrid({ gameId, slots = [], value = '', onChange, loading = false, error = '', onRetry, dateLabel = '', gameName = '' }) {
+export function SlotGrid({
+  gameId,
+  slots = [],
+  value = '',
+  onChange,
+  loading = false,
+  error = '',
+  onRetry,
+  dateLabel = '',
+  gameName = '',
+  isGroup = false,
+}) {
   if (loading) {
     return (
       <div role="status" aria-live="polite" aria-label="Loading slots">
@@ -40,7 +59,7 @@ export function SlotGrid({ gameId, slots = [], value = '', onChange, loading = f
     );
   }
 
-  const available = slots.filter((s) => !s.booked).length;
+  const available = slots.filter((s) => !s.booked && (s.remaining === undefined || s.remaining > 0)).length;
 
   return (
     <fieldset>
@@ -50,16 +69,32 @@ export function SlotGrid({ gameId, slots = [], value = '', onChange, loading = f
       <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Available slots">
         {slots.map((s) => {
           const selected = value === s.time;
+          const isFull = s.booked || s.status === 'full' || (s.remaining !== undefined && s.remaining <= 0);
+          const isAlmost = !isFull && (s.status === 'almost_full' || (s.remaining !== undefined && s.remaining <= 3));
+
+          let badgeText = 'Available';
+          if (isFull) {
+            badgeText = 'Full';
+          } else if (selected) {
+            badgeText = isGroup && s.remaining !== undefined ? `Selected (${s.remaining} left)` : 'Selected';
+          } else if (isAlmost) {
+            badgeText = isGroup && s.remaining !== undefined ? `Almost full (${s.remaining} left)` : 'Almost full';
+          } else if (isGroup && s.remaining !== undefined) {
+            badgeText = `Available (${s.remaining} left)`;
+          }
+
           return (
             <label
               key={s.time}
               className={cx(
-                'rounded-xl border px-4 py-2 text-center transition-colors duration-150 focus-within:ring-2 focus-within:ring-navy-800/30',
-                s.booked
-                  ? 'cursor-not-allowed border-slate-300 bg-slate-100 text-slate-500'
+                'rounded-xl border px-3.5 py-2 text-center transition-colors duration-150 focus-within:ring-2 focus-within:ring-navy-800/30',
+                isFull
+                  ? 'cursor-not-allowed border-slate-300 bg-slate-100 text-slate-400'
                   : selected
                     ? 'cursor-pointer border-navy-900 bg-navy-900 text-white shadow-card'
-                    : 'cursor-pointer border-slate-400 bg-white text-navy-900 hover:border-navy-900/60 hover:bg-navy-50',
+                    : isAlmost
+                      ? 'cursor-pointer border-amber-300 bg-amber-50/60 text-amber-900 hover:border-amber-400 hover:bg-amber-50'
+                      : 'cursor-pointer border-slate-300 bg-white text-navy-900 hover:border-navy-900/60 hover:bg-navy-50',
               )}
             >
               <input
@@ -67,17 +102,23 @@ export function SlotGrid({ gameId, slots = [], value = '', onChange, loading = f
                 name="slot"
                 className="sr-only"
                 checked={selected}
-                disabled={s.booked}
+                disabled={isFull}
                 onChange={() => onChange?.(s.time)}
               />
-              <span className="block text-sm font-semibold tabular-nums">{slotRange(gameId, s.time)}</span>
+              <span className="block text-sm font-semibold tabular-nums">{s.range || slotRange(gameId, s.time)}</span>
               <span
                 className={cx(
                   'block text-[10px] font-semibold',
-                  s.booked ? 'text-slate-500' : selected ? 'text-gold-400' : 'text-slate-500',
+                  isFull
+                    ? 'text-slate-400'
+                    : selected
+                      ? 'text-gold-400'
+                      : isAlmost
+                        ? 'text-amber-700'
+                        : 'text-slate-500',
                 )}
               >
-                {s.booked ? 'Booked' : selected ? 'Selected' : 'Available'}
+                {badgeText}
               </span>
             </label>
           );
@@ -88,7 +129,10 @@ export function SlotGrid({ gameId, slots = [], value = '', onChange, loading = f
           <span aria-hidden className="h-3 w-3 rounded border border-slate-400 bg-white" /> Available
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3 w-3 rounded border border-slate-300 bg-slate-100" /> Booked
+          <span aria-hidden className="h-3 w-3 rounded border border-amber-300 bg-amber-100" /> Almost full
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-3 w-3 rounded border border-slate-300 bg-slate-100" /> Full
         </span>
         <span className="flex items-center gap-1.5">
           <span aria-hidden className="h-3 w-3 rounded border border-navy-900 bg-navy-900" /> Selected

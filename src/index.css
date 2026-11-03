@@ -127,7 +127,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 a:not(.btn-base):not(.tag):not([class*="tag-"]):not([class*="icon"]) {
   @apply transition-colors duration-150;
 }
-a:not(.btn-base):not(.tag):not([class*="tag-"]):hover {
+a:not(.btn-base):not(.tag):not([class*="tag-"]):not(.bg-gold):hover {
   color: #C9A227; /* gold-500 */
 }
 
@@ -374,6 +374,86 @@ select.booking-field {
 .booking-card .field-error {
   color: #fca5a5;
 }
+
+/* Shared date picker customization: hide native indicator, stretch over input, avoid clipping */
+.date-picker-field,
+.date-picker-wrapper,
+.date-input-wrapper {
+  position: relative;
+}
+
+/* Make native picker indicator transparent and stretched over the entire input */
+.date-picker-field::-webkit-calendar-picker-indicator,
+.date-picker-native-overlay::-webkit-calendar-picker-indicator,
+.date-picker-wrapper input[type="date"]::-webkit-calendar-picker-indicator,
+.date-input-wrapper input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"].date-picker-field::-webkit-calendar-picker-indicator,
+input[type="date"].form-input::-webkit-calendar-picker-indicator,
+input[type="date"].field::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.date-picker-native-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* Ensure date input padding never cuts DD/MM/YYYY text across viewports */
+.booking-field.date-picker-field,
+.booking-card input.date-picker-field,
+.landing-hero-card-wrap input.date-picker-field,
+.booking-card--compact input.date-picker-field {
+  padding-left: 2.1rem !important;
+  padding-right: 0.5rem !important;
+  min-width: 0 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide native browser password reveal & clear icons (Microsoft Edge / IE) to prevent duplicate eye icons */
+input[type="password"]::-ms-reveal {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+input[type="password"]::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+input::-ms-reveal {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+input::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
 /* Gold member offer line under the fields. */
 .booking-offer {
   display: flex;
@@ -400,29 +480,34 @@ select.booking-field {
 /* ======================================================================== */
 /* Landing Page (/) Hero: Overlays + Typography + Compact Booking Card      */
 /* ======================================================================== */
-.landing-hero-wrap {
+.landing-hero-wrap,
+.service-hero-wrap {
   position: relative;
 }
 
-.landing-hero-wrap .hero {
+.landing-hero-wrap .hero,
+.service-hero-wrap .hero {
   position: relative;
   width: 100%;
   overflow: hidden;
 }
 
-.landing-hero-wrap .hero__shade {
+.landing-hero-wrap .hero__shade,
+.service-hero-wrap .hero__shade {
   display: none !important;
 }
 
 @media (min-width: 900px) {
-  .landing-hero-wrap .hero {
+  .landing-hero-wrap .hero,
+  .service-hero-wrap .hero {
     height: min(56.25vw, 88vh);
     min-height: 560px;
   }
 }
 
 @media (max-width: 899.98px) {
-  .landing-hero-wrap .hero {
+  .landing-hero-wrap .hero,
+  .service-hero-wrap .hero {
     height: auto;
     min-height: 480px;
     padding-top: 3.5rem;
@@ -655,36 +740,6 @@ select.booking-field {
   display: none !important;
 }
 
-/* Typewriter blinking caret */
-@keyframes typewriter-blink {
-  0%, 49% {
-    opacity: 1;
-  }
-  50%, 100% {
-    opacity: 0;
-  }
-}
-
-.typewriter-caret {
-  display: inline-block;
-  margin-left: 2px;
-  font-weight: 300;
-  color: currentColor;
-  animation: typewriter-blink 0.8s infinite;
-}
-
-.typewriter-caret--fade {
-  animation: none !important;
-  opacity: 0 !important;
-  transition: opacity 400ms ease-out !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .typewriter-caret {
-    display: none !important;
-  }
-}
-
 /* ======================================================================== */
 /* Service Hero: Reusable hero with Service Booking Card                    */
 /* ======================================================================== */
@@ -743,5 +798,72 @@ select.booking-field {
     width: 100% !important;
     max-width: 100% !important;
   }
+}
+
+/* ======================================================================== */
+/* Convention Hall module (merged from the Hall team's app).                 */
+/* Scoped to .convention-scope so the hall screens keep their own heading    */
+/* style (Playfair on navy) without touching any other page in the app.      */
+/* ======================================================================== */
+.convention-scope h1:not(.convention-hero-quote),
+.convention-scope h2,
+.convention-scope h3,
+.convention-scope h4 {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  color: #0b1a33;
+}
+
+/* Convention landing hero only: photo, navy overlay, quote. */
+.convention-hero-media {
+  background-color: #0b1d3a;
+  background-image:
+    url('/images/hero/convention-hero.jpg'),
+    url('https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1600&q=80');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+}
+
+@media (max-width: 768px) {
+  .convention-hero-media {
+    background-image:
+      url('/images/hero/convention-hero-1000.jpg'),
+      url('https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1600&q=80');
+  }
+}
+
+/* ~52% navy overall, a little deeper behind the quote. */
+.convention-hero-shade {
+  background:
+    radial-gradient(
+      ellipse 62% 55% at 50% 46%,
+      rgba(10, 23, 48, 0.42) 0%,
+      rgba(10, 23, 48, 0.22) 55%,
+      rgba(10, 23, 48, 0) 100%
+    ),
+    rgba(15, 31, 61, 0.52);
+}
+
+.convention-hero-quote {
+  font-size: clamp(2.25rem, 2.5vw + 1.75rem, 4.25rem);
+  font-weight: 700;
+  line-height: 1.18;
+  color: #ffffff;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.convention-hero-quote-gold {
+  color: #e8c14a;
+}
+
+.convention-hero-rule {
+  display: block;
+  width: 60px;
+  height: 3px;
+  margin: 1.5rem auto 0;
+  background: #c9a227;
+  border-radius: 2px;
 }
 

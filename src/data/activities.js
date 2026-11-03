@@ -180,6 +180,31 @@ export const games = [
     cancellationNote: 'Free cancellation up to 2 hours before the slot.',
   },
   {
+    id: 'card-room',
+    name: 'Card Room',
+    subtitle: 'Rummy · Poker · Teen Patti',
+    category: 'indoor',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '08:00',
+    openTo: '23:00',
+    maxPlayers: 6,
+    imageKey: 'card-room',
+    blurb: 'Dedicated card room for classic table games — Rummy, Poker and Teen Patti.',
+    level: 'Members & guests',
+    hours: { open: 8, close: 23 },
+    playerLabel: 'Players',
+    rentalPrice: 0,
+    extraFields: [
+      { id: 'table', label: 'Table number', type: 'select', required: true, options: ['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6'] },
+    ],
+    rules: ['Club card room etiquette and house rules apply at all times.', 'Members and accompanied guests only.'],
+    cancellationNote: 'Free cancellation up to 2 hours before the slot.',
+  },
+  {
     id: 'golf',
     name: 'Golf',
     category: 'outdoor',
@@ -330,6 +355,55 @@ export const games = [
     cancellationNote: 'Free cancellation up to 24 hours before the slot.',
   },
   {
+    id: 'squash',
+    name: 'Squash',
+    category: 'indoor',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00', // SAMPLE
+    openTo: '22:00', // SAMPLE
+    maxPlayers: 4,
+    imageKey: 'squash',
+    blurb: 'Two international-standard glass-back squash courts with wooden flooring.', // SAMPLE
+    level: 'All levels', // SAMPLE
+    hours: { open: 6, close: 22 }, // SAMPLE
+    playerLabel: 'Players', // SAMPLE
+    rentalPrice: 50, // SAMPLE
+    extraFields: [
+      { id: 'court', label: 'Court number', type: 'select', required: true, options: ['Court 1', 'Court 2'] }, // SAMPLE
+    ],
+    rules: ['Non-marking indoor court shoes mandatory.', 'Report 10 minutes prior to your slot time.'], // SAMPLE
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
+  },
+  {
+    id: 'basketball',
+    name: 'Basketball',
+    category: 'outdoor',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00', // SAMPLE
+    openTo: '21:00', // SAMPLE
+    maxPlayers: 10,
+    imageKey: 'basketball',
+    blurb: 'Full-size outdoor floodlit basketball court with tournament hoops.', // SAMPLE
+    level: 'All levels', // SAMPLE
+    hours: { open: 6, close: 21 }, // SAMPLE
+    playerLabel: 'Players (both teams)', // SAMPLE
+    rentalPrice: 50, // SAMPLE
+    extraFields: [
+      { id: 'court', label: 'Court format', type: 'select', required: true, options: ['Full court', 'Half court'] }, // SAMPLE
+      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 1, max: 5, placeholder: 'e.g. 5' }, // SAMPLE
+    ],
+    rules: ['Proper athletic basketball footwear required.', 'Balls issued at the sports reception against deposit.'], // SAMPLE
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
+  },
+  {
     id: 'luxury-gym',
     name: 'Luxury Gym',
     category: 'fitness', // Client: category "fitness"
@@ -346,7 +420,7 @@ export const games = [
     openFrom: '06:00',
     openTo: '22:00',
     maxPlayers: 30,
-    imageKey: 'facilityGym',
+    imageKey: 'luxury-gym',
     blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna.',
     level: 'All fitness levels',
     hours: { open: 6, close: 22 },
