@@ -6,7 +6,7 @@
 // confirmation — all styled by ./ParkingBookingPage.css and ./components/*.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';

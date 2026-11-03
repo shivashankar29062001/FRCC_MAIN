@@ -5,7 +5,6 @@ import { api } from '../services/api';
 import Stepper from '../components/Stepper';
 import HallCard from '../components/HallCard';
 
-
 export default function ConventionBook() {
   const { booking, updateBooking } = useBooking();
   const navigate = useNavigate();
@@ -37,20 +36,6 @@ export default function ConventionBook() {
       setLoading(false);
     });
   }, []);
-
-  // Load venues when city or area changes
-  useEffect(() => {
-    if (!cityId) {
-      setVenues([]);
-      return;
-    }
-    const params = new URLSearchParams();
-    params.append('cityId', cityId);
-    if (areaId && areaId !== 'ALL') params.append('areaId', areaId);
-    api(`/venues?${params.toString()}`, { auth: false })
-      .then(d => setVenues(Array.isArray(d?.venues) ? d.venues : []))
-      .catch(() => setVenues([]));
-  }, [cityId, areaId]);
 
   // Areas for the chosen city (from cities hierarchy)
   const areas = useMemo(() => {
@@ -95,6 +80,7 @@ export default function ConventionBook() {
   const guestsNum = Number(booking.guests) || 0;
   const GUEST_CHIPS = [30, 50, 100, 250, 500, 1000];
   const selectedHall = useMemo(() => halls.find(h => h.id === booking.hallId) || null, [halls, booking.hallId]);
+  const selectedVenue = useMemo(() => venues.find(v => v.id === venueId) || null, [venues, venueId]);
   const hallTooSmall = selectedHall && guestsNum > selectedHall.capacity;
   const setGuests = (val) => updateBooking({ guests: val === '' ? '' : String(val) });
   const stepGuests = (d) => setGuests(Math.min(10000, Math.max(30, (guestsNum || 30) + d)));
