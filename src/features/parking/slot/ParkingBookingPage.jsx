@@ -6,11 +6,12 @@
 // confirmation — all styled by ./ParkingBookingPage.css and ./components/*.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
 import BookingConfirmation, { getMaskedContactDetails } from './components/BookingConfirmation.jsx';
+import { isValidVehicleNumber, cleanVehicleNumber, VEHICLE_NUMBER_ERROR_MESSAGE } from '../../../utils/vehicle.js';
 import {
   createBooking,
   generateBookingReference,
@@ -20,7 +21,8 @@ import {
   BOOKING_STATUS_CODE,
   cancelBookingToAdmin,
   isBookingCancelApiConfigured,
-  fetchBookedSlotsFromSupabase
+  fetchBookedSlotsFromSupabase,
+  fetchParkingAvailability
 } from './services/bookingService.js';
 
 const generateInitialSlots = () => {
@@ -137,6 +139,19 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   const apiConfigured = isBookingApiConfigured();
 
+  // Preload selected campus from URL if navigated from /parking zone cards
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const campusParam = sp.get('campus') || sp.get('city');
+      if (campusParam) {
+        const normalized = campusParam.toLowerCase().includes('hyd') ? 'Hyderabad' : 'Vijayawada';
+        setFormData((prev) => ({ ...prev, city: normalized }));
+        setStep(STEP_DATE_TIME);
+      }
+    } catch (_) {}
+  }, []);
+
   // Reset confirmation receipt if active user changes or logs out
   useEffect(() => {
     if (confirmedBooking) {
@@ -161,22 +176,34 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     }
   }, [formData.date, formData.time, formData.days, step]);
 
-  // Synchronize slot occupancy dynamically from Supabase
-  useEffect(() => {
+  // Synchronize slot occupancy dynamically from Supabase per campus
+  const refreshSlots = useCallback(() => {
+    const cityKey = (formData.city || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+    const campus = cityKey === 'hyd' ? 'hyderabad' : 'vijayawada';
     if (formData.date) {
-      fetchBookedSlotsFromSupabase(formData.date).then((bookedIds) => {
-        if (bookedIds && bookedIds.length > 0) {
-          const bookedSet = new Set(bookedIds);
-          setSlots(INITIAL_SLOTS.map((s) => ({
-            ...s,
-            status: bookedSet.has(s.id) ? 'booked' : 'available',
-          })));
+      fetchParkingAvailability(campus, formData.date, formData.time || '09:00', formData.days || 1).then((slotData) => {
+        if (slotData && slotData.length > 0) {
+          const bookedSet = new Set(slotData.filter((s) => s.status === 'booked').map((s) => s.id));
+          setSlotStatuses((prev) => ({
+            ...prev,
+            [cityKey]: generateInitialSlots().map((s) => ({
+              ...s,
+              status: bookedSet.has(s.id) ? 'booked' : 'available',
+            }))
+          }));
         } else {
-          setSlots(INITIAL_SLOTS);
+          setSlotStatuses((prev) => ({
+            ...prev,
+            [cityKey]: generateInitialSlots()
+          }));
         }
       });
     }
-  }, [formData.date]);
+  }, [formData.city, formData.date, formData.time, formData.days]);
+
+  useEffect(() => {
+    refreshSlots();
+  }, [refreshSlots]);
 
   useEffect(() => {
     if (step === STEP_SLOT && selectedSlot) {
@@ -256,17 +283,11 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     }
 
     if (!formData.vehicleNumber || !formData.vehicleNumber.trim()) {
-      newErrors.vehicleNumber = 'Please enter your vehicle registration number.';
-    } else if (formData.vehicleNumber.trim().length < 4) {
-      newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP01AB1234).';
+      newErrors.vehicleNumber = VEHICLE_NUMBER_ERROR_MESSAGE;
     } else {
-      // Format validation for Indian vehicle registration numbers
-      // Pattern: 2 uppercase letters + 1-2 digits + 0-2 uppercase letters + 4 digits
-      // Examples: AP02AB1234, TS09CD5678
-      const normalized = formData.vehicleNumber.trim().toUpperCase();
-      const vehicleNumberRegex = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,2}[0-9]{4}$/;
-      if (!vehicleNumberRegex.test(normalized)) {
-        newErrors.vehicleNumber = 'Please enter a valid registration number (e.g., AP02AB1234).';
+      const clean = cleanVehicleNumber(formData.vehicleNumber);
+      if (!isValidVehicleNumber(clean)) {
+        newErrors.vehicleNumber = VEHICLE_NUMBER_ERROR_MESSAGE;
       }
     }
 
@@ -337,22 +358,27 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setIsSubmitting(true);
     setSubmissionState({ status: 'submitting', error: '' });
 
-    if (!apiConfigured) {
-      setSubmissionState({ status: 'not_configured', error: '' });
-      commitConfirmedBooking(booking);
-      return;
-    }
-
     submitBookingToAdmin(booking)
-      .then(() => {
+      .then((res) => {
         setSubmissionState({ status: 'success', error: '' });
-        commitConfirmedBooking(booking);
+        commitConfirmedBooking({ ...booking, id: res?.data?.id || booking.bookingReference });
       })
       .catch((err) => {
-        const message = err && err.message ? err.message : 'Could not reach the admin dashboard.';
-        setSubmissionState({ status: 'error', error: message });
         setIsSubmitting(false);
         submittingRef.current = false;
+        if (err && (err.code === 'SLOT_TAKEN' || err.message?.includes('SLOT_TAKEN'))) {
+          setErrors((prev) => ({ ...prev, slot: 'This slot was just booked' }));
+          setSelectedSlot(null);
+          setStep(STEP_SLOT);
+          refreshSlots();
+          setTimeout(() => {
+            const slotEl = document.getElementById('parking-slot-selection-card');
+            if (slotEl) slotEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+          return;
+        }
+        const message = err && err.message ? err.message : 'Could not confirm booking with database.';
+        setSubmissionState({ status: 'error', error: message });
         setErrors((prev) => ({ ...prev, payment: message }));
       });
   };

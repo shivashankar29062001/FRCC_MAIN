@@ -16,6 +16,7 @@ import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, ca
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
+import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE } from '../../utils/mobile.js';
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';

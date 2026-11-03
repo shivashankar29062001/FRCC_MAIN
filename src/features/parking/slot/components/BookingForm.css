@@ -181,15 +181,34 @@
 }
 
 .input-with-icon .form-input {
-  padding-right: 34px;
+  position: relative;
+  width: 100%;
+  padding-right: 38px;
+}
+
+/* Hide native WebKit picker indicators and stretch across input so click anywhere opens picker */
+.input-with-icon input[type="date"]::-webkit-calendar-picker-indicator,
+.input-with-icon input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .input-right-icon {
   position: absolute;
-  right: 10px;
+  right: 12px;
   pointer-events: none;
-  /* Blue secondary icon removed - only the black header icon remains visible */
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e293b;
+  z-index: 1;
 }
 
 /* 3. Full-width Card: Vehicle Details */

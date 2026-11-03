@@ -218,22 +218,94 @@ export function getBookingApiEndpoint() {
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 /**
+ * Trigger booking confirmation notifications via server-side Edge Function.
+ * Idempotent: safe to invoke multiple times.
+ */
+export async function triggerBookingConfirmationNotification(bookingId) {
+  try {
+    if (!bookingId) return { ok: false, error: 'No bookingId' };
+    const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: bookingId }
+    });
+    if (error) {
+      console.warn('[parkingService] Confirmation notification note:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, data };
+  } catch (err) {
+    console.warn('[parkingService] Confirmation notification catch:', err);
+    return { ok: false, error: err };
+  }
+}
+
+/**
+ * Resends booking confirmation with rate-limiting support (max 3 resends).
+ */
+export async function resendBookingConfirmation(bookingId) {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: bookingId, is_resend: true }
+    });
+    if (error) throw error;
+    return { ok: true, data };
+  } catch (err) {
+    throw err;
+  }
+}
+
+/**
  * Persists parking booking to Supabase database.
+ * Attempts atomic SECURITY DEFINER RPC create_parking_booking first (advisory locked).
+ * If slot is already taken, throws an error with code 'SLOT_TAKEN'.
  */
 export async function submitBookingToSupabase(booking) {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
+  const campus = (booking.city || 'Vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
 
+  // 1. Try atomic SECURITY DEFINER RPC create_parking_booking
+  try {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_parking_booking', {
+      p_campus: campus,
+      p_slot_id: booking.parkingSlot,
+      p_booking_date: booking.bookingDateISO || new Date().toISOString().split('T')[0],
+      p_arrival_time: booking.arrivalTime || '09:00',
+      p_duration_days: Number(booking.numberOfDays) || 1,
+      p_vehicle_type: booking.vehicleType || 'Four Wheeler',
+      p_vehicle_number: booking.vehicleNumber || '',
+      p_vehicle_model: booking.vehicleModel || null,
+      p_payment_method: booking.paymentMethodCode || 'UPI',
+      p_total_amount: booking.totalAmount || 0
+    });
+
+    if (rpcError) {
+      if (rpcError.message?.includes('SLOT_TAKEN') || rpcError.details?.includes('SLOT_TAKEN')) {
+        const err = new Error('SLOT_TAKEN');
+        err.code = 'SLOT_TAKEN';
+        throw err;
+      }
+      console.warn('[parkingService] RPC create_parking_booking error (falling back to direct insert):', rpcError.message);
+    } else if (rpcResult) {
+      return { ok: true, data: rpcResult };
+    }
+  } catch (rpcErr) {
+    if (rpcErr.code === 'SLOT_TAKEN' || rpcErr.message === 'SLOT_TAKEN') {
+      throw rpcErr;
+    }
+  }
+
+  // 2. Direct insert fallback
+  try {
     const payload = {
       booking_reference: booking.bookingReference || booking.bookingId,
       user_id: userId,
       slot_id: booking.parkingSlot,
-      city: booking.city || 'Vijayawada',
+      campus: campus,
+      city: booking.city || (campus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada'),
       booking_date: booking.bookingDateISO || new Date().toISOString().split('T')[0],
       arrival_time: booking.arrivalTime || '09:00',
-      duration_days: booking.numberOfDays || 1,
-      expires_at: new Date(Date.now() + (booking.numberOfDays || 1) * 24 * 60 * 60 * 1000).toISOString(),
+      duration_days: Number(booking.numberOfDays) || 1,
+      expires_at: new Date(Date.now() + (Number(booking.numberOfDays) || 1) * 24 * 60 * 60 * 1000).toISOString(),
       vehicle_type: booking.vehicleType || 'Car',
       vehicle_number: booking.vehicleNumber || '',
       vehicle_model: booking.vehicleModel || null,
@@ -250,31 +322,84 @@ export async function submitBookingToSupabase(booking) {
       .maybeSingle();
 
     if (error) {
-      console.warn('[parkingService] Supabase insert warning (schema may need migration):', error.message);
+      if (error.message?.includes('uq_parking_slot_campus_timerange') || error.code === '23P01') {
+        const err = new Error('SLOT_TAKEN');
+        err.code = 'SLOT_TAKEN';
+        throw err;
+      }
+      console.warn('[parkingService] Supabase insert warning:', error.message);
     }
-    return { ok: true, data };
+    return { ok: true, data: data || payload };
   } catch (err) {
+    if (err.code === 'SLOT_TAKEN' || err.message === 'SLOT_TAKEN') {
+      throw err;
+    }
     console.warn('[parkingService] Supabase insert catch:', err);
     return { ok: true };
   }
 }
 
 /**
- * Fetch occupied slots for a given date from Supabase
+ * Fetch occupied slots for a given campus and date/time range from Supabase.
+ * Isolated per campus: Vijayawada bookings never appear as Hyderabad bookings.
  */
-export async function fetchBookedSlotsFromSupabase(date) {
+export async function fetchParkingAvailability(campus = 'vijayawada', date, time = '09:00', days = 1) {
   try {
-    const { data, error } = await supabase
+    if (!campus || !date) return [];
+    const normalizedCampus = campus.toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+    const startTimeStr = time && time.length === 5 ? `${time}:00` : (time || '09:00:00');
+    const startAt = new Date(`${date}T${startTimeStr}+05:30`).toISOString();
+    const durationDays = Number(days) || 1;
+    const endAt = new Date(new Date(startAt).getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+    // 1. Try RPC get_parking_availability
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_parking_availability', {
+      p_campus: normalizedCampus,
+      p_start_at: startAt,
+      p_end_at: endAt
+    });
+
+    if (!rpcError && Array.isArray(rpcData)) {
+      return rpcData.map((row) => ({
+        id: row.slot_code || row.slot_id,
+        status: row.status || 'available'
+      }));
+    }
+
+    // 2. Fallback query if RPC migration hasn't been applied yet
+    const { data: fallbackData, error: fallbackError } = await supabase
       .from('parking_bookings')
-      .select('slot_id')
-      .eq('booking_date', date)
+      .select('slot_id, booking_date, arrival_time, duration_days')
+      .eq('campus', normalizedCampus)
       .eq('booking_status', 'CONFIRMED');
 
-    if (!error && Array.isArray(data)) {
-      return data.map((b) => b.slot_id);
+    if (!fallbackError && Array.isArray(fallbackData)) {
+      const bookedSet = new Set();
+      const targetStart = new Date(`${date}T${startTimeStr}+05:30`).getTime();
+      const targetEnd = targetStart + durationDays * 24 * 60 * 60 * 1000;
+
+      for (const row of fallbackData) {
+        const rowTime = row.arrival_time && row.arrival_time.length === 5 ? `${row.arrival_time}:00` : (row.arrival_time || '09:00:00');
+        const bStart = new Date(`${row.booking_date}T${rowTime}+05:30`).getTime();
+        const bEnd = bStart + (Number(row.duration_days) || 1) * 24 * 60 * 60 * 1000;
+        if (targetStart < bEnd && targetEnd > bStart) {
+          bookedSet.add(row.slot_id);
+        }
+      }
+      return Array.from(bookedSet).map(id => ({ id, status: 'booked' }));
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[parkingService] fetchParkingAvailability error:', err);
+  }
   return [];
+}
+
+/**
+ * Fetch occupied slots for a given date from Supabase (backward compatibility).
+ */
+export async function fetchBookedSlotsFromSupabase(date, campus = 'vijayawada') {
+  const result = await fetchParkingAvailability(campus, date);
+  return result.filter(s => s.status === 'booked').map(s => s.id);
 }
 
 /**

@@ -140,22 +140,20 @@ export function ServiceLanding({ service = 'stay', hero }) {
     }
 
     if (normService === 'parking') {
-      const filtered = parkingZones.filter((z) => !selectedArea || z.areaId === selectedArea);
-      return filtered.map((z) => ({
+      return parkingZones.map((z) => ({
         id: z.id,
         name: z.name,
         image: IMAGES[z.id] || IMAGES.parkingEntry,
         facts: [
           `${z.spots} parking slots`,
           `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
-          `Hours: ${z.operatingHours || '24x7'}`,
         ],
         priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
         priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
-        locationId: 'vja-parking',
-        locationName: 'Vijayawada Campus · Automated Parking',
+        locationId: z.areaId === 'hyd' ? 'hyd-office' : 'vja-parking',
+        locationName: z.campusName || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
         buttonLabel: 'Book Parking',
-        to: PARKING_BOOKING_URL,
+        to: `/parking/book?campus=${z.campus || (z.areaId === 'hyd' ? 'hyderabad' : 'vijayawada')}`,
       }));
     }
 

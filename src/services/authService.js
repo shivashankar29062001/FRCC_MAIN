@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { normalizeMobile } from '../utils/phone.js';
+import { isPhoneLike, isValidIndianMobile, INDIAN_MOBILE_MESSAGE } from '../utils/mobile.js';
 
 /**
  * Format user login identifier. If legacy phone login is enabled via VITE_ENABLE_LEGACY_PHONE_LOGIN
