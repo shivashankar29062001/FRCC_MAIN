@@ -15,6 +15,12 @@ import { saveActivityBooking, createActivityBookingRemote } from './bookings.sto
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../utils/mobile.js';
 import { MEMBER_DISCOUNT_LABEL, MEMBER_PROMO_NOTE } from '../../config/pricing.js';
 import { MEMBERSHIP_REDIRECT_URL } from '../../config/services.js';
 import {
@@ -112,8 +118,6 @@ function QrPlaceholder({ seed = 'frcc' }) {
     </div>
   );
 }
-
-const MOBILE_RE = /^[+\d][\d\s-]{7,14}$/;
 
 const STORAGE_KEY = 'frcc_activities_booking_draft';
 
@@ -298,7 +302,7 @@ export function ActivitiesProcessPage() {
             if (f.max !== undefined && nv > f.max) return false;
           }
           if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) return false;
-          if (f.type === 'tel' && v && !MOBILE_RE.test(String(v).trim())) return false;
+          if (f.type === 'tel' && v && !isValidIndianMobile(v)) return false;
         }
       }
       return true;
@@ -338,8 +342,7 @@ export function ActivitiesProcessPage() {
       const g = gameById(draft.gameId);
       const next = {};
       if (draft.name.trim().length < 2) next.name = 'Enter the booker’s full name.';
-      const cleanMobile = draft.mobile.replace(/\D/g, '');
-      if (cleanMobile.length !== 10 && !MOBILE_RE.test(draft.mobile.trim())) next.mobile = 'Enter a valid 10-digit mobile number.';
+      if (!isValidIndianMobile(draft.mobile)) next.mobile = INDIAN_MOBILE_MESSAGE;
       const n = Number(draft.players);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
@@ -369,8 +372,8 @@ export function ActivitiesProcessPage() {
           if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) {
             next[`x_${f.id}`] = `“${f.label}” is required.`;
           }
-          if (f.type === 'tel' && v && !MOBILE_RE.test(String(v).trim())) {
-            next[`x_${f.id}`] = `“${f.label}” must be a valid mobile number.`;
+          if (f.type === 'tel' && v && !isValidIndianMobile(v)) {
+            next[`x_${f.id}`] = INDIAN_MOBILE_MESSAGE;
           }
         }
       }
@@ -531,9 +534,27 @@ export function ActivitiesProcessPage() {
         <Input key={f.id} label={f.label} name={f.id} type="number" min={f.min} max={f.max} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} error={err} />
       );
     }
-    if (f.type === 'tel' || f.type === 'text') {
+    if (f.type === 'tel') {
       return (
-        <Input key={f.id} label={f.label} name={f.id} type={f.type} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
+        <Input
+          key={f.id}
+          label={f.label}
+          name={f.id}
+          type="tel"
+          inputMode="numeric"
+          pattern="[6-9][0-9]{9}"
+          maxLength={10}
+          value={value}
+          onChange={(e) => patchExtra(f.id, sanitizeMobileInput(e.target.value))}
+          placeholder={f.placeholder || INDIAN_MOBILE_PLACEHOLDER}
+          hint={f.hint}
+          error={err}
+        />
+      );
+    }
+    if (f.type === 'text') {
+      return (
+        <Input key={f.id} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
       );
     }
     if (f.type === 'checkbox') {

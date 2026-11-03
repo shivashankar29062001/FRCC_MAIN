@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { supabase } from '../services/supabase.js';
+import { isValidIndianMobile } from '../utils/mobile.js';
 import { rooms as LOCAL_ROOMS } from '../data/hotel.js';
 
 const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
@@ -150,6 +151,10 @@ export async function getAvailability(checkIn, checkOut) {
  * Create a stay booking atomically.
  */
 export async function createBooking(payload) {
+  const guestMobile = payload.guestMobile || payload.guest_mobile;
+  if (guestMobile && !isValidIndianMobile(guestMobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const clientRequestId = payload.clientRequestId || payload.client_request_id || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   let sessionUserId = null;

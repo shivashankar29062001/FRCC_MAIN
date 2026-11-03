@@ -25,6 +25,7 @@ import {
   ChevronLeftIcon,
   ArrowRightIcon,
   PrinterIcon,
+  ClockIcon,
 } from '../../components/ui/icons.jsx';
 import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 
@@ -142,6 +143,7 @@ export function HotelPage() {
   });
 
   const [paying, setPaying] = useState(false);
+  const [mobileTouched, setMobileTouched] = useState(false);
 
   // When browsing stay landing page, clear any previous stay booking draft or confirmation
   useEffect(() => {
@@ -456,11 +458,14 @@ export function HotelPage() {
 
   // Step 4 Validation (Guest details)
   const isStep4Valid = useMemo(() => {
-    const cleanMobile = draft.mobile.replace(/\D/g, '');
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim());
     const validSpecial = (draft.specialRequest || '').length <= 300;
-    return Boolean(draft.name.trim()) && cleanMobile.length === 10 && validEmail && validSpecial;
+    return Boolean(draft.name.trim()) && isValidIndianMobile(draft.mobile) && validEmail && validSpecial;
   }, [draft.name, draft.mobile, draft.email, draft.specialRequest]);
+
+  const mobileError = mobileTouched && !isValidIndianMobile(draft.mobile)
+    ? INDIAN_MOBILE_MESSAGE
+    : '';
 
   // Payment Handler
   async function handlePay() {
@@ -493,6 +498,8 @@ export function HotelPage() {
         roomTypeId: selectedRoom.id,
         checkIn: draft.checkin,
         checkOut: draft.checkout,
+        checkInTime: '12:00',
+        checkOutTime: '11:00',
         rooms: Number(draft.roomsCount || 1),
         adults: Number(draft.adults || 1),
         children: Number(draft.children || 0),
@@ -543,6 +550,8 @@ export function HotelPage() {
         areaName: 'Vijayawada',
         checkin: draft.checkin,
         checkout: draft.checkout,
+        checkinTime: '12:00 PM',
+        checkoutTime: '11:00 AM',
         date: draft.checkin,
         nights,
         roomsCount: draft.roomsCount,
@@ -596,7 +605,7 @@ export function HotelPage() {
     const cleanDigits = String(confirmedBooking.mobile || '').replace(/\D/g, '').slice(-10);
     const targetDigits = cleanDigits ? `91${cleanDigits}` : String(whatsappNumber || '917893616262').replace(/\D/g, '');
 
-    const msg = `*FRCC Stay Reservation*\nBooking ID: ${confirmedBooking.id}\nRoom: ${confirmedBooking.roomName}\nLocation: ${confirmedBooking.areaName}\nCheck-in: ${formatDMY(confirmedBooking.checkin)}\nCheck-out: ${formatDMY(confirmedBooking.checkout)} (${confirmedBooking.nights} night${confirmedBooking.nights > 1 ? 's' : ''})\nGuests: ${confirmedBooking.guests}\nTotal Paid: ${formatInr(confirmedBooking.total)}\n\nShow this confirmation at the front desk.`;
+    const msg = `*FRCC Stay Reservation*\nBooking ID: ${confirmedBooking.id}\nRoom: ${confirmedBooking.roomName}\nLocation: ${confirmedBooking.areaName}\nCheck-in: ${formatDMY(confirmedBooking.checkin)} at 12:00 PM\nCheck-out: ${formatDMY(confirmedBooking.checkout)} at 11:00 AM (${confirmedBooking.nights} night${confirmedBooking.nights > 1 ? 's' : ''})\nGuests: ${confirmedBooking.guests}\nTotal Paid: ${formatInr(confirmedBooking.total)}\n\nShow this confirmation at the front desk.`;
 
     return `https://wa.me/${targetDigits}?text=${encodeURIComponent(msg)}`;
   }, [confirmedBooking]);
@@ -797,7 +806,7 @@ export function HotelPage() {
                 </div>
               </div>
 
-              {/* Dates Grid */}
+              {/* Dates & Times Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <Input
@@ -807,9 +816,12 @@ export function HotelPage() {
                     value={draft.checkin}
                     onChange={(e) => handleCheckinChange(e.target.value)}
                   />
-                  {draft.checkin && (
-                    <p className="text-[11px] text-slate-500 mt-1">Check-in: {formatDMY(draft.checkin)}</p>
-                  )}
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-navy-900 font-medium">
+                    <ClockIcon className="h-4 w-4 shrink-0 text-navy-900" />
+                    <span>
+                      Check-in Time: <strong className="font-bold text-navy-950">12:00 PM</strong>
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <Input
@@ -819,18 +831,13 @@ export function HotelPage() {
                     value={draft.checkout}
                     onChange={(e) => updateDraft({ checkout: e.target.value })}
                   />
-                  {draft.checkout && (
-                    <p className="text-[11px] text-slate-500 mt-1">Check-out: {formatDMY(draft.checkout)}</p>
-                  )}
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-navy-900 font-medium">
+                    <ClockIcon className="h-4 w-4 shrink-0 text-navy-900" />
+                    <span>
+                      Check-out Time: <strong className="font-bold text-navy-950">11:00 AM</strong>
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Duration info & inline error */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 flex items-center justify-between text-sm">
-                <span className="text-slate-600 font-medium">Calculated Stay Duration:</span>
-                <span className="font-bold text-navy-900">
-                  {nights} {nights === 1 ? 'night' : 'nights'}
-                </span>
               </div>
 
               {step1Error && (
@@ -1122,14 +1129,27 @@ export function HotelPage() {
                   </span>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    autoComplete="tel"
                     value={draft.mobile}
-                    onChange={(e) => updateDraft({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    placeholder="9876543210"
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      updateDraft({ mobile: val });
+                      if (val.length === 10 || !val) setMobileTouched(true);
+                    }}
+                    onBlur={() => setMobileTouched(true)}
+                    placeholder={INDIAN_MOBILE_PLACEHOLDER}
                     maxLength={10}
+                    aria-invalid={Boolean(mobileError)}
                     className="block w-full rounded-r-xl border-0 py-2.5 px-3.5 text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-0"
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number</p>
+                {mobileError ? (
+                  <p role="alert" className="field-error mt-1">{mobileError}</p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number</p>
+                )}
               </div>
 
               <Input

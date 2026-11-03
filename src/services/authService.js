@@ -122,6 +122,9 @@ export async function getUserProfile(userId) {
  */
 export async function updateProfile(userId, updates) {
   if (!userId) throw new Error('Missing user id');
+  if (updates?.phone && isPhoneLike(updates.phone) && !isValidIndianMobile(updates.phone)) {
+    throw new Error(INDIAN_MOBILE_MESSAGE);
+  }
   const { data, error } = await supabase
     .from('profiles')
     .update({

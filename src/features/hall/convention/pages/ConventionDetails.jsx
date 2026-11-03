@@ -4,6 +4,12 @@ import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr } from '../utils/format';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../../../utils/mobile.js';
 
 const EVENT_TYPES = ['Wedding', 'Conference', 'Birthday', 'Corporate', 'Engagement', 'Workshop', 'Social Gathering', 'Other'];
 
@@ -31,7 +37,7 @@ export default function ConventionDetails() {
     if (Number(booking.guests) > 10000) return setError('Guest count cannot exceed 10,000.');
     if (hall && Number(booking.guests) > hall.capacity) return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
-    if (!/^[6-9]\d{9}$/.test(booking.phone)) return setError('Enter a valid 10-digit phone number.');
+    if (!isValidIndianMobile(booking.phone)) return setError(INDIAN_MOBILE_MESSAGE);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(booking.email)) return setError('Enter a valid email address.');
     setError(''); navigate('/convention/payment');
   };
