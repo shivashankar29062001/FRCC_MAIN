@@ -287,8 +287,22 @@ export function HotelPage() {
     return displayRooms.find((r) => r.id === draft.selectedRoomId) || displayRooms[0] || ALL_ROOMS[0];
   }, [displayRooms, draft.selectedRoomId]);
 
-  // Step 3 Filtered Rooms
+  const itemParam = searchParams.get('item') || searchParams.get('room');
+  const hasPreselectedRoom = Boolean(itemParam || draft.selectedRoomId);
+  const [showAllRooms, setShowAllRooms] = useState(() => !itemParam);
+
+  const effectiveSteps = useMemo(() => {
+    if (itemParam) {
+      return ['Dates', 'Guests', 'Room Details', 'Guest Details', 'Review & Pay', 'Confirmation'];
+    }
+    return STEPS;
+  }, [itemParam]);
+
+  // Step 3 Filtered Rooms - if user already selected a room from the Stay section, only show that room by default
   const filteredStep3Rooms = useMemo(() => {
+    if (hasPreselectedRoom && !showAllRooms && selectedRoom) {
+      return [selectedRoom];
+    }
     if (categoryFilter === 'all') return displayRooms;
     return displayRooms.filter((r) => {
       const cat = (r.category || '').toLowerCase();
@@ -301,7 +315,7 @@ export function HotelPage() {
       }
       return true;
     });
-  }, [displayRooms, categoryFilter]);
+  }, [displayRooms, categoryFilter, hasPreselectedRoom, showAllRooms, selectedRoom]);
 
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -774,7 +788,7 @@ export function HotelPage() {
     <FlowShell
       service="stay"
       title="Book your stay"
-      steps={STEPS}
+      steps={effectiveSteps}
       currentStep={step}
       onStepClick={(i) => {
         if (i < step && step < 5) setStep(i);
@@ -934,7 +948,7 @@ export function HotelPage() {
                 onClick={() => setStep(2)}
                 className="px-7 py-2.5 inline-flex items-center gap-1.5"
               >
-                Next: Choose Room <ArrowRightIcon className="h-4 w-4" />
+                {hasPreselectedRoom && !showAllRooms ? 'Next: Room Details' : 'Next: Choose Room'} <ArrowRightIcon className="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -953,36 +967,55 @@ export function HotelPage() {
           </Card>
         ) : (
           <Card>
-            <p className="eyebrow">Step 3 · Choose Room</p>
-            <h2 className="h-sub mt-1">Available rooms for your stay</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Showing availability for {formatDMY(draft.checkin)} to {formatDMY(draft.checkout)} ({nights} {nights === 1 ? 'night' : 'nights'}) · {draft.roomsCount} {Number(draft.roomsCount) > 1 ? 'rooms' : 'room'}.
-            </p>
-
-            {/* Category tabs */}
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'normal', label: 'Normal rooms' },
-                { id: 'suite', label: 'Suites' },
-              ].map((f) => {
-                const active = categoryFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setCategoryFilter(f.id)}
-                    className={`rounded-xl px-4 py-2 border transition ${
-                      active
-                        ? 'border-navy-900 bg-navy-900 text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p className="eyebrow">
+                  {hasPreselectedRoom && !showAllRooms ? 'Step 3 · Room Details' : 'Step 3 · Choose Room'}
+                </p>
+                <h2 className="h-sub mt-1">
+                  {hasPreselectedRoom && !showAllRooms ? 'Your selected room' : 'Available rooms for your stay'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Showing availability for {formatDMY(draft.checkin)} to {formatDMY(draft.checkout)} ({nights} {nights === 1 ? 'night' : 'nights'}) · {draft.roomsCount} {Number(draft.roomsCount) > 1 ? 'rooms' : 'room'}.
+                </p>
+              </div>
+              {hasPreselectedRoom && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRooms((prev) => !prev)}
+                  className="text-xs font-semibold text-navy-900 underline hover:text-gold-600 self-start sm:self-auto cursor-pointer"
+                >
+                  {showAllRooms ? 'Show only selected room' : 'Change room'}
+                </button>
+              )}
             </div>
+
+            {/* Category tabs - only show when browsing all rooms */}
+            {(showAllRooms || !hasPreselectedRoom) && (
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'normal', label: 'Normal rooms' },
+                  { id: 'suite', label: 'Suites' },
+                ].map((f) => {
+                  const active = categoryFilter === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setCategoryFilter(f.id)}
+                      className={`rounded-xl px-4 py-2 border transition ${
+                        active
+                          ? 'border-navy-900 bg-navy-900 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Capacity Warning Banner */}
             {!fitsParty && selectedRoom && (
@@ -1001,7 +1034,7 @@ export function HotelPage() {
             {availabilityLoading ? (
               <div className="py-12 text-center text-sm text-slate-500">Checking room availability…</div>
             ) : (
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className={`mt-6 ${hasPreselectedRoom && !showAllRooms ? 'max-w-xl' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}`}>
                 {filteredStep3Rooms.map((room) => {
                   const isSelected = draft.selectedRoomId === room.id;
                   const availableCount = room.available ?? 1;

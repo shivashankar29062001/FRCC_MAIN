@@ -59,12 +59,17 @@ export function SlotGrid({
     );
   }
 
-  const available = slots.filter((s) => !s.booked && (s.remaining === undefined || s.remaining > 0)).length;
+  const totalCapacity = isGroup
+    ? slots.reduce((acc, s) => acc + (s.capacity ?? 1), 0)
+    : slots.length;
+  const totalAvailable = isGroup
+    ? slots.reduce((acc, s) => acc + (s.remaining ?? 0), 0)
+    : slots.filter((s) => !s.booked && (s.remaining === undefined || s.remaining > 0)).length;
 
   return (
     <fieldset>
       <legend className="label">
-        Slots{gameName ? ` for ${gameName}` : ''}{dateLabel ? ` — ${dateLabel}` : ''} · {available} of {slots.length} available
+        Slots{gameName ? ` for ${gameName}` : ''}{dateLabel ? ` — ${dateLabel}` : ''} · {totalAvailable} of {totalCapacity} available
       </legend>
       <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Available slots">
         {slots.map((s) => {

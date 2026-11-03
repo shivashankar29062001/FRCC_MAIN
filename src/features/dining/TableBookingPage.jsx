@@ -45,15 +45,35 @@ export function TableBookingPage() {
   const navigate = useNavigate();
   const { user } = useApp();
 
-  const initialVenueParam = searchParams.get('venue') || 'restaurant';
+  const venueParam = searchParams.get('venue');
+  const hasPreselectedVenue = Boolean(venueParam);
+  const initialVenueParam = venueParam || 'restaurant';
   const initialDateParam = searchParams.get('date') || formatDMY(todayISO());
   const initialGuestsParam = Number(searchParams.get('guests')) || 2;
 
   // Step index: 0 = Venue, 1 = Date/time/guests, 2 = Your details, 3 = Confirmation
   const [step, setStep] = useState(0);
 
+  // If a venue was chosen in the dining section, show only that venue by default
+  const [showAllVenues, setShowAllVenues] = useState(() => !hasPreselectedVenue);
+
+  const effectiveSteps = useMemo(() => {
+    if (hasPreselectedVenue) {
+      return ['Venue Details', 'Date & Time', 'Your Details', 'Confirmation'];
+    }
+    return STEPS;
+  }, [hasPreselectedVenue]);
+
   // Form state
   const [selectedVenueId, setSelectedVenueId] = useState(initialVenueParam);
+
+  const displayedVenues = useMemo(() => {
+    if (hasPreselectedVenue && !showAllVenues) {
+      const v = venues.find((item) => item.id === selectedVenueId) || venues[0];
+      return [v];
+    }
+    return venues;
+  }, [hasPreselectedVenue, showAllVenues, selectedVenueId]);
   const [dateStr, setDateStr] = useState(initialDateParam);
   const [guestsCount, setGuestsCount] = useState(initialGuestsParam);
   const [selectedSlot, setSelectedSlot] = useState('');
@@ -208,7 +228,13 @@ export function TableBookingPage() {
       setStep(3);
     } catch (err) {
       console.error('Failed to create table booking:', err);
-      setErrors({ form: err?.message || 'Unable to reserve table. Please try again.' });
+      const msg = err?.message || 'Unable to reserve table. Please try again.';
+      if (msg.toLowerCase().includes('capacity') || msg.toLowerCase().includes('seat') || msg.toLowerCase().includes('not available')) {
+        setStep(1); // Return to Date & Time selection
+        setErrors({ slot: msg, form: msg });
+      } else {
+        setErrors({ form: msg });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -235,20 +261,37 @@ export function TableBookingPage() {
     <FlowShell
       title="Table Booking"
       service={{ label: diningLabel, to: '/dining' }}
-      steps={STEPS}
+      steps={effectiveSteps}
       currentStep={step}
       summary={summary}
     >
       {/* STEP 0: VENUE */}
       {step === 0 && (
         <Card className="!p-6 sm:!p-8">
-          <div className="border-b border-slate-100 pb-4 mb-6">
-            <h2 className="font-display text-xl sm:text-2xl font-bold text-navy-900">Choose a Venue</h2>
-            <p className="mt-1 text-xs text-slate-500">Select one of our five dining destinations on campus</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
+            <div>
+              <h2 className="font-display text-xl sm:text-2xl font-bold text-navy-900">
+                {hasPreselectedVenue && !showAllVenues ? 'Your Selected Venue' : 'Choose a Venue'}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {hasPreselectedVenue && !showAllVenues
+                  ? `Selected: ${venue.name} (${venue.hours})`
+                  : 'Select one of our five dining destinations on campus'}
+              </p>
+            </div>
+            {hasPreselectedVenue && (
+              <button
+                type="button"
+                onClick={() => setShowAllVenues((prev) => !prev)}
+                className="text-xs font-semibold text-navy-900 underline hover:text-gold-600 self-start sm:self-auto cursor-pointer"
+              >
+                {showAllVenues ? 'Show only selected venue' : 'Change venue'}
+              </button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {venues.map((v) => {
+          <div className={`grid grid-cols-1 gap-4 ${hasPreselectedVenue && !showAllVenues ? 'max-w-md' : 'sm:grid-cols-2'}`}>
+            {displayedVenues.map((v) => {
               const isSelected = selectedVenueId === v.id;
               const imgSlot = `dining-${v.id}`;
               const img = IMAGES[imgSlot] || { slot: imgSlot, name: v.name, alt: v.name };
@@ -298,7 +341,7 @@ export function TableBookingPage() {
               onClick={() => setStep(1)}
               className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-6 py-2.5 font-semibold text-sm inline-flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              Continue <ArrowRightIcon className="h-4 w-4" />
+              Continue to Date &amp; Time <ArrowRightIcon className="h-4 w-4" />
             </button>
           </div>
         </Card>
