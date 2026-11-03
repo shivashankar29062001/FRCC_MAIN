@@ -3,14 +3,16 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH || (process.env.GITHUB_ACTIONS ? '/FRCC_MAIN/' : '/'),
   plugins: [react()],
   server: {
-    port: 5173,
+    host: '0.0.0.0',
+    port: 5174,
     proxy: {
       // Convention Hall API (server/index.js) — brought over with the Hall
       // module. FRCC_MAIN had no proxy before; this only affects /api calls.
       '/api': {
-        target: 'http://127.0.0.1:5000',
+        target: 'http://127.0.0.1:5005',
         changeOrigin: true,
       },
     },

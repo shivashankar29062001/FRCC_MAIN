@@ -3,16 +3,21 @@
 // Powering Stay, Halls, Parking, Activities, and Membership landing pages.
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
-import { IMAGES, roomSlot } from '../config/images.js';
+import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
+import { ROUTES } from '../config/routes.js';
 import { areas as hotelAreas, rooms as hotelRooms } from '../data/hotel.js';
 import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
 import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
 import { games as activityGames } from '../data/activities.js';
 import { formatInr } from '../utils/pricing.js';
+import { HALL_BOOKING_URL, PARKING_BOOKING_URL } from '../config/redirects.js';
+import { healthCardDiscountPercent } from '../config/site.js';
 import {
   plans as membershipPlans,
   BENEFITS_DATA,
@@ -37,14 +42,34 @@ const BENEFIT_ICONS = {
 };
 
 const ALL_EXPLORE_LINKS = [
-  { key: 'stay', to: '/stay', label: 'Stay', detail: 'Rooms and suites across campus', image: IMAGES.exploreMoreHotel },
-  { key: 'halls', to: '/halls', label: 'Halls', detail: 'Weddings, conventions and private dining', image: IMAGES.exploreMoreHall },
-  { key: 'parking', to: '/parking', label: 'Parking', detail: 'Secure zoned parking with EV charging', image: IMAGES.exploreMoreParking },
-  { key: 'activities', to: '/activities', label: 'Activities', detail: 'Eleven sports, courts, and pool sessions', image: IMAGES.exploreMoreActivities },
-  { key: 'membership', to: '/membership', label: 'Membership', detail: 'Lifetime enrollment and club privileges', image: IMAGES.exploreMoreMembership },
+  { key: 'stay', to: ROUTES.stay, label: 'Stay', detail: 'Rooms and suites across campus', image: IMAGES.exploreMoreHotel },
+  { key: 'halls', to: ROUTES.halls, label: 'Halls', detail: 'Weddings, conventions and private dining', image: IMAGES.exploreMoreHall },
+  { key: 'parking', to: ROUTES.parking, label: 'Parking', detail: 'Secure zoned parking with EV charging', image: IMAGES.exploreMoreParking },
+  { key: 'activities', to: ROUTES.activities, label: 'Activities', detail: 'Eleven sports, courts, and pool sessions', image: IMAGES.exploreMoreActivities },
+  { key: 'membership', to: ROUTES.membership, label: 'Membership', detail: 'Lifetime enrollment and club privileges', image: IMAGES.exploreMoreMembership },
 ];
 
 export function ServiceLanding({ service = 'stay', hero }) {
+  const { user } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { openAuthPrompt } = useAuthModal();
+
+  useEffect(() => {
+    if (location.state?.authPrompt && location.state?.from && !user) {
+      openAuthPrompt(location.state.from);
+      // Immediately clear authPrompt from history state so closing/re-rendering never loops
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+  }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
+
+  function handleActionClick(e, to) {
+    if (!user) {
+      e.preventDefault();
+      openAuthPrompt(to);
+    }
+  }
+
   // Normalize service key ('hotel' -> 'stay', 'hall' -> 'halls')
   const normService = service === 'hotel' ? 'stay' : service === 'hall' ? 'halls' : service;
   const heroService = normService === 'halls' ? 'hall' : normService;
@@ -110,8 +135,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
           locationId: 'vja-halls',
           locationName: 'Vijayawada Campus · Convention Block',
-          buttonLabel: 'Select hall',
-          to: `/book/hall?item=${encodeURIComponent(h.id)}`,
+          buttonLabel: 'Book Hall',
+          to: HALL_BOOKING_URL,
         };
       });
     }
@@ -131,8 +156,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
         locationId: 'vja-parking',
         locationName: 'Vijayawada Campus · Automated Parking',
-        buttonLabel: 'Reserve parking',
-        to: `/book/parking?item=${encodeURIComponent(z.id)}`,
+        buttonLabel: 'Book Parking',
+        to: PARKING_BOOKING_URL,
       }));
     }
 
@@ -157,7 +182,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         return {
           id: g.id,
           name: g.name,
-          image: IMAGES[g.imageKey] || IMAGES.badminton,
+          subtitle: g.subtitle,
+          image: gameSlot(g.imageKey),
           facts: [
             `${g.slotMinutes} min session duration`,
             `Capacity: Up to ${g.maxPlayers} players`,
@@ -180,7 +206,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         image: IMAGES[p.imageSlot] || IMAGES.serviceMembership,
         facts: p.benefits || [
           '30% discount on every booking',
-          'Health card: 20% discount at collaborating diagnostic centres',
+          `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
           'Membership ID card and Health card',
         ],
         priceDisplay: formatInr(p.price || p.amount),
@@ -245,7 +271,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       {hero || <ServiceHero service={heroService} />}
 
       {/* 2 · Main Section */}
-      <section className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
+      <section id="content" className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
         <div className="container-x section">
           {/* Header */}
           <div className="max-w-2xl">
@@ -361,6 +387,10 @@ export function ServiceLanding({ service = 'stay', hero }) {
                 <div className="flex flex-1 flex-col p-5 sm:p-6">
                   <h3 className="font-display text-xl font-bold text-navy-900">{item.name}</h3>
 
+                  {item.subtitle && (
+                    <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
+                  )}
+
                   {item.locationName && (
                     <div className="mt-1">
                       <LocationTrigger
@@ -403,6 +433,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
                   <div className="mt-5 pt-1">
                     <Link
                       to={item.to}
+                      onClick={(e) => handleActionClick(e, item.to)}
                       className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
                     >
                       {item.buttonLabel}
@@ -496,6 +527,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
               <div className="mt-8 flex justify-center">
                 <Link
                   to={FINAL_STRIP.buttonLink}
+                  onClick={(e) => handleActionClick(e, FINAL_STRIP.buttonLink)}
                   className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-3.5 text-base font-semibold inline-flex items-center gap-2"
                 >
                   {FINAL_STRIP.buttonText}
@@ -517,6 +549,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
               <Link
                 key={item.to}
                 to={item.to}
+                onClick={() => { if (import.meta.env.DEV) console.info("[tile]", item.label, item.to); }}
                 className="group relative block overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm"
               >
                 <div className="h-44 overflow-hidden">

@@ -5,66 +5,16 @@ import { galleryItems as baseGalleryItems } from '../data/gallery.js';
 
 // ---------------------------------------------------------------------------
 // /gallery — FRCC Public Gallery
-// Chips: All, Launch event, Posters, Awards
-// Automatically loads awards images from /src/assets/awards/ or /src/assets/Awards/
+// Chips: All, Launch event, Posters
 // Masonry layout (columns-1 md:columns-2 lg:columns-3) with natural image ratio (no cropping)
 // Full-screen viewer with zoom (buttons, double-click, pinch), swipe, counter, focus trap
 // Pagination: 12 items first + "Load more"
 // ---------------------------------------------------------------------------
 
-// Auto-load all awards images with import.meta.glob (eager, url)
-const awardsGlob = import.meta.glob(
-  [
-    '../assets/awards/*.{webp,jpg,jpeg,png,avif,WEBP,JPG,JPEG,PNG,AVIF}',
-    '../assets/Awards/*.{webp,jpg,jpeg,png,avif,WEBP,JPG,JPEG,PNG,AVIF}',
-  ],
-  {
-    eager: true,
-    query: '?url',
-    import: 'default',
-  }
-);
-
-function getAwardItems() {
-  const entries = Object.entries(awardsGlob);
-  const seen = new Set();
-  const unique = [];
-
-  for (const [path, url] of entries) {
-    const filename = path.split('/').pop() || '';
-    const norm = filename.toLowerCase();
-    if (!seen.has(norm)) {
-      seen.add(norm);
-      unique.push({ filename, url });
-    }
-  }
-
-  // Natural sort by filename
-  unique.sort((a, b) =>
-    a.filename.localeCompare(b.filename, undefined, { numeric: true, sensitivity: 'base' })
-  );
-
-  return unique.map((item, index) => {
-    const id = `award-${index + 1}`;
-    // TODO: replace with real titles
-    const title = `Award ${index + 1}`;
-    return {
-      id,
-      category: 'awards',
-      categoryRaw: 'awards',
-      src: item.url,
-      title,
-      caption: title,
-      alt: `${title} - Film Recreation & Cultural Centre`,
-    };
-  });
-}
-
 const CATEGORY_TABS = [
   { id: 'all', label: 'All' },
   { id: 'Launch event', label: 'Launch event' },
   { id: 'Posters', label: 'Posters' },
-  { id: 'awards', label: 'Awards' },
 ];
 
 const PAGE_SIZE = 12;
@@ -95,7 +45,7 @@ function GalleryTile({ item, onClick }) {
           aria-label={item.title || item.caption}
         >
           <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-gold-400">
-            {item.category === 'awards' ? 'FRCC Award' : item.caption || 'FRCC Gallery'}
+            {item.caption || 'FRCC Gallery'}
           </span>
           <span className="mt-2 block text-sm font-medium text-slate-300">
             {item.title || item.caption}
@@ -343,10 +293,10 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
           onClose();
         }
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-between p-4 sm:p-6 bg-[#0a1730]/95 backdrop-blur-sm select-none"
+      className="fixed inset-0 z-50 flex flex-col justify-between p-3 sm:p-6 bg-[#0a1730]/95 backdrop-blur-sm select-none overflow-y-auto overscroll-contain min-h-screen"
     >
       {/* Top Bar: Counter, Zoom Controls, Close Button */}
-      <div className="flex items-center justify-between w-full max-w-7xl mx-auto z-20 gap-3">
+      <div className="flex items-center justify-between w-full max-w-7xl mx-auto z-20 gap-3 shrink-0 mb-2">
         <span className="text-sm font-semibold font-mono tracking-wider text-slate-300">
           {currentIndex + 1} of {items.length}
         </span>
@@ -398,7 +348,7 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
 
       {/* Main View Area: Prev Button, Image, Next Button */}
       <div
-        className="relative flex-1 flex items-center justify-center min-h-0 w-full max-w-7xl mx-auto my-2 overflow-hidden"
+        className={`relative flex-1 flex flex-col items-center justify-center min-h-0 w-full max-w-7xl mx-auto my-2 ${zoom > 1 ? 'overflow-hidden' : 'overflow-y-auto overscroll-contain py-2'}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -417,14 +367,14 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
             onPrev();
           }}
           aria-label="Previous photo"
-          className="absolute left-0 sm:left-2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
+          className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
         >
           <ChevronLeftIcon className="h-7 w-7 sm:h-8 sm:w-8" />
         </button>
 
         {/* Large Image & Caption */}
         <div
-          className="flex flex-col items-center justify-center max-h-full max-w-full px-12 sm:px-16"
+          className="flex flex-col items-center justify-center w-full max-w-full px-10 sm:px-16 my-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
@@ -439,10 +389,10 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
               transition: isDragging || isReducedMotion ? 'none' : 'transform 150ms ease-out',
               transformOrigin: 'center center',
             }}
-            className="max-h-[76vh] max-w-full object-contain rounded-lg shadow-lift select-none"
+            className="max-h-[58vh] sm:max-h-[62vh] md:max-h-[66vh] max-w-full object-contain rounded-lg shadow-lift select-none shrink-0"
             draggable={false}
           />
-          <p className="mt-3 text-center text-sm sm:text-base font-semibold text-slate-100 px-4 max-w-2xl">
+          <p className="mt-3 text-center text-sm sm:text-base font-semibold text-slate-100 px-4 max-w-2xl shrink-0">
             {currentItem.title || currentItem.caption}
           </p>
           {currentItem.credit && (
@@ -462,14 +412,14 @@ function GalleryLightbox({ items, currentIndex, onClose, onPrev, onNext }) {
             onNext();
           }}
           aria-label="Next photo"
-          className="absolute right-0 sm:right-2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
+          className="absolute right-0 sm:right-2 top-1/2 -translate-y-1/2 z-20 p-2 sm:p-3 rounded-full text-white/80 hover:text-white bg-black/40 hover:bg-black/70 border border-white/10 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-gold-500"
         >
           <ChevronRightIcon className="h-7 w-7 sm:h-8 sm:w-8" />
         </button>
       </div>
 
       {/* Bottom hint */}
-      <div className="text-center text-xs text-slate-400 z-10 py-1">
+      <div className="text-center text-xs text-slate-400 z-10 py-2 shrink-0 mt-auto">
         <span>Tip: Use arrow keys, swipe, or double-click to zoom</span>
       </div>
     </div>
@@ -481,20 +431,12 @@ export function GalleryPage() {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  // Load awards images automatically via Vite glob
-  const awardsItems = useMemo(() => getAwardItems(), []);
-
-  // Filter base items to ensure only Launch event and Posters are preserved
-  const baseItems = useMemo(() => {
+  // Base gallery items (Launch event + Posters)
+  const allItems = useMemo(() => {
     return baseGalleryItems.filter(
       (item) => item.category === 'Launch event' || item.category === 'Posters'
     );
   }, []);
-
-  // Combine all items (Launch event + Posters + Awards)
-  const allItems = useMemo(() => {
-    return [...baseItems, ...awardsItems];
-  }, [baseItems, awardsItems]);
 
   // Tab counts
   const tabCounts = useMemo(() => {
@@ -502,7 +444,6 @@ export function GalleryPage() {
       all: allItems.length,
       'Launch event': allItems.filter((i) => i.category === 'Launch event').length,
       Posters: allItems.filter((i) => i.category === 'Posters').length,
-      awards: allItems.filter((i) => i.category === 'awards').length,
     };
   }, [allItems]);
 
@@ -542,7 +483,7 @@ export function GalleryPage() {
   return (
     <div>
       {/* Page title & one-line subtitle */}
-      <div className="container-x section-top pb-16">
+      <div className="container-x section-top pb-20 sm:pb-24 min-h-[calc(100vh-140px)]">
         <Breadcrumbs items={[{ label: 'Home', to: '/home' }, { label: 'Gallery' }]} />
 
         <div className="mt-3">
@@ -552,7 +493,7 @@ export function GalleryPage() {
           </p>
         </div>
 
-        {/* 1. Category Tabs: All, Launch event, Posters, Awards with counts */}
+        {/* 1. Category Tabs: All, Launch event, Posters with counts */}
         <div className="mt-8 flex flex-wrap items-center gap-2" role="tablist" aria-label="Gallery categories">
           {CATEGORY_TABS.map((tab) => {
             const active = activeTab === tab.id;
@@ -580,10 +521,10 @@ export function GalleryPage() {
           {filteredItems.length === 0 ? (
             <div className="text-center py-16 text-slate-500 rounded-2xl border border-dashed border-slate-300 bg-white/50 p-8 my-6">
               <p className="text-base font-semibold text-navy-900">
-                {activeTab === 'awards' ? 'No awards posters available.' : 'No photos found in this category.'}
+                No photos found in this category.
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                {activeTab === 'awards' ? 'Check back soon for new award additions.' : 'Please select another category above.'}
+                Please select another category above.
               </p>
             </div>
           ) : (

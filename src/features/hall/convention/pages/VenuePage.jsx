@@ -28,8 +28,8 @@ export default function VenuePage() {
     setLoading(true);
     api(`/venues/${id}`, { auth: false })
       .then(d => { 
-        setVenue(d.venue); 
-        setHalls(d.halls); 
+        setVenue(d?.venue || null); 
+        setHalls(Array.isArray(d?.halls) ? d.halls : []); 
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

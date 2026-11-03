@@ -1,15 +1,152 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useRef, useMemo } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { HeroImage } from './HeroImage.jsx';
+import { HeroSlider } from './HeroSlider.jsx';
 import { BookingCard } from './BookingPanel.jsx';
 import { TypeWriter } from './TypeWriter.jsx';
 import { SmartImage } from './ui/media.jsx';
-import { ArrowRightIcon } from './ui/icons.jsx';
+import { ArrowRightIcon, CalendarIcon, UsersIcon } from './ui/icons.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
 import { SERVICE_HERO_DATA } from '../data/serviceHero.js';
 import { OFFERS_DATA } from '../data/offers.js';
 import { IMAGES, heroSrc } from '../config/images.js';
 import { HERO_CARD } from '../data/membership.js';
+import { venues } from '../data/dining.js';
+import { todayISO } from '../utils/helpers.js';
+import { formatDMY } from '../utils/dates.js';
+import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
+
+function DiningHeroCard() {
+  const navigate = useNavigate();
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
+  const [venue, setVenue] = useState('restaurant');
+  const [date, setDate] = useState(() => formatDMY(todayISO()));
+  const [guests, setGuests] = useState('2');
+  const pickerRef = useRef(null);
+
+  const isoValue = useMemo(() => {
+    if (!date) return '';
+    const parts = date.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+  }, [date]);
+
+  function handlePickerChange(e) {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    setDate(`${d}/${m}/${y}`);
+  }
+
+  function openPicker() {
+    if (pickerRef.current) {
+      try {
+        pickerRef.current.showPicker();
+      } catch {
+        pickerRef.current.focus();
+      }
+    }
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (venue) params.set('venue', venue);
+    if (date) params.set('date', date);
+    if (guests) params.set('guests', guests);
+    const targetUrl = `/dining/book?${params.toString()}`;
+    if (!user) {
+      openAuthPrompt(targetUrl);
+      return;
+    }
+    navigate(targetUrl);
+  }
+
+  return (
+    <div className="booking-card booking-card--compact">
+      <p className="booking-eyebrow">TABLE RESERVATION</p>
+      <h2 className="booking-title font-display">Reserve your table</h2>
+      <p className="mt-1 text-xs text-slate-300">Reserve a table at any of our campus dining venues</p>
+      <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3">
+        <div>
+          <label htmlFor="hero-dining-venue" className="booking-label">Venue</label>
+          <select
+            id="hero-dining-venue"
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
+            className="booking-field w-full text-sm"
+          >
+            {venues.map((v) => (
+              <option key={v.id} value={v.id} className="text-navy-950 bg-white">
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="hero-dining-date" className="booking-label">Date (DD/MM/YYYY)</label>
+            <div className="relative date-input-wrapper">
+              <span aria-hidden className="booking-field-icon pointer-events-none">
+                <CalendarIcon className="h-4 w-4" />
+              </span>
+              <input
+                id="hero-dining-date"
+                type="text"
+                placeholder="DD/MM/YYYY"
+                value={date}
+                onClick={openPicker}
+                onChange={(e) => setDate(e.target.value)}
+                className="booking-field date-picker-field w-full text-sm cursor-pointer !pr-2"
+              />
+              <input
+                ref={pickerRef}
+                type="date"
+                value={isoValue}
+                min={todayISO()}
+                onChange={handlePickerChange}
+                className="date-picker-native-overlay"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="hero-dining-guests" className="booking-label">Guests</label>
+            <div className="relative">
+              <span aria-hidden className="booking-field-icon">
+                <UsersIcon className="h-4 w-4" />
+              </span>
+              <select
+                id="hero-dining-guests"
+                value={guests}
+                onChange={(e) => setGuests(e.target.value)}
+                className="booking-field w-full text-sm"
+              >
+                {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((g) => (
+                  <option key={g} value={String(g)} className="text-navy-950 bg-white">
+                    {g} {g === 1 ? 'Guest' : 'Guests'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+        <button
+          type="submit"
+          className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 mt-1 transition"
+        >
+          <span>Find a table</span>
+          <ArrowRightIcon className="h-4 w-4" />
+        </button>
+      </form>
+    </div>
+  );
+}
 
 function getSlot(service) {
   if (service === 'hall') return 'hero-halls';
@@ -18,18 +155,38 @@ function getSlot(service) {
 }
 
 export function ServiceHero({ service = 'stay' }) {
+  const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const [headlineDone, setHeadlineDone] = useState(false);
   const data = SERVICE_HERO_DATA[service] || SERVICE_HERO_DATA.stay;
   const slot = getSlot(service);
   const isHub = service === 'hub';
   const offers = OFFERS_DATA[service] || null;
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  function handleScroll(e) {
-    e.preventDefault();
+  function handleExplore(e) {
     const targetId = (data.linkTarget || '#content').replace(/^#/, '');
-    const el = document.getElementById(targetId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const currentPath = location.pathname;
+    const targetPath = (data.to || '').split('#')[0];
+
+    // If we are already on this service's page and the element exists in DOM:
+    if (currentPath === targetPath || !targetPath) {
+      const el = document.getElementById(targetId);
+      if (el) {
+        e.preventDefault();
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        try {
+          window.history.replaceState(null, '', `#${targetId}`);
+        } catch {}
+        return;
+      }
+    }
+
+    // Otherwise navigate directly to the target URL
+    if (data.to && currentPath !== targetPath) {
+      e.preventDefault();
+      navigate(data.to);
     }
   }
 
@@ -79,14 +236,14 @@ export function ServiceHero({ service = 'stay' }) {
                 </div>
 
                 <div className="mt-[18px]">
-                  <a
-                    href={data.linkTarget || '#content'}
-                    onClick={handleScroll}
-                    className="landing-hero-member-link inline-flex items-center gap-1.5"
+                  <Link
+                    to={data.to || data.linkTarget || '#content'}
+                    onClick={handleExplore}
+                    className="landing-hero-member-link inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>{data.linkText}</span>
                     <ArrowRightIcon className="h-4 w-4" />
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -105,9 +262,34 @@ export function ServiceHero({ service = 'stay' }) {
               <div className="mt-6">
                 <Link
                   to={HERO_CARD.buttonLink}
-                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center"
+                  onClick={(e) => {
+                    if (!user) {
+                      e.preventDefault();
+                      openAuthPrompt(HERO_CARD.buttonLink);
+                    }
+                  }}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
                 >
                   {HERO_CARD.buttonText}
+                </Link>
+              </div>
+            </div>
+          ) : service === 'dining' ? (
+            <DiningHeroCard />
+          ) : service === 'events' ? (
+            <div className="booking-card booking-card--compact">
+              <p className="booking-eyebrow">FRCC EVENTS</p>
+              <h2 className="booking-title font-display">Experience the Culture</h2>
+              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                Screenings, workshops, discussions, and cultural evenings celebrating cinema and arts.
+              </p>
+              <div className="mt-6">
+                <Link
+                  to="/events#content"
+                  onClick={handleExplore}
+                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
+                >
+                  Explore events
                 </Link>
               </div>
             </div>
@@ -145,6 +327,7 @@ export function ServiceHero({ service = 'stay' }) {
                       <div className="mt-4 pt-1">
                         <Link
                           to={offer.link}
+                          onClick={() => { if (import.meta.env.DEV) console.info("[tile]", offer.title, offer.link); }}
                           className="inline-flex items-center gap-1 text-sm font-semibold text-navy-900 transition-colors duration-150 hover:text-gold-600"
                         >
                           <span>View</span>

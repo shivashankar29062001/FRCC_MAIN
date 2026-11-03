@@ -33,12 +33,19 @@ export function LoadingButton({ loading = false, loadingLabel = 'Please wait…'
   );
 }
 
-export function Input({ label, id, error, hint, ...props }) {
+export function Input({ label, id, error, hint, className, ...props }) {
   const inputId = id || props.name;
+  const isDate = props.type === 'date';
   return (
-    <div>
+    <div className={isDate ? "relative date-input-wrapper" : undefined}>
       {label && <label htmlFor={inputId} className="label">{label}</label>}
-      <input id={inputId} className="field" aria-invalid={!!error} aria-describedby={error ? `${inputId}-err` : undefined} {...props} />
+      <input
+        id={inputId}
+        className={cx('field', isDate && 'date-picker-field cursor-pointer', className)}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${inputId}-err` : undefined}
+        {...props}
+      />
       {hint && !error && <p className="text-xs text-slate-500 mt-1">{hint}</p>}
       {error && <p id={`${inputId}-err`} role="alert" className="field-error">{error}</p>}
     </div>

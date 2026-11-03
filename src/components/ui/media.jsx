@@ -74,7 +74,7 @@ export function SmartImage({
       {overlay && (
         <span
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-t from-navy-950/85 via-navy-950/35 to-navy-950/10"
+          className="absolute inset-0 bg-gradient-to-t from-navy-950/85 via-navy-950/35 to-navy-950/10 pointer-events-none"
         />
       )}
       {children}

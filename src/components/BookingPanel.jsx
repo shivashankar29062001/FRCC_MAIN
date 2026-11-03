@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
+import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
 import { GAMES } from '../features/activities/games.config.js';
 import { LoadingButton } from './ui/controls.jsx';
@@ -23,6 +24,7 @@ import {
 } from './ui/icons.jsx';
 import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
 import { SITE_INFO } from '../config/siteInfo.js';
+import { ROUTES } from '../config/routes.js';
 
 // ---------------------------------------------------------------------------
 // THE booking bar — the one booking widget in the site. It is used
@@ -46,11 +48,11 @@ import { SITE_INFO } from '../config/siteInfo.js';
 const STORAGE_KEY = 'frcc.bookingBar.v2';
 
 const TABS = [
-  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: '/stay' },
-  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: '/halls' },
-  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: '/parking' },
-  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: '/activities' },
-  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: '/membership' },
+  { id: 'stay', label: 'Stay', icon: HotelIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hotel', showcase: ROUTES.stay, booking: '/book/stay' },
+  { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: ROUTES.halls, booking: '/book/hall' },
+  { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: ROUTES.parking, booking: '/parking/book' },
+  { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: ROUTES.activities, booking: '/book/activities/process' },
+  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership, booking: '/membership/join' },
 ];
 
 // Game list comes from the activities team's config — the single source of truth.
@@ -199,25 +201,66 @@ function SelectInput({ id, error, inputClass = inputCls, nativeArrow = false, op
 }
 
 /**
- * Date field typed as DD/MM/YYYY. The value it reports is the text the visitor
- * typed (the site's own format); parseDMY() turns it into the ISO date the
- * booking flow takes.
+ * Date field with interactive calendar picker and typed DD/MM/YYYY fallback.
+ * The left icon is the only visible icon; the native picker indicator is transparent
+ * and stretched over the field so clicking anywhere opens the calendar.
  */
-function DateInput({ id, error, value, onChange, inputClass, ...props }) {
+function DateInput({ id, error, value, onChange, inputClass, min, ...props }) {
+  const pickerRef = useRef(null);
+
+  const isoValue = useMemo(() => {
+    if (!value) return '';
+    const parts = value.split('/');
+    if (parts.length === 3 && parts[2]?.length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return '';
+  }, [value]);
+
+  function handlePickerChange(e) {
+    const val = e.target.value;
+    if (!val) return;
+    const [y, m, d] = val.split('-');
+    onChange(`${d}/${m}/${y}`);
+  }
+
+  function openPicker() {
+    if (pickerRef.current) {
+      try {
+        pickerRef.current.showPicker();
+      } catch {
+        pickerRef.current.focus();
+      }
+    }
+  }
+
   return (
-    <TextInput
-      id={id}
-      error={error}
-      inputClass={inputClass}
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      placeholder="DD/MM/YYYY"
-      maxLength={10}
-      value={value || ''}
-      onChange={(e) => onChange(maskDMY(e.target.value))}
-      {...props}
-    />
+    <div className="relative w-full min-w-0 flex-1 date-input-wrapper">
+      <TextInput
+        id={id}
+        error={error}
+        inputClass={cx(inputClass, 'date-picker-field cursor-pointer !pr-2')}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="DD/MM/YYYY"
+        maxLength={10}
+        value={value || ''}
+        onClick={openPicker}
+        onChange={(e) => onChange(maskDMY(e.target.value))}
+        {...props}
+      />
+      <input
+        ref={pickerRef}
+        type="date"
+        value={isoValue}
+        min={min || todayISO()}
+        onChange={handlePickerChange}
+        className="date-picker-native-overlay"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </div>
   );
 }
 
@@ -294,6 +337,7 @@ function targetFor(tabId, v) {
     if (checkout) params.set('checkout', checkout);
     if (v.adults) params.set('adults', v.adults);
     if (v.rooms) params.set('rooms', v.rooms);
+    params.set('item', v.item || v.room || 'standard');
   }
   if (tabId === 'hall') {
     const date = parseDMY(v.date);
@@ -315,10 +359,7 @@ function targetFor(tabId, v) {
   }
 
   const qs = params.toString();
-  const url = getRedirect(t.redirectKey);
-  // A service whose URL is still a placeholder ("#") falls back to its own page
-  // in the app, so the bar always lands somewhere useful.
-  const base = isPlaceholder(url) ? t.showcase : url;
+  const base = t?.booking || t?.showcase || '/book';
   return `${base}${qs ? `?${qs}` : ''}`;
 }
 
@@ -328,6 +369,7 @@ function targetFor(tabId, v) {
  */
 function useBookingForm(defaultTab, preselect) {
   const { user } = useApp();
+  const { openAuthPrompt } = useAuthModal();
   const navigate = useNavigate();
   const [tab, setTab] = useState(() => {
     // Section landing pages pass preselect + their own tab; everywhere else the
@@ -380,7 +422,7 @@ function useBookingForm(defaultTab, preselect) {
 
   function selectTab(id) {
     if (id === 'membership') {
-      navigate('/membership');
+      navigate(ROUTES.membership);
       return;
     }
     setTab(id);
@@ -414,17 +456,9 @@ function useBookingForm(defaultTab, preselect) {
     setTimeout(() => {
       setBusy(false);
       if (!user) {
-        // Logged out → the protected target redirects to "/" with state.from,
-        // and the Sign in link forwards the visitor back after signing in.
-        navigate(target);
-        return;
-      }
-      if (target.startsWith('/')) {
-        navigate(target);
-      } else if (OPEN_IN_NEW_TAB) {
-        window.open(target, '_blank', 'noopener,noreferrer');
+        openAuthPrompt(target);
       } else {
-        window.location.assign(target);
+        navigate(target);
       }
     }, 450);
   }
@@ -441,10 +475,10 @@ function Fields({ tab, v, errors, patch, busy }) {
       {tab === 'stay' && (
         <>
           <Field id="stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
-            <DateInput id="stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
+            <DateInput id="stay-checkin" error={errors.checkin} value={v.checkin} min={todayISO()} onChange={(val) => patch({ checkin: val })} />
           </Field>
           <Field id="stay-checkout" label="Check-out" icon={CalendarIcon} error={errors.checkout}>
-            <DateInput id="stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
+            <DateInput id="stay-checkout" error={errors.checkout} value={v.checkout} min={v.checkin ? parseDMY(v.checkin) || todayISO() : todayISO()} onChange={(val) => patch({ checkout: val })} />
           </Field>
           <Field id="stay-guests" label="Guests" icon={UsersIcon} error={errors.adults}>
             <SelectInput id="stay-guests" error={errors.adults} value={v.adults || ''} onChange={(e) => patch({ adults: e.target.value })} options={GUEST_OPTIONS} placeholder="Guests…" />
@@ -526,7 +560,7 @@ function ServiceTabs({ tab, onTabKey, tabRefs, selectTab }) {
           return (
             <Link
               key={t.id}
-              to="/membership"
+              to={ROUTES.membership}
               id={`booking-tab-${t.id}`}
               className="relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-semibold transition-colors duration-150 sm:px-4 text-slate-500 hover:text-navy-900"
             >
@@ -576,7 +610,7 @@ function CardField({ id, label, icon: Icon, error, children }) {
     <div className="min-w-0 flex-1">
       <label htmlFor={id} className="booking-label">{label}</label>
       <div className="relative">
-        <span aria-hidden className="booking-field-icon">
+        <span aria-hidden className="booking-field-icon pointer-events-none">
           <Icon className="h-4 w-4" />
         </span>
         {children}
@@ -607,7 +641,7 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
           return (
             <Link
               key={t.id}
-              to="/membership"
+              to={ROUTES.membership}
               id={`booking-card-tab-${t.id}`}
               className="booking-tab"
             >
@@ -648,10 +682,10 @@ function CardFields({ tab, v, errors, patch, busy, compact = false }) {
         <>
           <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-stay-checkin" label="Check-in" icon={CalendarIcon} error={errors.checkin}>
-              <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} onChange={(val) => patch({ checkin: val })} />
+              <DateInput inputClass="booking-field" id="card-stay-checkin" error={errors.checkin} value={v.checkin} min={todayISO()} onChange={(val) => patch({ checkin: val })} />
             </CardField>
             <CardField id="card-stay-checkout" label="Check-out" icon={CalendarIcon} error={errors.checkout}>
-              <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} onChange={(val) => patch({ checkout: val })} />
+              <DateInput inputClass="booking-field" id="card-stay-checkout" error={errors.checkout} value={v.checkout} min={v.checkin ? parseDMY(v.checkin) || todayISO() : todayISO()} onChange={(val) => patch({ checkout: val })} />
             </CardField>
           </div>
           <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>

@@ -7,19 +7,33 @@ import { MEMBER_DISCOUNT_PERCENT, MEMBER_PROMO_NOTE } from './pricing.js';
 export const name = 'Film Recreation & Cultural Centre';
 export const shortName = 'FRCC';
 export const tagline = 'Reel stories... real connections...';
+export const url = '';
 
 export const phone = '+91 78936 16262';
-export const whatsappNumber = '917893616262';
-export const whatsappLink = 'https://wa.me/917893616262';
+export const vijayawadaPhone = '+91 98663 33787';
+export const hyderabadPhone = '+91 73967 44556';
+export const whatsappNumber = '919866333787';
+export const whatsappLink = 'https://wa.me/919866333787';
 export const whatsappTarget = 'member'; // 'member' | 'club'
 export const autoRedirectToWhatsApp = false;
 
 export const memberDiscountPercent = 30; // 30% discount on every booking
-export const healthCardDiscountPercent = 20; // 20% discount at selected diagnostic centres
+export const healthCardDiscountPercent = 30; // 30% discount at selected diagnostic centres
 export const memberPromoNote = MEMBER_PROMO_NOTE;
+export const diningLabel = 'Dining';
+export const requireSignIn = 'booking'; // 'booking' | 'services'
 
 // Registered office address
 export const address = 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003';
+
+const previewRegId = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_PREVIEW_REG_ID) || '';
+
+export const registration = {
+  id: previewRegId || '',
+  authority: '',
+  date: '',
+  certificate: '',
+};
 
 // Hyderabad branch office address
 export const hyderabadAddress = 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081';
@@ -33,6 +47,8 @@ export const locations = [
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
     state: 'Andhra Pradesh',
     pincode: '520003',
+    phone: '+91 98663 33787',
+    whatsappNumber: '919866333787',
     isDefault: true,
   },
   {
@@ -42,6 +58,8 @@ export const locations = [
     address: 'Second Floor, Samridhi Vasyam, D No 1/98/9/3/23, Capital Pk Rd, Above Axis bank Image gardens branch, Jaihind Enclave, Madhapur, Hyderabad, Telangana 500081',
     state: 'Telangana',
     pincode: '500081',
+    phone: '+91 73967 44556',
+    whatsappNumber: '917396744556',
     isDefault: false,
   },
 ];
@@ -70,6 +88,7 @@ export const siteConfig = {
   name,
   shortName,
   tagline,
+  url,
   phone,
   whatsappNumber,
   whatsappLink,
@@ -77,6 +96,8 @@ export const siteConfig = {
   memberDiscountPercent,
   healthCardDiscountPercent,
   memberPromoNote,
+  diningLabel,
+  requireSignIn,
   whatsappTarget,
   club,
   autoRedirectToWhatsApp,
@@ -85,6 +106,7 @@ export const siteConfig = {
   locations,
   email, // SAMPLE
   hours, // SAMPLE
+  registration,
 };
 
 export default siteConfig;

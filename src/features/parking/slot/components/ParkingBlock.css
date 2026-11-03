@@ -1,0 +1,454 @@
+/* ==========================================================================
+   Parking Block - Updated with new color scheme & animations
+   ========================================================================== */
+
+/* CSS Custom Properties for per-block theming */
+.parking-block-card {
+  --header-bg: #EAF3FF;
+  --header-border: #BFDBFE;
+  --icon-color: #1E40AF;
+  --slot-available-bg: #F0FDF4;
+  --slot-available-border: #BBF7D0;
+  --slot-available-text: #166534;
+  --slot-available-hover-bg: #DCFCE7;
+  --slot-available-hover-border: #86EFAC;
+  --slot-selected-bg: #DCFCE7;
+  --slot-selected-border: #4ADE80;
+  --slot-selected-text: #166534;
+  --slot-selected-hover-bg: #BBF7D0;
+  --slot-selected-hover-border: #4ADE80;
+  --slot-booked-bg: #FEE2E2;
+  --slot-booked-border: #F87171;
+  --slot-booked-text: #B91C1C;
+}
+
+/* Block B - Lavender */
+#parking-block-B {
+  --header-bg: #F0ECFF;
+  --header-border: #DDD6FE;
+  --icon-color: #5B21B6;
+}
+
+/* Block C - Gold */
+#parking-block-C {
+  --header-bg: #FFF5D9;
+  --header-border: #FDE68A;
+  --icon-color: #B45309;
+}
+
+/* Parking block card */
+.parking-block-card {
+  background: #FFFFFF;
+  border: 1px solid #DCE6F1;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(11, 24, 51, 0.03);
+  display: flex;
+  flex-direction: column;
+  height: 260px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: box-shadow 0.2s ease;
+}
+
+.parking-block-card:hover {
+  box-shadow: 0 4px 12px rgba(11, 24, 51, 0.08);
+}
+
+/* Block header with per-block color */
+.parking-block-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  height: 56px;
+  min-height: 56px;
+}
+
+.block-header-icon {
+  color: var(--icon-color);
+  flex-shrink: 0;
+}
+
+.block-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.block-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0B1833;
+  margin: 0;
+  line-height: 1.2;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+}
+
+.block-availability {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--icon-color);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Body wrapper to hold scrollable area + custom scrollbar */
+.parking-block-body-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+/* Scrollable block body - fits exactly 4 rows (20 slots) */
+.parking-block-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  height: 204px;
+  scrollbar-width: none; /* Hide default Firefox scrollbar */
+  -ms-overflow-style: none; /* Hide default IE/Edge scrollbar */
+}
+
+.parking-block-body::-webkit-scrollbar {
+  display: none; /* Hide default Chrome/Safari scrollbar */
+}
+
+/* 5-column parking slot grid */
+.parking-slot-grid-5col {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slot-grid-btn {
+  position: relative;
+  height: 38px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.slot-grid-btn:focus-visible {
+  outline: 2px solid var(--icon-color);
+  outline-offset: 2px;
+}
+
+/* Slot label */
+.slot-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* Booked slot content - vertical stack: car icon on top, label below */
+.slot-booked-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+}
+
+.slot-booked-icon {
+  color: var(--slot-booked-text);
+  flex-shrink: 0;
+}
+
+.slot-booked-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slot-booked-text);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Checkmark for selected slot */
+.slot-checkmark {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #166534;
+  opacity: 0;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.slot-grid-btn.slot-btn-selected .slot-checkmark {
+  transform: translateY(-50%) scale(1);
+  opacity: 1;
+}
+
+/* Available slots: pale green */
+.slot-grid-btn.slot-btn-available {
+  background: var(--slot-available-bg);
+  border-color: var(--slot-available-border);
+  color: var(--slot-available-text);
+}
+
+.slot-grid-btn.slot-btn-available:hover:not(:disabled) {
+  background: var(--slot-available-hover-bg);
+  border-color: var(--slot-available-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.12);
+}
+
+.slot-grid-btn.slot-btn-available:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Selected slot: stronger green with checkmark */
+.slot-grid-btn.slot-btn-selected {
+  background: var(--slot-selected-bg);
+  border-color: var(--slot-selected-border);
+  color: var(--slot-selected-text);
+  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.2);
+}
+
+.slot-grid-btn.slot-btn-selected:hover:not(:disabled) {
+  background: var(--slot-selected-hover-bg);
+  border-color: var(--slot-selected-hover-border);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.25);
+}
+
+.slot-grid-btn.slot-btn-selected:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Successfully booked slot: pale red */
+.slot-grid-btn.slot-btn-booked {
+  background: var(--slot-booked-bg);
+  border-color: var(--slot-booked-border);
+  color: var(--slot-booked-text);
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.slot-grid-btn.slot-btn-booked:hover {
+  background: var(--slot-booked-bg);
+  border-color: var(--slot-booked-border);
+}
+
+/* Disabled state */
+.slot-grid-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Animation for slot selection */
+@keyframes slotSelectPulse {
+  0% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(22, 101, 52, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0); }
+}
+
+.slot-grid-btn.slot-btn-selected {
+  animation: slotSelectPulse 0.4s ease-out;
+}
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  background: #F8FAFC;
+  border-left: 1px solid #E2E8F0;
+  flex-shrink: 0;
+  width: 32px;
+}
+
+.scroll-arrow {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.scroll-arrow:hover:not(:disabled) {
+  background: #E2E8F0;
+  color: #0B1833;
+}
+
+.scroll-arrow:active:not(:disabled) {
+  background: #CBD5E1;
+  transform: scale(0.95);
+}
+
+.scroll-arrow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scroll-track {
+  flex: 1;
+  width: 10px;
+  background: #E2E8F0;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+  min-height: 60px;
+}
+
+.scroll-thumb {
+  width: 6px;
+  background: #94A3B8;
+  border-radius: 3px;
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  cursor: grab;
+  transition: background 0.15s ease;
+  min-height: 40px;
+}
+
+.scroll-thumb:hover,
+.scroll-thumb:active {
+  background: #64748B;
+  cursor: grabbing;
+}
+
+/* Responsive design */
+@media (max-width: 1100px) {
+  .parking-block-card {
+    height: 250px;
+  }
+  
+  .parking-block-body {
+    height: 194px;
+    padding: 8px 10px;
+  }
+  
+  .slot-grid-btn {
+    height: 36px;
+    font-size: 11px;
+  }
+  
+  .custom-scrollbar {
+    width: 28px;
+    padding: 4px 3px;
+  }
+  
+  .scroll-arrow {
+    width: 22px;
+    height: 22px;
+  }
+  
+  .scroll-track {
+    width: 8px;
+  }
+  
+  .scroll-thumb {
+    width: 5px;
+    left: 1.5px;
+    right: 1.5px;
+  }
+  
+  .block-availability {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 900px) {
+  .parking-block-card {
+    height: 240px;
+  }
+  
+  .parking-block-body {
+    height: 184px;
+  }
+  
+  .slot-grid-btn {
+    height: 34px;
+  }
+  
+  .block-header-title {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .parking-block-card {
+    height: 280px;
+  }
+  
+  .parking-block-body {
+    height: 224px;
+    padding: 10px 12px;
+  }
+  
+  .slot-grid-btn {
+    height: 38px;
+    font-size: 12px;
+  }
+  
+  .custom-scrollbar {
+    width: 32px;
+    padding: 6px 4px;
+  }
+  
+  .scroll-arrow {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .scroll-track {
+    width: 10px;
+  }
+  
+  .scroll-thumb {
+    width: 6px;
+    left: 2px;
+    right: 2px;
+  }
+  
+  .parking-block-header {
+    padding: 10px 14px;
+    height: 52px;
+    min-height: 52px;
+  }
+  
+  .block-availability {
+    font-size: 12px;
+  }
+}

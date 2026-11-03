@@ -1,6 +1,5 @@
 // Data Service - Single entry point for all data access
-// In demo mode (VITE_DEMO_MODE=true): reads from local demo files
-// In production mode: reads from Supabase (stub for now)
+// In demo mode or production: provides locations, hotels, halls, parking, and activities.
 
 import { LOCATIONS, getLocationById, getDefaultLocation } from '../data/demo/locations.js';
 import { HOTELS, getHotelsByLocation, getHotelById } from '../data/demo/hotels.js';
@@ -11,150 +10,105 @@ import { ACTIVITIES, getActivitiesByLocation, getActivityById, getAllActivities 
 // Demo mode flag
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
-// Simulate network delay for realistic UX
-const DEMO_DELAY = 300;
+const DEMO_DELAY = 150;
 function delay(ms = DEMO_DELAY) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Error helper
-function createError(message) {
-  const err = new Error(message);
-  err.isDemoError = true;
-  return err;
 }
 
 /**
  * Get all locations
  */
 export async function getLocations() {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return [...LOCATIONS];
-  }
-  // TODO: Replace with Supabase call
-  throw createError('Production mode not implemented - Supabase adapter needed');
+  await delay(50);
+  return [...LOCATIONS];
 }
 
 /**
  * Get location by ID
  */
 export async function getLocation(id) {
-  if (IS_DEMO_MODE) {
-    await delay(100);
-    return getLocationById(id);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getLocationById(id);
 }
 
 /**
  * Get default location
  */
 export async function getDefaultLocationData() {
-  if (IS_DEMO_MODE) {
-    await delay(50);
-    return getDefaultLocation();
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getDefaultLocation();
 }
 
 /**
  * Get hotels for a location
  */
 export async function getHotels(locationId) {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return getHotelsByLocation(locationId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getHotelsByLocation(locationId);
 }
 
 /**
  * Get single hotel by ID
  */
 export async function getHotel(hotelId) {
-  if (IS_DEMO_MODE) {
-    await delay(100);
-    return getHotelById(hotelId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getHotelById(hotelId);
 }
 
 /**
  * Get halls for a location
  */
 export async function getHalls(locationId) {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return getHallsByLocation(locationId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getHallsByLocation(locationId);
 }
 
 /**
  * Get single hall by ID
  */
 export async function getHall(hallId) {
-  if (IS_DEMO_MODE) {
-    await delay(100);
-    return getHallById(hallId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getHallById(hallId);
 }
 
 /**
  * Get parking zones for a location
  */
 export async function getParkingZones(locationId) {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return getParkingByLocation(locationId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getParkingByLocation(locationId);
 }
 
 /**
  * Get single parking zone by ID
  */
 export async function getParkingZone(zoneId) {
-  if (IS_DEMO_MODE) {
-    await delay(100);
-    return getParkingZoneById(zoneId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getParkingZoneById(zoneId);
 }
 
 /**
  * Get activities/games for a location
  */
 export async function getActivities(locationId) {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return getActivitiesByLocation(locationId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getActivitiesByLocation(locationId);
 }
 
 /**
  * Get single activity by ID
  */
 export async function getActivity(locationId, activityId) {
-  if (IS_DEMO_MODE) {
-    await delay(100);
-    return getActivityById(locationId, activityId);
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getActivityById(locationId, activityId);
 }
 
 /**
  * Get all activities across all locations (for admin/search)
  */
 export async function getAllActivitiesData() {
-  if (IS_DEMO_MODE) {
-    await delay();
-    return getAllActivities();
-  }
-  throw createError('Production mode not implemented');
+  await delay(50);
+  return getAllActivities();
 }
 
 /**

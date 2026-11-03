@@ -2,7 +2,7 @@
 // scripts/dev.mjs — runs the Convention Hall API (server/) and the FRCC_MAIN
 // Vite dev server together. Brought over with the Convention Hall module.
 //
-//   npm run dev:all        → API on http://localhost:5000 + app on http://localhost:5173
+//   npm run dev:all        → API on http://localhost:5005 + app on http://localhost:5174
 //   npm run server         → API only
 //   npm run dev            → app only (hall API calls will fail without server)
 // ---------------------------------------------------------------------------
@@ -19,6 +19,7 @@ console.log('🚀 Starting FRCC Convention Hall API + FRCC_MAIN app...\n');
 const backend = spawn(process.execPath, [path.join(rootDir, 'server', 'index.js')], {
   cwd: rootDir,
   stdio: 'inherit',
+  env: { ...process.env, PORT: '5005' },
 });
 
 const frontend = spawn(npmCmd, ['run', 'dev'], {

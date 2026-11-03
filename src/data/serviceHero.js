@@ -3,7 +3,7 @@
 // Facts drawn exclusively from verified campus entities (rooms, venues, etc.)
 // ---------------------------------------------------------------------------
 
-import { name, shortName, tagline } from '../config/site.js';
+import { name, shortName, tagline, healthCardDiscountPercent } from '../config/site.js';
 
 export const SERVICE_HERO_DATA = {
   stay: {
@@ -17,7 +17,22 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore rooms',
     linkTarget: '#content',
+    to: '/stay#content',
     statSuffix: 'on every stay',
+  },
+  dining: {
+    eyebrow: 'FRCC DINING',
+    headline: 'Restaurants, lounges and cafes',
+    phrases: [
+      'Multi-cuisine family restaurant.',
+      'Artisan coffee and fresh bakes.',
+      'Evening lounge bar and pub.',
+      'Open-air rooftop grills.',
+    ],
+    linkText: 'Explore venues',
+    linkTarget: '#content',
+    to: '/dining#content',
+    statSuffix: 'on dining',
   },
   hall: {
     eyebrow: 'CELEBRATIONS & EVENTS',
@@ -30,6 +45,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore halls',
     linkTarget: '#content',
+    to: '/halls#content',
     statSuffix: 'on every event',
   },
   parking: {
@@ -43,6 +59,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore zones',
     linkTarget: '#content',
+    to: '/parking#content',
     statSuffix: 'on every slot',
   },
   activities: {
@@ -56,6 +73,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore activities',
     linkTarget: '#content',
+    to: '/activities#content',
     statSuffix: 'on every game',
   },
   membership: {
@@ -63,13 +81,28 @@ export const SERVICE_HERO_DATA = {
     headline: 'Belong for a lifetime',
     phrases: [
       '30% discount on every booking.',
-      'Health card: 20% discount.',
+      `Health card: ${healthCardDiscountPercent}% discount.`,
       'One card across the campus.',
       'ID & Health card on WhatsApp.',
     ],
     linkText: 'Explore plan',
     linkTarget: '#content',
+    to: '/membership#content',
     statSuffix: 'on every booking',
+  },
+  events: {
+    eyebrow: 'FILM & CULTURAL EVENTS',
+    headline: 'Cinema, conversations and culture',
+    phrases: [
+      'Short film screenings.',
+      'Workshops and masterclasses.',
+      'Filmmakers and artists meetups.',
+      'Cultural evenings and performances.',
+    ],
+    linkText: 'Explore events',
+    linkTarget: '#content',
+    to: '/events#content',
+    statSuffix: 'on member passes',
   },
   hub: {
     eyebrow: `WELCOME TO ${shortName}`,
@@ -83,7 +116,22 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore campus',
     linkTarget: '#explore',
+    to: '/home#explore',
     statSuffix: 'on every booking',
+  },
+  support: {
+    eyebrow: '24/7 MEMBER CONCIERGE & DESK',
+    headline: 'Here for you, always',
+    phrases: [
+      '24/7 campus front desk concierge.',
+      'Direct WhatsApp & phone assistance.',
+      'Fast ticket resolution within 1 day.',
+      'Campus visits, directions & bookings.',
+    ],
+    linkText: 'Reach our teams below',
+    linkTarget: '#content',
+    to: '/support#content',
+    statSuffix: 'live desk assistance',
   },
 };
 
