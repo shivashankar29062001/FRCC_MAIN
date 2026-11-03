@@ -28,7 +28,7 @@ export default function ConventionDetails() {
   const next = () => {
     if (!booking.eventType) return setError('Please select an event type.');
     if (!booking.guests || Number(booking.guests) < 30) return setError('Enter a guest count of at least 30.');
-    if (Number(booking.guests) > 100000) return setError('Guest count cannot exceed 1,00,000.');
+    if (Number(booking.guests) > 10000) return setError('Guest count cannot exceed 10,000.');
     if (hall && Number(booking.guests) > hall.capacity) return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
     if (!/^[6-9]\d{9}$/.test(booking.phone)) return setError('Enter a valid 10-digit phone number.');
@@ -49,13 +49,46 @@ export default function ConventionDetails() {
               {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
             </select></label>
           <label className="block">Guest Count {hall && <span className="text-gray-500 text-sm">(min 30, up to this hall's max of {hall.capacity.toLocaleString('en-IN')})</span>}
-            <input type="number" min="30" max="100000" className={inputClass} value={booking.guests} onChange={e => updateBooking({ guests: e.target.value })} /></label>
+            <input type="number" min="30" max="10000" className={inputClass} value={booking.guests} onChange={e => updateBooking({ guests: e.target.value })} /></label>
           <p className="text-sm text-gray-600">Food: ₹1,500 – ₹3,000 per plate</p>
           <label className="block">Organizer Name
             <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: e.target.value })} /></label>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">Phone
-              <input className={inputClass} value={booking.phone} onChange={e => updateBooking({ phone: e.target.value })} placeholder="98XXXXXXXX" /></label>
+              <input
+              className={inputClass}
+              value={booking.phone}
+              onChange={e => {
+                const digits = e.target.value.replace(/\D/g, '');
+                updateBooking({ phone: digits.slice(0, 10) });
+              }}
+              onBlur={e => {
+                const phone = booking.phone;
+                const trimmed = phone.trim();
+                if (!trimmed) return setError('Phone number is required');
+                if (!/^[6-9][0-9]{9}$/.test(trimmed)) {
+                  return setError('Enter a valid 10-digit mobile number');
+                }
+                setError('');
+              }}
+              onKeyUp={e => {
+                if (e.key === 'Enter') next();
+              }}
+              onBlur={e => {
+                const phone = booking.phone;
+                if (!phone.trim()) setError('Phone number is required');
+                else if (!/^[6-9][0-9]{9}$/.test(phone)) setError('Enter a valid 10-digit mobile number');
+                else setError('');
+              }}
+              onFocus={e => {
+                if (error) setError('');
+              }}
+              placeholder="98XXXXXXXX"
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              autoComplete="tel-national"
+            /></label>
             <label className="block">Email
               <input className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
           </div>
@@ -63,6 +96,11 @@ export default function ConventionDetails() {
             <input className={inputClass} value={booking.eventDetails} onChange={e => updateBooking({ eventDetails: e.target.value })} placeholder="e.g. Annual general meet" /></label>
           <label className="block">Special Requests
             <textarea className={inputClass} rows={3} value={booking.specialRequests} onChange={e => updateBooking({ specialRequests: e.target.value })} /></label>
+          <label className="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" className="mt-1" checked={booking.notifyUpdates !== false}
+              onChange={e => updateBooking({ notifyUpdates: e.target.checked })} />
+            <span>Send my booking updates by SMS, WhatsApp and email.</span>
+          </label>
 
           {error && <p className="text-red-600">{error}</p>}
           <div className="flex justify-between">

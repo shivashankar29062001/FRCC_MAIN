@@ -85,7 +85,7 @@ Tariff is price per night (per day). Indian Rupee formatting (`formatInr()`) is 
   - `price`: ₹1,500 per person
   - `includesFood`: `true` (wording *"with food"*)
   - `capacityMin`: 30
-  - `capacityMax`: 1,00,000
+  - `capacityMax`: 10,000
   - `type`: `"ac"` *(AC/Non-AC SAMPLE)*
 - **Meeting Hall**:
   - `pricingUnit`: `"per-hour"`

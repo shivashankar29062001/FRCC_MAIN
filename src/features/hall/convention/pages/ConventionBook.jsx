@@ -5,22 +5,22 @@ import { api } from '../services/api';
 import Stepper from '../components/Stepper';
 import HallCard from '../components/HallCard';
 
+
 export default function ConventionBook() {
   const { booking, updateBooking } = useBooking();
   const navigate = useNavigate();
   const [halls, setHalls] = useState([]);
-  const [venues, setVenues] = useState([]);
   const [citiesData, setCitiesData] = useState([]);
   const [error, setError] = useState('');
-  const [type, setType] = useState('ALL');
+  const [roomType, setRoomType] = useState('ALL');
+  const [cooling, setCooling] = useState('ALL');
   const [cityId, setCityId] = useState(booking.cityId || '');
   const [areaId, setAreaId] = useState(booking.areaId || '');
   const [venueId, setVenueId] = useState(booking.venueId || '');
   const [sortBy, setSortBy] = useState('price-asc');
-  const [near, setNear] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load cities hierarchy and initial halls
+  // Load cities hierarchy and halls
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -60,6 +60,17 @@ export default function ConventionBook() {
     return city.areas.map(a => ({ id: a.id, name: a.name, rating: a.rating }));
   }, [cityId, citiesData]);
 
+  // Clubs (venues) for the chosen city, from the same hierarchy — no extra request.
+  // Each city currently has exactly one club, which is auto-selected below.
+  const venues = useMemo(() => {
+    if (!cityId) return [];
+    const city = citiesData.find(c => c.id === cityId);
+    if (!city) return [];
+    return city.areas.flatMap(a => a.venues.map(v => ({
+      id: v.id, name: v.name, areaId: a.id, areaName: a.name, cityId: city.id, cityName: city.name,
+    })));
+  }, [cityId, citiesData]);
+
   // Single-area cities (one club per city): auto-select the only area and hide the dropdown
   useEffect(() => {
     if (!cityId || areas.length !== 1) return;
@@ -70,13 +81,30 @@ export default function ConventionBook() {
     }
   }, [cityId, areas, areaId, updateBooking]);
 
+  // One club per city: auto-select it so its halls show straight away
+  useEffect(() => {
+    if (loading || !cityId || venues.length !== 1) return;
+    const only = venues[0];
+    if (venueId !== only.id) {
+      setVenueId(only.id);
+      updateBooking({ venueId: only.id, venueName: only.name });
+    }
+  }, [loading, cityId, venues, venueId, updateBooking]);
+
   // Number of guests / capacity — saved in booking.guests (the same field the Details step uses)
   const guestsNum = Number(booking.guests) || 0;
   const GUEST_CHIPS = [30, 50, 100, 250, 500, 1000];
   const selectedHall = useMemo(() => halls.find(h => h.id === booking.hallId) || null, [halls, booking.hallId]);
   const hallTooSmall = selectedHall && guestsNum > selectedHall.capacity;
   const setGuests = (val) => updateBooking({ guests: val === '' ? '' : String(val) });
-  const stepGuests = (d) => setGuests(Math.min(100000, Math.max(30, (guestsNum || 30) + d)));
+  const stepGuests = (d) => setGuests(Math.min(10000, Math.max(30, (guestsNum || 30) + d)));
+
+  // Room types present in the hall data, in the order the API returns them
+  const roomTypes = useMemo(() => {
+    const seen = [];
+    for (const h of halls) if (h.roomType && !seen.includes(h.roomType)) seen.push(h.roomType);
+    return seen;
+  }, [halls]);
 
   // Filtered + sorted hall list (from already-loaded halls)
   const sortedHalls = useMemo(() => {
@@ -84,14 +112,15 @@ export default function ConventionBook() {
     let list = halls.filter(h => String(h.cityId) === String(cityId));
     if (areaId && areaId !== 'ALL') list = list.filter(h => String(h.areaId) === String(areaId));
     if (venueId) list = list.filter(h => h.venueId === venueId);
-    if (type !== 'ALL') list = list.filter(h => h.type === type);
+    if (roomType !== 'ALL') list = list.filter(h => h.roomType === roomType);
+    if (cooling !== 'ALL') list = list.filter(h => h.cooling === cooling);
     list = [...list];
     if (sortBy === 'price-asc') list.sort((a, b) => a.pricePerHour - b.pricePerHour);
     if (sortBy === 'price-desc') list.sort((a, b) => b.pricePerHour - a.pricePerHour);
     if (sortBy === 'capacity-asc') list.sort((a, b) => a.capacity - b.capacity);
     if (sortBy === 'capacity-desc') list.sort((a, b) => b.capacity - a.capacity);
     return list;
-  }, [cityId, areaId, venueId, type, sortBy, halls]);
+  }, [cityId, areaId, venueId, roomType, cooling, sortBy, halls]);
 
   const next = () => {
     if (!booking.hallId) { setError('Please select a hall to continue.'); return; }
@@ -99,7 +128,7 @@ export default function ConventionBook() {
     if (!hall) { setError('Selected hall no longer exists. Please pick again.'); return; }
     const g = Number(booking.guests);
     if (!booking.guests || !Number.isFinite(g) || g < 30) { setError('Enter how many guests you expect (minimum 30).'); return; }
-    if (g > 100000) { setError('Guest count cannot exceed 1,00,000.'); return; }
+    if (g > 10000) { setError('Guest count cannot exceed 10,000.'); return; }
     if (g > hall.capacity) { setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`); return; }
     setError('');
     updateBooking({
@@ -111,29 +140,11 @@ export default function ConventionBook() {
     navigate('/convention/date');
   };
 
-  const nearMe = () => {
-    setError('');
-    if (!navigator.geolocation) { setError('Geolocation is not supported by this browser.'); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude, longitude } = pos.coords;
-        setNear({ coords: { latitude, longitude } });
-        setError('');
-      },
-      err => setError(
-        err.code === err.PERMISSION_DENIED
-          ? 'Location permission denied. Choose a city and area to continue.'
-          : 'Could not get your location. Please choose a city and area.'
-      ),
-      { timeout: 8000 }
-    );
-  };
-
-  // Clear stale booking state if venue/hall no longer exists (after data has loaded,
-  // so a refreshed draft is not wiped before the lists arrive)
+  // Clear stale booking state if the saved club/hall is gone (after data has loaded,
+  // so a refreshed draft — including one saved by the old venue step — is not wiped early)
   useEffect(() => {
     if (loading) return;
-    if (booking.venueId && !venues.some(v => v.id === booking.venueId)) {
+    if (booking.venueId && venues.length && !venues.some(v => v.id === booking.venueId)) {
       updateBooking({ venueId: '', venueName: '', hallId: null, hallName: '' });
     }
     if (booking.hallId && !halls.some(h => h.id === booking.hallId)) {
@@ -141,7 +152,7 @@ export default function ConventionBook() {
     }
   }, [loading, venues, halls, booking.venueId, booking.hallId, updateBooking]);
 
-  // City and area names for display
+  // City and club names for display
   const cityName = useMemo(() => {
     const c = Array.isArray(citiesData) ? citiesData.find(c => c.id === cityId) : null;
     return c ? c.name : '';
@@ -162,7 +173,7 @@ export default function ConventionBook() {
         <select className="border rounded p-2 w-full sm:flex-1" value={cityId}
           onChange={e => {
             const val = e.target.value;
-            setCityId(val); setAreaId(''); setVenueId('');
+            setCityId(val); setAreaId(''); setVenueId(''); setRoomType('ALL'); setCooling('ALL');
             updateBooking({ cityId: val, areaId: '', areaName: '', venueId: '', venueName: '', hallId: null });
           }}>
           <option value="">-- Select City --</option>
@@ -202,12 +213,18 @@ export default function ConventionBook() {
 
       {/* Filters & sort */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <select className="border rounded p-2 w-full sm:w-56" value={type}
-          onChange={e => { setType(e.target.value); updateBooking({ hallId: null }); }}>
+        <select className="border rounded p-2 w-full sm:w-56" value={roomType}
+          aria-label="Room type"
+          onChange={e => { setRoomType(e.target.value); updateBooking({ hallId: null }); }}>
           <option value="ALL">All types</option>
+          {roomTypes.map(rt => <option key={rt} value={rt}>{rt}</option>)}
+        </select>
+        <select className="border rounded p-2 w-full sm:w-56" value={cooling}
+          aria-label="Cooling"
+          onChange={e => { setCooling(e.target.value); updateBooking({ hallId: null }); }}>
+          <option value="ALL">All cooling</option>
           <option value="AC">AC</option>
           <option value="NON_AC">Non-AC</option>
-          <option value="BOARD_ROOM">Board Room</option>
         </select>
         <select className="border rounded p-2 w-full sm:w-56" value={sortBy} onChange={e => setSortBy(e.target.value)}>
           <option value="price-asc">Price: Low to High</option>
@@ -215,10 +232,6 @@ export default function ConventionBook() {
           <option value="capacity-asc">Capacity: Low to High</option>
           <option value="capacity-desc">Capacity: High to Low</option>
         </select>
-        <button onClick={nearMe} className="border border-navy text-navy rounded px-4 py-2 hover:bg-navy hover:text-gold">
-          📍 Near me
-        </button>
-        {near && <span className="self-center text-sm text-gray-600">Sorted from your location ({near.coords.latitude.toFixed(2)}, {near.coords.longitude.toFixed(2)})</span>}
       </div>
 
       {/* Number of guests / capacity */}
@@ -228,7 +241,7 @@ export default function ConventionBook() {
           <div className="flex items-center">
             <button type="button" aria-label="Decrease guests" onClick={() => stepGuests(-10)}
               className="border border-navy text-navy rounded-l px-3 py-2 font-bold hover:bg-navy hover:text-gold">−</button>
-            <input id="guest-count" type="number" min="30" max="100000" step="10" inputMode="numeric"
+            <input id="guest-count" type="number" min="30" max="10000" step="10" inputMode="numeric"
               value={booking.guests} placeholder="e.g. 100"
               onChange={e => updateBooking({ guests: e.target.value })}
               className="border-y border-navy w-28 px-3 py-2 text-center" />
@@ -254,45 +267,13 @@ export default function ConventionBook() {
 
       {error && <p className="text-red-600 mb-4">{error}</p>}
 
-      {!cityId && <p className="text-gray-500 mb-6">Start by choosing a city to see its areas, venues and halls.</p>}
-
-      {/* Venue summary cards */}
-      {cityId && (
-        <>
-          <h2 className="text-2xl mb-4">
-            {venueId ? venues.find(v => v.id === venueId)?.name : areaId && areaId !== 'ALL' ? `Venues in ${areaName}, ${cityName}` : `Venues in ${cityName}`}
-            {' '}— {venues.length}
-          </h2>
-          {venues.length === 0 ? (
-            <div className="bg-white rounded shadow p-8 text-center mb-10">
-              <p className="text-gray-500 mb-4">No venues found.</p>
-              {areaId && areaId !== 'ALL' && (
-                <button onClick={() => { setAreaId('ALL'); updateBooking({ areaId: 'ALL', areaName: '', venueId: '', venueName: '', hallId: null }); }}
-                  className="text-navy underline hover:text-gold">Try All areas</button>
-              )}
-            </div>
-          ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-              {venues.map(v => (
-                <div key={v.id} className="bg-white rounded-lg shadow p-4">
-                  <h3 className="text-lg font-bold text-navy">{v.name}</h3>
-                  <p className="text-sm text-gray-600">{v.areaName}, {v.cityName}</p>
-                  <p className="text-sm text-gray-500 mt-1 truncate">{v.address || 'Address coming soon'}</p>
-                  <p className="mt-1 text-sm text-gray-500">{v.hallCount} hall{v.hallCount > 1 ? 's' : ''} • ⭐ {v.rating} • from ₹{v.startingPrice.toLocaleString('en-IN')}/hr</p>
-                  <button onClick={() => { setVenueId(v.id); updateBooking({ venueId: v.id, venueName: v.name, hallId: null }); }}
-                    className={`mt-3 w-full rounded py-2 font-semibold ${venueId === v.id ? 'bg-gold text-navy' : 'bg-navy text-gold hover:bg-navy-800'}`}>
-                    {venueId === v.id ? '✓ Selected' : 'View Halls'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {!cityId && <p className="text-gray-500 mb-6">Start by choosing a city to see its halls.</p>}
 
       {/* Hall list */}
       <h2 className="text-2xl mb-4">
-        {cityId ? (venueId ? venues.find(v => v.id === venueId)?.name : `Halls in ${areaId && areaId !== 'ALL' ? areaName : cityName}`) : 'Halls'}
+        {cityId
+          ? (selectedVenue ? `Halls in ${selectedVenue.name}, ${cityName}` : `Halls in ${cityName}`)
+          : 'Halls'}
       </h2>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {sortedHalls.map((h, i) => (
@@ -303,7 +284,9 @@ export default function ConventionBook() {
 
       {sortedHalls.length === 0 && cityId && (
         <p className="text-gray-500 mt-6 bg-white rounded shadow p-6 text-center">
-          {venueId ? 'No halls in this venue.' : areaId && areaId !== 'ALL' ? 'No halls in this area. Try All areas.' : 'No halls in this city.'}
+          {roomType !== 'ALL' || cooling !== 'ALL'
+            ? 'No halls match the selected filters. Try All types and All cooling.'
+            : areaId && areaId !== 'ALL' ? 'No halls in this area. Try All areas.' : 'No halls in this city.'}
         </p>
       )}
 

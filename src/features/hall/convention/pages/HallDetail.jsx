@@ -42,7 +42,7 @@ export default function HallDetail() {
           <p className="text-gold text-sm uppercase tracking-wider">{hall.areaName} • {hall.cityName}</p>
           <h1 className="text-3xl font-bold text-navy">{hall.name}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            <Link to={`/venue/${hall.venueId}`} className="underline">{hall.venueName}</Link> • {TYPE_LABEL[hall.type]} • Capacity {hall.capacity} guests
+            <Link to={`/venue/${hall.venueId}`} className="underline">{hall.venueName}</Link> • {TYPE_LABEL[hall.type]} • Capacity {hall.capacity.toLocaleString('en-IN')} guests
           </p>
         </div>
         <div className="text-right">

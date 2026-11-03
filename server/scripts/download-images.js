@@ -4,7 +4,8 @@
 //   public/images/halls/<club>/<club>-hero.jpg (+ .webp)
 // and writes public/images/halls/photo-credits.md with every source + licence.
 //
-// 40 hall photos (4 per hall × 10 halls) + 2 club heroes = 42 unique images.
+// AC halls: 40 photos (4 × 10). Non-AC halls: 36 photos (3-4 × 10).
+// Plus 2 club heroes.
 // Safe to re-run: files are overwritten, nothing is duplicated in data.json
 // (hall image paths are generated in server/db.js from the CLUBS seed).
 //
@@ -120,6 +121,115 @@ const SETS = [
     ],
     backups: ['photo-1519741497674-611481863552'],
   },
+  // ── Non-AC halls (same rooms, fans & ventilation) ────────────────────
+  // reuse:true lets a non-AC hall share a photo with an AC hall (only the
+  // first photo of each hall must be unique — see check-images.js).
+  {
+    folder: 'hyderabad-board-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1462826303086-329426d1aef5', // long board table beside full-height windows
+      'photo-1497366858526-0766cadbe8fa', // board table and chairs, bright daylight
+      'photo-1517502884422-41eaead166d4', // board table facing the city skyline
+      'photo-1543269664-56d93c1b41a6',    // planner working at the meeting table
+    ],
+    backups: ['photo-1524758631624-e2822e304c36'],
+  },
+  {
+    folder: 'hyderabad-meeting-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1521737604893-d14cc237f11d', // team seated around a large table
+      'photo-1522071820081-009f0129c71c', // group with laptops at a wooden table
+      'photo-1522071901873-411886a10004', // review session at a white table
+      'photo-1497215728101-856f4ea42174', // facilitator standing at a whiteboard
+    ],
+    backups: ['photo-1522202176988-66273c2fd55f'],
+  },
+  {
+    folder: 'hyderabad-conference-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1560439513-74b037a25d84',    // speaker on stage with a screen
+      'photo-1541339907198-e08756dedf3f', // attendees seated at desks
+      'photo-1509062522246-3755977927d7', // presenter addressing a seminar room
+    ],
+    backups: ['photo-1571260899304-425eee4c7efc'],
+  },
+  {
+    folder: 'hyderabad-convention-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1522673607200-164d1b6ce486', // large hall filled with guests, daylight
+      'photo-1517457373958-b7bdd4587205', // open-air evening gathering under lights
+      'photo-1505409859467-3a796fd5798e', // confetti over a celebration crowd
+    ],
+    backups: ['photo-1533174072545-7a4b6ad7a6c3'],
+  },
+  {
+    folder: 'hyderabad-banquet-hall-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1527529482837-4698179dc6ce', // toast under string lights
+      'photo-1478147427282-58a87a120781', // garden arbor ceremony setup
+      'photo-1414235077428-338989a2e8c0', // plated dinner service
+      'photo-1424847651672-bf20a4b0982b', // shared dining spread on the table
+    ],
+    backups: ['photo-1511795409834-ef04bbd61622'],
+  },
+  {
+    folder: 'vijayawada-board-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1521737852567-6949f3f9f2b5', // two colleagues meeting at a table
+      'photo-1551836022-d5d88e9218df',    // group around a wooden board table
+      'photo-1542744094-3a31f272c490',    // team along a long wooden table
+      'photo-1543269865-cbf427effbad',    // discussion across a bright table
+    ],
+    backups: ['photo-1517502884422-41eaead166d4'],
+  },
+  {
+    folder: 'vijayawada-meeting-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1552581234-26160f608093',    // lounge seating beside tall windows
+      'photo-1571260899304-425eee4c7efc', // plant-filled breakout area
+      'photo-1522202176988-66273c2fd55f', // two people working together
+      'photo-1556761175-b413da4baf72',    // small group at a shared desk
+    ],
+    backups: ['photo-1522071820081-009f0129c71c'],
+  },
+  {
+    folder: 'vijayawada-conference-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1580582932707-520aed937b7b', // rows of desks facing the front
+      'photo-1559223607-a43c990c692c',    // audience seated for a seminar
+      'photo-1523240795612-9a054b0db644', // group working around a laptop
+    ],
+    backups: ['photo-1509062522246-3755977927d7'],
+  },
+  {
+    folder: 'vijayawada-convention-room-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1492684223066-81342ee5ff30', // confetti over a large crowd
+      'photo-1533174072545-7a4b6ad7a6c3', // packed hall with the crowd cheering
+      'photo-1524368535928-5b5e00ddc76b', // audience with hands raised
+    ],
+    backups: ['photo-1505409859467-3a796fd5798e'],
+  },
+  {
+    folder: 'vijayawada-banquet-hall-non-ac',
+    reuse: true,
+    picks: [
+      'photo-1541532713592-79a0317b6b77', // guests raising glasses at a reception
+      'photo-1523438885200-e635ba2c371e', // garden chairs set out for a ceremony
+      'photo-1478146059778-26028b07395a', // dessert table against a brick wall
+      'photo-1519671482749-fd09be7ccebf', // wine glasses raised in a toast
+    ],
+    backups: ['photo-1465495976277-4387d4b0b4c6'],
+  },
   {
     folder: 'hyderabad-club',
     fileBase: 'hyderabad-club-hero',
@@ -150,7 +260,7 @@ async function main() {
   const credits = [];
 
   for (const set of SETS) {
-    const n = set.fileBase ? 1 : 4;
+    const n = set.fileBase ? 1 : (set.picks.length < 4 ? set.picks.length : 4);
     const base = set.fileBase || set.folder;
     const dir = path.join(HALLS_DIR, set.folder);
     fs.mkdirSync(dir, { recursive: true });
@@ -158,7 +268,7 @@ async function main() {
     let slot = 0;
     for (const id of [...set.picks, ...(set.backups || [])]) {
       if (slot >= n) break;
-      if (used.has(id)) continue;
+      if (used.has(id) && !set.reuse) continue;
       const fileName = n === 1 ? base : `${base}-${slot + 1}`;
       const fileBase = path.join(dir, fileName);
       try {

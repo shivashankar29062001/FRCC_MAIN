@@ -26,6 +26,7 @@ function ensureCollections(db) {
   db.users = db.users || [];
   db.bookings = db.bookings || [];
   db.notifications = db.notifications || [];
+  db.notification_log = db.notification_log || [];
   db.tickets = db.tickets || [];
   db.reviews = db.reviews || [];
   db.halls = db.halls || [];
@@ -60,10 +61,17 @@ function seed(verbose = true) {
     Object.assign(testUser, TEST_USER);
   }
 
-  // 2. Rebuild halls from the hierarchy (replace legacy hall set entirely)
+  // 2. Upsert halls from the hierarchy: match an existing row by slug or id,
+  // update it in place, and add only missing halls — so re-running never
+  // creates duplicates (new Non-AC halls are keyed by their slug).
   const fresh = buildData();
-  const before = db.halls.length;
-  db.halls = fresh.halls;
+  for (const hall of fresh.halls) {
+    const existing = db.halls.find(h =>
+      (hall.slug && h.slug === hall.slug) || h.id === hall.id
+    );
+    if (existing) Object.assign(existing, hall);
+    else db.halls.push(hall);
+  }
   // Also update venues with full details (including lat/lng, address, etc.)
   db.venues = fresh.venues;
 
