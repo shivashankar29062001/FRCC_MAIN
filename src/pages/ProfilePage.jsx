@@ -43,6 +43,9 @@ import {
   canCancelBooking,
   getCancellationPolicyInfo,
   cancelBooking,
+  getPersistedCancelledIds,
+  persistCancelledId,
+  isBookingCancelledLocally,
 } from '../services/cancellationService.js';
 
 // ---------------------------------------------------------------------------
@@ -443,7 +446,7 @@ export function ProfilePage({ initialTab = 'details' }) {
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
-  const [cancelledIds, setCancelledIds] = useState(() => new Set());
+  const [cancelledIds, setCancelledIds] = useState(() => getPersistedCancelledIds());
   const { loading, error, retry } = useMockQuery(() => ({ ready: true }));
 
   async function handleConfirmCancel() {
@@ -802,6 +805,12 @@ export function ProfilePage({ initialTab = 'details' }) {
     userTableBookings.forEach((tbl) => {
       const ref = tbl.bookingRef || tbl.booking_ref || tbl.bookingId || tbl.id;
       const uuid = tbl.uuid || tbl.rawId || tbl.raw_id || tbl.dbId || tbl.db_id || tbl.id;
+      const isCancelled =
+        cancelledIds.has(ref) ||
+        cancelledIds.has(uuid) ||
+        isBookingCancelledLocally(ref) ||
+        isBookingCancelledLocally(uuid) ||
+        (tbl.status && String(tbl.status).toLowerCase() === 'cancelled');
       const normalized = {
         ...tbl,
         bookingRef: ref,
@@ -809,6 +818,7 @@ export function ProfilePage({ initialTab = 'details' }) {
         id: ref,
         uuid,
         rawId: uuid,
+        status: isCancelled ? 'cancelled' : tbl.status,
       };
       bookingsByRef.set(ref, normalized);
       registerKeys(ref, tbl);
@@ -1366,7 +1376,11 @@ export function ProfilePage({ initialTab = 'details' }) {
                             </div>
                             <p className="font-semibold text-navy-900">{b.venue_name || b.venueName || b.roomName || b.gameName || b.title || b.game}</p>
                           </div>
-                          <StatusTag status={cancelledIds.has(b.bookingRef || b.bookingId || b.id) ? 'Cancelled' : b.status} />
+                          {(() => {
+                            const ref = b.bookingRef || b.bookingId || b.id;
+                            const isCancelled = cancelledIds.has(ref) || isBookingCancelledLocally(ref) || (b.status && String(b.status).toLowerCase() === 'cancelled');
+                            return <StatusTag status={isCancelled ? 'Cancelled' : b.status} />;
+                          })()}
                         </div>
                         <p className="mt-2 font-mono text-xs text-slate-500">{b.bookingRef || b.bookingId}</p>
                         <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">

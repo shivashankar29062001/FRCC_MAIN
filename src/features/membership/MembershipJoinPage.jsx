@@ -798,7 +798,7 @@ export function MembershipJoinPage() {
         };
 
         const saved = await saveMembership(record);
-        const assignedCode = saved?.memberCode || saved?.memberId || memberId;
+        const assignedCode = saved?.memberCode || saved?.memberId || confirmedMemberId || '';
 
         console.info('[membership] assigned sequential member code:', assignedCode);
 

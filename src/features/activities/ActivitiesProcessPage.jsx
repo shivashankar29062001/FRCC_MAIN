@@ -284,7 +284,7 @@ export function ActivitiesProcessPage() {
       const n = Number(draft.players);
       const nameOk = draft.name.trim().length >= 2;
       const cleanMobile = draft.mobile.replace(/\D/g, '');
-      const mobileOk = cleanMobile.length === 10 || MOBILE_RE.test(draft.mobile.trim());
+      const mobileOk = isValidIndianMobile(draft.mobile);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
         ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)

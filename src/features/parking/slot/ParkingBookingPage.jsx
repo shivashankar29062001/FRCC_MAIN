@@ -96,7 +96,7 @@ const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
 export default function ParkingBookingPage() {
-  const { user } = useApp();
+  const { user, pushToast } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   const [formData, setFormData] = useState({
