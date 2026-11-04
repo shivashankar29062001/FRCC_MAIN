@@ -218,6 +218,8 @@ async function fallbackCreateActivityBooking({
         date: String(date),
         slot: String(slot),
         players: Number(players || 1),
+        subtotal,
+        discount,
         amount,
         status,
         payment_method: paymentMethod || 'upi',

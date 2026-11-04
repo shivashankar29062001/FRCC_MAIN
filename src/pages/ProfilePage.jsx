@@ -32,6 +32,7 @@ import {
   XIcon,
 } from '../components/ui/icons.jsx';
 import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
+import { generateBookingReceiptPdf } from '../utils/receiptGenerator.js';
 import {
   normalizeMobile,
   isValidMobile,
@@ -423,6 +424,20 @@ export function ProfilePage({ initialTab = 'details' }) {
     }
   });
 
+  const isMember = Boolean(
+    user?.isMember || user?.membershipId || membership?.status === 'ACTIVE' || membership?.active
+  );
+
+  const handleDownloadReceipt = (booking) => {
+    try {
+      generateBookingReceiptPdf(booking);
+      pushToast('Receipt downloaded successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to generate receipt:', err);
+      pushToast('Unable to generate receipt. Please try again.', 'error');
+    }
+  };
+
   const isLegacyAccount = Boolean(
     user && (user.isLegacy || isLegacySyntheticEmail(user.email || user.emailOrPhone))
   );
@@ -796,7 +811,7 @@ export function ProfilePage({ initialTab = 'details' }) {
           booking_status: isCancelled ? 'CANCELLED' : status,
           areaName: (r.campus || r.city || '').toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
           user_id: r.user_id || r.userId || currentUid,
-          userId: r.user_id || r.userId || currentUid,
+          userId: r.userId || currentUid,
           createdAt: r.created_at || r.createdAt,
         });
       };
@@ -1143,13 +1158,35 @@ export function ProfilePage({ initialTab = 'details' }) {
       dedupedList.push(b);
     }
 
-    const unique = dedupedList;
+    const unique = dedupedList.map((item) => {
+      const amount = Number(item.total !== undefined ? item.total : (item.amount ?? 0));
+      let subtotal = Number(item.subtotal || 0);
+      let discount = Number(item.discount || 0);
+      if ((subtotal <= 0 || subtotal < amount) && amount > 0) {
+        if (item.is_member || item.isMember || isMember) {
+          subtotal = Math.round(amount / 0.7);
+          discount = subtotal - amount;
+        } else {
+          subtotal = amount;
+          discount = 0;
+        }
+      } else if (subtotal > amount && discount <= 0) {
+        discount = subtotal - amount;
+      }
+      return {
+        ...item,
+        amount,
+        total: amount,
+        subtotal,
+        discount,
+      };
+    });
     return unique.sort((a, b) => {
       const timeA = new Date(a.createdAt || a.created_at || a.date || 0).getTime();
       const timeB = new Date(b.createdAt || b.created_at || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings, dbParkingBookings]);
+  }, [user, isMember, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings, dbParkingBookings]);
 
   // Merged unique payments strictly isolated to the authenticated user
   const payments = useMemo(() => {
@@ -1722,7 +1759,7 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                             </>
                           )}
-                          {b.subtotal !== undefined && b.subtotal !== b.amount && (
+                          {b.subtotal > 0 && b.subtotal !== (b.total !== undefined ? b.total : b.amount) && (
                             <div className="flex justify-between gap-3">
                               <dt className="text-slate-500">Subtotal</dt>
                               <dd className="font-medium text-navy-900">{formatINR(b.subtotal)}</dd>
@@ -1735,39 +1772,61 @@ export function ProfilePage({ initialTab = 'details' }) {
                             </div>
                           )}
                           <div className="flex justify-between gap-3">
-                            <dt className="text-slate-500">{b.subtotal ? 'Total' : 'Amount'}</dt>
+                            <dt className="text-slate-500">{b.subtotal > 0 && b.discount > 0 ? 'Total' : 'Amount'}</dt>
                             <dd className="font-medium text-navy-900">{formatINR(b.total !== undefined ? b.total : b.amount)}</dd>
                           </div>
                         </dl>
 
-                        {/* Cancel Booking Action (Only for upcoming, cancellable bookings) */}
+                        {/* Booking Card Actions: Download Receipt & Cancel Booking */}
                         {(() => {
                           const ref = b.bookingRef || b.bookingId || b.id;
-                          const effectiveStatus = cancelledIds.has(ref) ? 'Cancelled' : b.status;
+                          const isCancelled =
+                            cancelledIds.has(ref) ||
+                            String(b.status).toLowerCase() === 'cancelled';
+                          const effectiveStatus = isCancelled ? 'Cancelled' : (b.status || 'Confirmed');
                           const effectiveBooking = { ...b, status: effectiveStatus };
-                          const canCancel = canCancelBooking(effectiveBooking) && !cancelledIds.has(ref);
-                          if (!canCancel) return null;
-                          const policy = getCancellationPolicyInfo(effectiveBooking);
+                          const canCancel = canCancelBooking(effectiveBooking) && !isCancelled;
+                          if (isCancelled && !canCancel) return null;
+                          const policy = canCancel ? getCancellationPolicyInfo(effectiveBooking) : null;
 
                           return (
                             <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                               <span className="text-[11px] text-slate-500">
-                                {policy.isWithinCutoff
-                                  ? policy.type === 'stay'
-                                    ? '⚠️ Late cancellation (1-night charge)'
-                                    : '⚠️ Cutoff notice'
-                                  : 'Eligible for cancellation'}
+                                {canCancel ? (
+                                  policy?.isWithinCutoff
+                                    ? policy.type === 'stay'
+                                      ? '⚠️ Late cancellation (1-night charge)'
+                                      : '⚠️ Cutoff notice'
+                                    : 'Eligible for cancellation'
+                                ) : (
+                                  'FRCC Confirmed Booking'
+                                )}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCancelError('');
-                                  setBookingToCancel(effectiveBooking);
-                                }}
-                                className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
-                              >
-                                Cancel booking
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {!isCancelled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadReceipt(effectiveBooking)}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-navy-900 hover:border-gold-500 hover:bg-gold-50/60 transition cursor-pointer"
+                                    title="Download PDF Receipt"
+                                  >
+                                    <DownloadIcon className="h-3.5 w-3.5 text-gold-600" />
+                                    Download Receipt
+                                  </button>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCancelError('');
+                                      setBookingToCancel(effectiveBooking);
+                                    }}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
+                                  >
+                                    Cancel booking
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}

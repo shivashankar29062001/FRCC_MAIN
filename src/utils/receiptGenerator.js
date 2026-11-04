@@ -177,3 +177,4 @@ export function generateBookingReceiptPdf(booking) {
 
   doc.save(`FRCC-Receipt-${ref}.pdf`);
 }
+
