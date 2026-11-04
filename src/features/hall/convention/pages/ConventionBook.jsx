@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBooking } from '../context/BookingContext';
 import { api } from '../services/api';
 import Stepper from '../components/Stepper';
@@ -12,7 +12,19 @@ export default function ConventionBook() {
   const [halls, setHalls] = useState([]);
   const [citiesData, setCitiesData] = useState([]);
   const [error, setError] = useState('');
-  const [roomType, setRoomType] = useState('ALL');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roomType = searchParams.get('type') || 'ALL';
+  const setRoomType = (val) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (!val || val === 'ALL') {
+        next.delete('type');
+      } else {
+        next.set('type', val);
+      }
+      return next;
+    }, { replace: true });
+  };
   const [cooling, setCooling] = useState('ALL');
   const [cityId, setCityId] = useState(booking.cityId || '');
   const [areaId, setAreaId] = useState(booking.areaId || '');
