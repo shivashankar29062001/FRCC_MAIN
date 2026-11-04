@@ -399,7 +399,7 @@ export const IMAGES = {
   'vja-meeting-hall': S('vja-meeting-hall', 'Meeting Room', 'FRCC Meeting Room with presentation screen', { src: '/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-1.jpg' }),
   'vja-meeting-room': S('vja-meeting-room', 'Meeting Room', 'FRCC Meeting Room with presentation screen', { src: '/images/halls/vijayawada-meeting-room/vijayawada-meeting-room-1.jpg' }),
   'vja-conference-room': S('vja-conference-room', 'Conference Room', 'FRCC Conference Room with tiered theater seating', { src: '/images/halls/vijayawada-conference-room/vijayawada-conference-room-1.jpg' }),
-  'vja-convention-room': S('vja-convention-room', 'Convention Room', 'FRCC Grand Convention Room with stage and LED wall', { src: '/images/halls/vijayawada-convention-room/vijayawada-convention-room-1.jpg' }),
+  'vja-convention-room': S('vja-convention-room', 'Convention Hall', 'FRCC Grand Convention Hall with stage and LED wall', { src: '/images/halls/vijayawada-convention-room/vijayawada-convention-room-1.jpg' }),
   'vja-banquet-hall': S('vja-banquet-hall', 'Banquet Hall', 'FRCC Banquet Hall dressed for a celebration', { src: '/images/halls/vijayawada-banquet-hall/vijayawada-banquet-hall-1.jpg' }),
   'vja-function-hall': S('vja-function-hall', 'Function Hall', 'FRCC Function Hall laid out for a wedding'),
   'vja-meeting-rooms': S('vja-meeting-rooms', 'Meeting Rooms', 'FRCC Meeting Rooms arranged for a meeting'),

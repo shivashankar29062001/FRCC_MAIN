@@ -132,7 +132,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
             h.priceNote ? `Dining: ${h.priceNote}` : (h.amenities?.[0] || 'AV Systems & Stage'),
           ],
           priceDisplay: formatInr(h.price || h.prices?.fullDay || 50000),
-          priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
+          priceUnit: (h.pricingUnit === 'per-plate' || h.pricingUnit === 'per-person') ? ' / plate' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
 
 
           buttonLabel: 'Book Hall',
@@ -238,7 +238,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       case 'halls':
         return {
           eyebrow: 'Event Spaces',
-          title: 'Select convention or function hall',
+          title: 'Select convention hall',
           desc: 'Host grand weddings, summits, or executive board meetings with full AC and technical support.',
         };
       case 'parking':
@@ -323,7 +323,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
                 { id: 'Board Room', label: 'Board Room' },
                 { id: 'Meeting Room', label: 'Meeting Room' },
                 { id: 'Conference Room', label: 'Conference Room' },
-                { id: 'Convention Room', label: 'Convention Room' },
+                { id: 'Convention Hall', label: 'Convention Hall' },
                 { id: 'Banquet Hall', label: 'Banquet Hall' },
               ].map((chip) => {
                 const isActive = hallFilter === chip.id;

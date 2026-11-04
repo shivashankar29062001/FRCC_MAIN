@@ -90,7 +90,11 @@ export default function ConventionPayment() {
   const hours = booking.startTime && booking.endTime
     ? (Number(booking.endTime.split(':')[0]) * 60 + Number(booking.endTime.split(':')[1]) - Number(booking.startTime.split(':')[0]) * 60 - Number(booking.startTime.split(':')[1])) / 60
     : 0;
-  const hallCharge = hall && hours > 0 ? Math.round(hours * hall.pricePerHour) : 0;
+  const hallCharge = hall
+    ? (hall.pricingUnit === 'per-plate' || hall.pricePerPlate)
+      ? Math.round(Number(booking.guests || 30) * (hall.pricePerPlate || hall.price || 1500))
+      : (hours > 0 ? Math.round(hours * hall.pricePerHour) : 0)
+    : 0;
   const gst = Math.round(hallCharge * 0.18);
   const fee = FEE[selectedMethod] || 0;
   const total = hallCharge + gst + fee;

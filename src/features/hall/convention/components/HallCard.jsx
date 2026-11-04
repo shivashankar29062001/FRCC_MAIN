@@ -118,7 +118,11 @@ export default function HallCard({ hall, onSelect, selected, actionLabel = 'Sele
           </p>
         )}
         <p className="mt-1 font-semibold text-navy">
-          Rs. {Number(hall.pricePerHour).toLocaleString('en-IN')}/hr <span className="text-gray-500 font-normal">• Rs. {Number(hall.pricePerDay).toLocaleString('en-IN')}/day</span>
+          {(hall.pricingUnit === 'per-plate' || hall.pricePerPlate) ? (
+            <>Rs. {Number(hall.pricePerPlate || hall.pricePerHour || 1500).toLocaleString('en-IN')}/plate</>
+          ) : (
+            <>Rs. {Number(hall.pricePerHour).toLocaleString('en-IN')}/hr <span className="text-gray-500 font-normal">• Rs. {Number(hall.pricePerDay).toLocaleString('en-IN')}/day</span></>
+          )}
         </p>
         <div className="flex flex-wrap gap-1 mt-2">
           {hall.amenities.slice(0, 4).map(a => <span key={a} className="text-xs bg-navy-100 text-navy rounded-full px-2 py-0.5">{a}</span>)}

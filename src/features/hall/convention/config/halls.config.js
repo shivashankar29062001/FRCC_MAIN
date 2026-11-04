@@ -8,11 +8,13 @@ export const HALL_CAPACITIES = {
   MEETING_ROOM: 200,
   CONFERENCE_ROOM: 300,
   BANQUET_HALL: 1500,
+  CONVENTION_HALL: 10000,
   CONVENTION_ROOM: 10000,
   'Board Room': 100,
   'Meeting Room': 200,
   'Conference Room': 300,
   'Banquet Hall': 1500,
+  'Convention Hall': 10000,
   'Convention Room': 10000,
 };
 
@@ -20,7 +22,7 @@ export const HALL_TYPES = [
   'Board Room',
   'Meeting Room',
   'Conference Room',
-  'Convention Room',
+  'Convention Hall',
   'Banquet Hall',
 ];
 

@@ -97,20 +97,22 @@ export const halls = [
     id: 'vja-convention-room',
     areaId: 'vja',
     locationId: 'vja',
-    name: 'Convention Room',
-    roomType: 'Convention Room',
+    name: 'Convention Hall',
+    roomType: 'Convention Hall',
     tagline: 'Mega summits, conventions and large-scale gatherings',
     type: 'ac',
-    pricingUnit: 'per-hour',
-    price: 25000,
-    pricePerHour: 25000,
-    includesFood: false,
+    pricingUnit: 'per-plate',
+    price: 1500,
+    pricePerPlate: 1500,
+    pricePerHour: 1500,
+    includesFood: true,
+    priceNote: 'with food',
     capacityMin: 100,
     capacityMax: 10000,
     capacity: 10000,
     capacityBreakdown: { theater: 10000, banquet: 7000, classroom: 5000, reception: 10000 },
-    prices: { hour: 25000, halfDay: 125000, fullDay: 200000 },
-    pricePerDay: { morning: 125000, afternoon: 125000, evening: 125000, fullDay: 200000 },
+    prices: { hour: 1500, perPlate: 1500, halfDay: 7500, fullDay: 12000 },
+    pricePerDay: { morning: 7500, afternoon: 7500, evening: 7500, fullDay: 12000 },
     amenities: ['Central AC', 'Grand Stage', 'LED Wall', 'Professional Lighting Rig', 'VIP Lounge'],
     features: ['Central AC', 'Grand Stage', 'LED Wall', 'Professional Lighting Rig', 'VIP Lounge'],
     image: '/images/halls/vijayawada-convention-room/vijayawada-convention-room-1.jpg',
@@ -149,36 +151,6 @@ export const halls = [
     powerBackup: true,
     acoustics: 'Acoustic-treated walls',
   },
-  {
-    id: 'vja-function-hall',
-    areaId: 'vja',
-    locationId: 'vja',
-    name: 'Function Hall',
-    roomType: 'Banquet Hall',
-    tagline: 'Grand celebrations with food included',
-    type: 'ac',
-    pricingUnit: 'per-person',
-    price: 1500,
-    pricePerPerson: 1500,
-    includesFood: true,
-    priceNote: 'with food',
-    capacityMin: 30,
-    capacityMax: 10000,
-    capacity: 100000,
-    capacityBreakdown: { theater: 50000, banquet: 35000, classroom: 15000, reception: 100000 },
-    prices: { hour: 1500, halfDay: 1500, fullDay: 1500, perPerson: 1500 },
-    pricePerDay: { morning: 1500, afternoon: 1500, evening: 1500, fullDay: 1500 },
-    timeSlots: ['08:00 - 13:00 (Morning)', '13:00 - 18:00 (Afternoon)', '18:00 - 23:00 (Evening)', '08:00 - 23:00 (Full Day)'],
-    amenities: ['Central AC', 'Food & Buffet Setup Included', 'Stage & Lighting', 'Green Rooms', 'VIP Lounge', 'Valet Parking'],
-    features: ['Central AC', 'Food & Buffet Setup Included', 'Stage & Lighting', 'Green Rooms', 'VIP Lounge', 'Valet Parking'],
-    imageKey: 'vja-function-hall',
-    image: 'https://images.unsplash.com/photo-1745573674360-644c2edec427?w=1600&q=80&auto=format&fit=crop',
-    images: ['hallWedding', 'hallConference', 'hallStage', 'hallCatering'],
-    description: 'Column-free celebration hall welcoming intimate gatherings of 30 up to mega gatherings of 1,00,000 guests, inclusive of catering and food service.',
-    floor: 'Ground Floor',
-    powerBackup: true,
-    acoustics: 'Acoustic-treated walls',
-  },
 ];
 
 export const HALLS = halls;
@@ -192,7 +164,7 @@ export function getHallsByLocation(locationId) {
 }
 
 export function getHallById(id) {
-  return halls.find((h) => h.id === id || h.name === id || (id === 'vja-meeting-room' && h.id === 'vja-meeting-hall'));
+  return halls.find((h) => h.id === id || h.name === id || (id === 'vja-convention-hall' && (h.id === 'vja-convention-room' || h.name === 'Convention Hall')) || (id === 'vja-convention-room' && (h.id === 'vja-convention-room' || h.name === 'Convention Hall')) || (id === 'vja-meeting-room' && h.id === 'vja-meeting-hall'));
 }
 
 export default {
