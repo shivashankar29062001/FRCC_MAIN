@@ -56,6 +56,57 @@ import {
 // ---------------------------------------------------------------------------
 
 
+
+function extractStayLocation(r, localRecord = null) {
+  if (localRecord) {
+    const locName = localRecord.areaName || localRecord.cityName;
+    if (locName && (locName.toLowerCase().includes('hyd') || localRecord.cityId === 'hyd')) {
+      return {
+        areaName: localRecord.areaName || 'Hyderabad Campus',
+        venueName: localRecord.venueName || 'Hyderabad Club Residency',
+        cityName: localRecord.cityName || 'Hyderabad',
+        cityId: 'hyd',
+      };
+    }
+    if (localRecord.areaName && localRecord.venueName) {
+      return {
+        areaName: localRecord.areaName,
+        venueName: localRecord.venueName,
+        cityName: localRecord.cityName || 'Vijayawada',
+        cityId: localRecord.cityId || 'vja',
+      };
+    }
+  }
+
+  const sr = String(r.special_request || r.specialRequest || r.notes || '');
+  const locMatch = sr.match(/\[Location:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/i);
+  if (locMatch) {
+    return {
+      cityId: locMatch[1].trim(),
+      cityName: locMatch[2].trim(),
+      areaName: locMatch[3].trim(),
+      venueName: locMatch[4].trim(),
+    };
+  }
+
+  const allText = `${sr} ${r.area_name || ''} ${r.areaName || ''} ${r.venue_name || ''} ${r.venueName || ''} ${r.city_name || ''} ${r.cityName || ''} ${r.location || ''}`.toLowerCase();
+  if (allText.includes('hyd') || allText.includes('hyderabad')) {
+    return {
+      areaName: 'Hyderabad Campus',
+      venueName: 'Hyderabad Club Residency',
+      cityName: 'Hyderabad',
+      cityId: 'hyd',
+    };
+  }
+
+  return {
+    areaName: r.area_name || r.areaName || 'Vijayawada Campus',
+    venueName: r.venue_name || r.venueName || 'FRCC Riverfront',
+    cityName: r.city_name || r.cityName || 'Vijayawada',
+    cityId: r.city_id || r.cityId || 'vja',
+  };
+}
+
 function getRoomTypeName(record) {
   const fromJoin = Array.isArray(record?.room_types) ? record.room_types[0]?.name : record?.room_types?.name;
   if (fromJoin && fromJoin !== 'Hotel Room' && fromJoin !== 'FRCC Riverfront') return fromJoin;
@@ -577,7 +628,19 @@ export function ProfilePage({ initialTab = 'details' }) {
     getMyStayBookings(user.id)
       .then((records) => {
         if (!mounted || !records) return;
+        let localStays = [];
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStays = JSON.parse(window.localStorage.getItem('frcc_stay_bookings') || '[]');
+          }
+        } catch (_) {}
+
         const mapped = records.map((r) => {
+          const matchedLocal = localStays.find(
+            (ls) => (ls.bookingRef && ls.bookingRef === (r.booking_ref || r.bookingRef || r.bookingId || r.id)) ||
+                    (ls.id && (ls.id === (r.booking_ref || r.bookingRef || r.bookingId || r.id) || ls.id === (r.uuid || r.stay_id || r.id)))
+          );
+          const stayLoc = extractStayLocation(r, matchedLocal);
           const uuid = r.uuid || r.stay_id || r.raw_id || r.db_id || r.id;
           const ref = r.booking_ref || r.bookingRef || r.bookingId || r.id;
           return {
@@ -828,8 +891,8 @@ export function ProfilePage({ initialTab = 'details' }) {
           vehicleType: r.vehicle_type || r.vehicleType || 'Vehicle',
           vehicleNumber: r.vehicle_number || r.vehicleNumber || '',
           vehicleModel: r.vehicle_model || r.vehicleModel || '',
-          amount: Number(r.total_amount || r.totalAmount || r.amount || r.total || 0),
-          total: Number(r.total_amount || r.totalAmount || r.amount || r.total || 0),
+          amount: 0,
+          total: 0,
           status: isCancelled ? 'CANCELLED' : status,
           booking_status: isCancelled ? 'CANCELLED' : status,
           areaName: (r.campus || r.city || '').toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
@@ -1052,7 +1115,11 @@ export function ProfilePage({ initialTab = 'details' }) {
     userParkingBookings.forEach((prk) => {
       const ref = prk.bookingRef || prk.bookingReference || prk.bookingId || prk.id;
       if (ref && !bookingsByRef.has(ref)) {
-        bookingsByRef.set(ref, prk);
+        bookingsByRef.set(ref, {
+          ...prk,
+          amount: 0,
+          total: 0,
+        });
         registerKeys(ref, prk);
       }
     });
@@ -1108,10 +1175,54 @@ export function ProfilePage({ initialTab = 'details' }) {
         const resolvedRoom = isStay
           ? (getRoomTypeName(appB) !== 'Standard Room' ? getRoomTypeName(appB) : getRoomTypeName(existing))
           : null;
+
+        const isHydLocation =
+          (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
+          (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
+          (appB.venueName && appB.venueName.toLowerCase().includes('hyd')) ||
+          (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
+          (appB.details?.cityName && appB.details.cityName.toLowerCase().includes('hyd')) ||
+          (appB.details?.areaName && appB.details.areaName.toLowerCase().includes('hyd')) ||
+          (existing.cityName && existing.cityName.toLowerCase().includes('hyd')) ||
+          (existing.areaName && existing.areaName.toLowerCase().includes('hyd')) ||
+          (existing.venueName && existing.venueName.toLowerCase().includes('hyd')) ||
+          (existing.cityId && String(existing.cityId).toLowerCase().includes('hyd'));
+
+        const resolvedLocation = isStay
+          ? (isHydLocation
+              ? {
+                  areaName: 'Hyderabad Campus',
+                  venueName: 'Hyderabad Club Residency',
+                  cityName: 'Hyderabad',
+                  cityId: 'hyd',
+                }
+              : {
+                  areaName:
+                    (appB.areaName && !appB.areaName.includes('Vijayawada') ? appB.areaName : null) ||
+                    (existing.areaName && !existing.areaName.includes('Vijayawada') ? existing.areaName : null) ||
+                    appB.areaName ||
+                    existing.areaName ||
+                    'Vijayawada Campus',
+                  venueName:
+                    (appB.venueName && !appB.venueName.includes('Riverfront') ? appB.venueName : null) ||
+                    (existing.venueName && !existing.venueName.includes('Riverfront') ? existing.venueName : null) ||
+                    appB.venueName ||
+                    existing.venueName ||
+                    'FRCC Riverfront',
+                  cityName:
+                    (appB.cityName && !appB.cityName.includes('Vijayawada') ? appB.cityName : null) ||
+                    (existing.cityName && !existing.cityName.includes('Vijayawada') ? existing.cityName : null) ||
+                    appB.cityName ||
+                    existing.cityName ||
+                    'Vijayawada',
+                })
+          : {};
+
         bookingsByRef.set(matchedRef, {
           ...appB,
           ...existing,
           ...(resolvedRoom ? { roomName: resolvedRoom, title: resolvedRoom } : {}),
+          ...resolvedLocation,
           bookingRef: matchedRef,
           bookingId: matchedRef,
           id: matchedRef,
@@ -1186,6 +1297,23 @@ export function ProfilePage({ initialTab = 'details' }) {
     }
 
     const unique = dedupedList.map((item) => {
+      const isItemParking =
+        item.category === 'parking' ||
+        Boolean(item.slot_id) ||
+        Boolean(item.parkingSlot) ||
+        String(item.bookingId || '').includes('PARK') ||
+        String(item.bookingRef || '').includes('PARK');
+
+      if (isItemParking) {
+        return {
+          ...item,
+          amount: 0,
+          total: 0,
+          subtotal: 0,
+          discount: 0,
+        };
+      }
+
       const amount = Number(item.total !== undefined ? item.total : (item.amount ?? 0));
       let subtotal = Number(item.subtotal || 0);
       let discount = Number(item.discount || 0);
@@ -1695,6 +1823,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                                 <dt className="text-slate-500">Campus</dt>
                                 <dd className="font-medium text-navy-900">{b.areaName || 'Vijayawada Campus'}</dd>
                               </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Parking Fee</dt>
+                                <dd className="font-bold text-emerald-700">Free</dd>
+                              </div>
                             </>
                           ) : isHall ? (
                             <>
@@ -1769,7 +1901,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                               {(b.areaName || b.details?.area) && (
                                 <div className="flex justify-between gap-3">
                                   <dt className="text-slate-500">Location</dt>
-                                  <dd className="font-medium text-navy-900">{b.venueName ? `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}` : (b.areaName || b.details?.area || b.location || 'Vijayawada Campus')}</dd>
+                                  <dd className="font-medium text-navy-900">{b.venueName
+                                      ? (b.venueName.includes(b.areaName || '') ? b.venueName : `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}`)
+                                      : (b.areaName || b.details?.area || b.location || 'Vijayawada Campus')}</dd>
                                 </div>
                               )}
                             </>
@@ -1789,7 +1923,7 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                             </>
                           )}
-                          {(() => {
+                          {!isParking && !isDining && (() => {
                             const rawAmount = Number(b.total !== undefined ? b.total : b.amount) || 0;
                             let cardSubtotal = Number(b.subtotal || 0);
                             let cardDiscount = Number(b.discount || 0);

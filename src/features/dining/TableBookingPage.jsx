@@ -234,7 +234,10 @@ export function TableBookingPage() {
         name: guestName.trim(),
         mobile: cleanMob,
         email: guestEmail.trim().toLowerCase(),
-        notes: notes.trim(),
+        notes: (function() {
+          const loc = `[Location: ${selectedCityId || 'vja'} | ${selectedCity?.name || 'Vijayawada'} | ${selectedVenueLocation?.areaName || 'Vijayawada Campus'} | ${selectedVenueLocation?.name || 'FRCC Clubhouse Dining'}]`;
+          return notes.trim() ? `${notes.trim()} ${loc}` : loc;
+        })(),
         ageConfirmed: Boolean(ageConfirmed),
         cityId: selectedCityId,
         cityName: selectedCity?.name || 'Vijayawada',

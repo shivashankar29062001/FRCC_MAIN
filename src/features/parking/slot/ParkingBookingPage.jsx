@@ -327,14 +327,9 @@ const slots = useMemo(
     setSelectedSlot(null);
   }, [formData.city, formData.date, formData.time, formData.days]);
 
-  const pricePerDay =
-    formData.vehicleType === 'Two Wheeler'
-      ? 20
-      : formData.vehicleType === 'Four Wheeler'
-      ? 40
-      : 0;
+  const pricePerDay = 0;
   const numberOfDays = Number(formData.days) || 0;
-  const amount = pricePerDay * numberOfDays;
+  const amount = 0;
 
   const handleProceedToSlots = () => {
     const validationErrors = {};
@@ -519,12 +514,12 @@ const slots = useMemo(
         city: booking.city,
         durationDays: booking.numberOfDays,
       },
-      amount: booking.totalAmount,
-      total: booking.totalAmount,
+      amount: 0,
+      total: 0,
       status: 'Confirmed',
       payment: {
-        method: booking.paymentMethod || 'UPI',
-        amount: booking.totalAmount,
+        method: 'Complimentary Pass',
+        amount: 0,
       },
     };
     if (addBooking) {
@@ -556,7 +551,8 @@ const slots = useMemo(
       vehicleType: formData.vehicleType,
       vehicleNumber: formData.vehicleNumber.trim(),
       numberOfDays,
-      pricePerDay,
+      pricePerDay: 0,
+      totalAmount: 0,
       bookingDate: formData.date,
       bookingTime: formData.time,
       paymentMethod: 'Demo',

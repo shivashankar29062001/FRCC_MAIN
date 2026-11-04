@@ -514,6 +514,18 @@ export function HotelPage() {
 
       const isTestBooking = Boolean(appliedCoupon?.is_test || appliedCoupon);
 
+      const isHyd = draft.cityId === 'hyd' || (draft.cityName || '').toLowerCase().includes('hyd') || (draft.areaName || '').toLowerCase().includes('hyd');
+      const resolvedAreaName = draft.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus');
+      const resolvedVenueName = draft.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront');
+      const resolvedCityName = draft.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada');
+      const resolvedCityId = draft.cityId || (isHyd ? 'hyd' : 'vja');
+      const resolvedVenueId = draft.venueId || (isHyd ? 'hyd-residency' : 'vja-residency');
+
+      const locationTag = `[Location: ${resolvedCityId} | ${resolvedCityName} | ${resolvedAreaName} | ${resolvedVenueName}]`;
+      const combinedSpecialRequest = draft.specialRequest
+        ? `${draft.specialRequest.trim()} ${locationTag}`
+        : locationTag;
+
       const bookingPayload = {
         clientRequestId,
         userId: user?.id || null,
@@ -528,7 +540,7 @@ export function HotelPage() {
         guestName: draft.name,
         guestMobile: draft.mobile,
         guestEmail: draft.email,
-        specialRequest: draft.specialRequest || null,
+        specialRequest: combinedSpecialRequest,
         paymentMethod: total === 0 ? 'coupon' : draft.paymentMethod,
         couponCode: appliedCoupon?.code || null,
         couponDiscount,
@@ -569,11 +581,19 @@ export function HotelPage() {
         title: selectedRoom.name,
         roomName: selectedRoom.name,
         roomId: selectedRoom.id,
-        areaName: draft.areaName || 'Vijayawada Campus',
-        venueName: draft.venueName || 'FRCC Riverfront',
-        cityName: draft.cityName || 'Vijayawada',
-        cityId: draft.cityId || 'vja',
-        venueId: draft.venueId || 'vja-residency',
+        areaName: resolvedAreaName,
+        venueName: resolvedVenueName,
+        cityName: resolvedCityName,
+        cityId: resolvedCityId,
+        venueId: resolvedVenueId,
+        location: `${resolvedAreaName} · ${resolvedVenueName}`,
+        details: {
+          areaName: resolvedAreaName,
+          venueName: resolvedVenueName,
+          cityName: resolvedCityName,
+          cityId: resolvedCityId,
+          venueId: resolvedVenueId,
+        },
         checkin: draft.checkin,
         checkout: draft.checkout,
         checkinTime: '12:00 PM',
@@ -610,6 +630,14 @@ export function HotelPage() {
       if (addBooking) {
         await addBooking(confirmationRecord);
       }
+
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const storedStays = JSON.parse(window.localStorage.getItem('frcc_stay_bookings') || '[]');
+          const updatedStays = [confirmationRecord, ...storedStays.filter((s) => s.bookingRef !== bookingRef && s.id !== bookingId)];
+          window.localStorage.setItem('frcc_stay_bookings', JSON.stringify(updatedStays.slice(0, 50)));
+        }
+      } catch (_) {}
 
       setConfirmedBooking(confirmationRecord);
       setStep(5);
@@ -829,19 +857,21 @@ export function HotelPage() {
                   cityLabel="Select City"
                   venueLabel="Select Venue / Campus"
                   onCityChange={(cid, cityObj, firstVenue) => {
+                    const isHydCity = cid === 'hyd' || (cityObj?.name || '').toLowerCase().includes('hyd');
                     updateDraft({
                       cityId: cid,
-                      cityName: cityObj?.name || '',
-                      venueId: firstVenue?.id || '',
-                      venueName: firstVenue?.displayName || firstVenue?.name || '',
-                      areaName: firstVenue?.areaName || 'Vijayawada Campus',
+                      cityName: cityObj?.name || (isHydCity ? 'Hyderabad' : 'Vijayawada'),
+                      venueId: firstVenue?.id || (isHydCity ? 'hyd-residency' : 'vja-residency'),
+                      venueName: firstVenue?.name || firstVenue?.displayName || (isHydCity ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+                      areaName: firstVenue?.areaName || (isHydCity ? 'Hyderabad Campus' : 'Vijayawada Campus'),
                     });
                   }}
                   onVenueChange={(vid, venueObj) => {
+                    const isHydVenue = vid === 'hyd-residency' || (venueObj?.name || '').toLowerCase().includes('hyd') || draft.cityId === 'hyd';
                     updateDraft({
                       venueId: vid,
-                      venueName: venueObj?.displayName || venueObj?.name || '',
-                      areaName: venueObj?.areaName || 'Vijayawada Campus',
+                      venueName: venueObj?.name || venueObj?.displayName || (isHydVenue ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+                      areaName: venueObj?.areaName || (isHydVenue ? 'Hyderabad Campus' : 'Vijayawada Campus'),
                     });
                   }}
                 />

@@ -333,8 +333,8 @@ export function getCancellationPolicyInfo(booking) {
         : undefined,
       hoursUntilStart: hoursUntil,
       refundPercent: 100,
-      refundAmount: Number(booking.total || booking.amount || 0),
-      refundStatusText: 'Full refund',
+      refundAmount: 0,
+      refundStatusText: 'Complimentary booking',
     };
   }
 

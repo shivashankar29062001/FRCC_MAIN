@@ -118,6 +118,7 @@ export function generateBookingReceiptPdf(booking) {
       rows.push(['Duration', String(booking.duration || `${booking.durationDays} Days`)]);
     }
     rows.push(['Campus Location', String(booking.areaName || 'Vijayawada Campus')]);
+    rows.push(['Parking Fee', 'Complimentary (Free)']);
   } else {
     // Activity
 
@@ -138,8 +139,8 @@ export function generateBookingReceiptPdf(booking) {
   if (discount > 0) {
     rows.push(['Member Privilege Discount (30%)', `-${formatINR(discount)}`]);
   }
-  rows.push(['Total Amount Paid', isDining ? 'Free (₹0)' : formatINR(totalAmount)]);
-  rows.push(['Payment Method', String(booking.payment_method || booking.paymentMethod || (isDining ? 'Free Pass' : 'Online (UPI/Card)'))]);
+  rows.push(['Total Amount Paid', (isDining || isParking) ? 'Free (₹0)' : formatINR(totalAmount)]);
+  rows.push(['Payment Method', String(booking.payment_method || booking.paymentMethod || ((isDining || isParking) ? 'Complimentary Pass' : 'Online (UPI/Card)'))]);
   rows.push(['Booking Status', String(booking.status || 'Confirmed')]);
 
   // 4 · Render Card-like Table
