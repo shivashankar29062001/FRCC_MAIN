@@ -19,6 +19,7 @@ export default function BookingForm({
   formData,
   errors = {},
   onChange,
+  onError,
   selectedSlot,
   slots,
   onSelectSlot,
@@ -37,6 +38,14 @@ export default function BookingForm({
   const handleVehicleNumberChange = (e) => {
     const raw = cleanVehicleNumber(e.target.value);
     handleInputChange('vehicleNumber', raw);
+  };
+
+  const handleVehicleNumberBlur = () => {
+    if (formData.vehicleNumber && formData.vehicleNumber.trim().length > 0 && !isValidVehicleNumber(formData.vehicleNumber)) {
+      if (typeof onError === 'function') {
+        onError('vehicleNumber', VEHICLE_NUMBER_ERROR_MESSAGE);
+      }
+    }
   };
 
   const formatDisplayDate = (dateStr) => {
@@ -77,25 +86,24 @@ export default function BookingForm({
         <div className="slot-booking-card location-card" id="city-selection-card">
           <div className="slot-booking-card-header">
             <MapPin size={18} className="card-header-icon" />
-            <h3 className="slot-booking-card-title">Select Location</h3>
+            <h3 className="slot-booking-card-title">Location</h3>
           </div>
           <div className="slot-booking-card-body">
             <div className="form-field-group">
               <label className="field-label" htmlFor="city-select">
                 City <span className="req-star">*</span>
               </label>
-              <div className="select-wrapper">
-                <select
+              <div className="city-input-wrapper">
+                <input
+                  type="text"
                   id="city-select"
-                  className={`form-select ${errors.city ? 'input-error' : ''}`}
-                  value={formData.city || ''}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  disabled={isSubmitting}
-                >
-                  <option value="">Select City</option>
-                  <option value="Vijayawada">Vijayawada</option>
-                  <option value="Hyderabad">Hyderabad</option>
-                </select>
+                  className="form-input read-only-city-input"
+                  value={formData.city || 'Vijayawada'}
+                  readOnly
+                  disabled
+                  aria-readonly="true"
+                  tabIndex={-1}
+                />
               </div>
               {errors.city && <span className="field-error-text">{errors.city}</span>}
             </div>
@@ -263,11 +271,12 @@ export default function BookingForm({
                 type="text"
                 id="vehicle-number"
                 className={`form-input ${errors.vehicleNumber ? 'input-error' : ''}`}
-                placeholder="Enter vehicle number (e.g. AP39AB1234)"
+                placeholder="AP74HU7654"
                 value={formData.vehicleNumber || ''}
                 onChange={handleVehicleNumberChange}
+                onBlur={handleVehicleNumberBlur}
                 disabled={isSubmitting}
-                maxLength={11}
+                maxLength={10}
                 aria-invalid={Boolean(errors.vehicleNumber)}
                 aria-describedby={errors.vehicleNumber ? 'vehicle-number-error' : undefined}
               />

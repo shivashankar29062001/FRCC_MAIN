@@ -95,17 +95,73 @@ const STEP_VEHICLE = 4;
 const STEP_PAYMENT = 5;
 const STEP_CONFIRMATION = 6;
 
+const getInitialCampusData = () => {
+  let initialCity = 'Vijayawada';
+  let initialCampusId = 'vja';
+  let initialZoneId = 'vja-multi-level';
+  let initialCampusKey = 'vijayawada';
+  try {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const campusParam = sp.get('campus') || sp.get('campus_id') || sp.get('city');
+      const zoneParam = sp.get('zone_id');
+      if (campusParam) {
+        if (campusParam.toLowerCase().includes('hyd')) {
+          initialCity = 'Hyderabad';
+          initialCampusId = 'hyd';
+          initialCampusKey = 'hyderabad';
+          initialZoneId = zoneParam || 'hyd-multi-level';
+        } else {
+          initialCity = 'Vijayawada';
+          initialCampusId = 'vja';
+          initialCampusKey = 'vijayawada';
+          initialZoneId = zoneParam || 'vja-multi-level';
+        }
+      } else {
+        const savedCampus = window.sessionStorage?.getItem('frcc_parking_selected_campus');
+        if (savedCampus) {
+          const parsed = JSON.parse(savedCampus);
+          if (parsed.city) initialCity = parsed.city;
+          if (parsed.campusId) initialCampusId = parsed.campusId;
+          if (parsed.campus) initialCampusKey = parsed.campus;
+          if (parsed.zoneId) initialZoneId = parsed.zoneId;
+        } else {
+          const savedCity = window.sessionStorage?.getItem('frcc_parking_selected_city');
+          if (savedCity === 'Hyderabad') {
+            initialCity = 'Hyderabad';
+            initialCampusId = 'hyd';
+            initialCampusKey = 'hyderabad';
+            initialZoneId = 'hyd-multi-level';
+          }
+        }
+      }
+    }
+  } catch (_) {}
+  return {
+    city: initialCity,
+    campusId: initialCampusId,
+    campus: initialCampusKey,
+    zoneId: initialZoneId
+  };
+};
+
 export default function ParkingBookingPage() {
   const { user, pushToast } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
-  const [formData, setFormData] = useState({
-    city: '',
-    date: '',
-    time: '',
-    days: '',
-    vehicleType: '',
-    vehicleNumber: ''
+  const [formData, setFormData] = useState(() => {
+    const initCampus = getInitialCampusData();
+    return {
+      city: initCampus.city,
+      campus: initCampus.campus,
+      campusId: initCampus.campusId,
+      zoneId: initCampus.zoneId,
+      date: '',
+      time: '',
+      days: '',
+      vehicleType: '',
+      vehicleNumber: ''
+    };
   });
 
 // Slot statuses tracked independently per city (Vijayawada and Hyderabad).
@@ -119,13 +175,13 @@ const [slotStatuses, setSlotStatuses] = useState(() => ({
 // Defaults to Vijayawada ('vja') when the city is unspecified.
 const slots = useMemo(
   () => {
-    const cityKey = formData.city === 'Vijayawada' ? 'vja' : formData.city === 'Hyderabad' ? 'hyd' : 'vja';
+    const cityKey = (formData.city || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
     return slotStatuses[cityKey];
   },
   [slotStatuses, formData.city]
 );
-const [selectedSlot, setSelectedSlot] = useState(null);
-  const [step, setStep] = useState(STEP_CITY);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [step, setStep] = useState(STEP_DATE_TIME);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,18 +195,38 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   const apiConfigured = isBookingApiConfigured();
 
-  // Preload selected campus from URL if navigated from /parking zone cards
+  // Preload selected campus from URL if navigated from /parking zone cards or sessionStorage
   useEffect(() => {
     try {
-      const sp = new URLSearchParams(window.location.search);
-      const campusParam = sp.get('campus') || sp.get('city');
-      if (campusParam) {
-        const normalized = campusParam.toLowerCase().includes('hyd') ? 'Hyderabad' : 'Vijayawada';
-        setFormData((prev) => ({ ...prev, city: normalized }));
-        setStep(STEP_DATE_TIME);
-      }
+      const campusData = getInitialCampusData();
+      setFormData((prev) => ({
+        ...prev,
+        city: campusData.city,
+        campus: campusData.campus,
+        campusId: campusData.campusId,
+        zoneId: campusData.zoneId
+      }));
+      window.sessionStorage?.setItem('frcc_parking_selected_city', campusData.city);
+      window.sessionStorage?.setItem('frcc_parking_selected_campus', JSON.stringify(campusData));
     } catch (_) {}
   }, []);
+
+  // Persist selected campus to sessionStorage
+  useEffect(() => {
+    if (formData.city) {
+      try {
+        window.sessionStorage?.setItem('frcc_parking_selected_city', formData.city);
+        const campusId = formData.city.toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+        const campus = campusId === 'hyd' ? 'hyderabad' : 'vijayawada';
+        window.sessionStorage?.setItem('frcc_parking_selected_campus', JSON.stringify({
+          campusId,
+          campus,
+          city: formData.city,
+          zoneId: formData.zoneId
+        }));
+      } catch (_) {}
+    }
+  }, [formData.city, formData.zoneId]);
 
   // Reset confirmation receipt if active user changes or logs out
   useEffect(() => {
@@ -158,18 +234,12 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
       if (!matches) {
         setConfirmedBooking(null);
-        setStep(STEP_CITY);
+        setStep(STEP_DATE_TIME);
       }
     }
   }, [user?.id, user?.userId, confirmedBooking]);
 
   // Auto-advance step based on form completion
-  useEffect(() => {
-    if (step === STEP_CITY && formData.city && formData.city.trim()) {
-      setStep(STEP_DATE_TIME);
-    }
-  }, [formData.city, step]);
-
   useEffect(() => {
     if (step === STEP_DATE_TIME && formData.date && formData.date.trim() && formData.time && formData.time.trim() && formData.days) {
       setStep(STEP_SLOT);
@@ -212,7 +282,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
   }, [selectedSlot, step]);
 
   useEffect(() => {
-    if (step === STEP_VEHICLE && formData.vehicleType && formData.vehicleNumber && formData.vehicleNumber.trim().length >= 4) {
+    if (step === STEP_VEHICLE && formData.vehicleType && isValidVehicleNumber(formData.vehicleNumber)) {
       setStep(STEP_PAYMENT);
     }
   }, [formData.vehicleType, formData.vehicleNumber, step]);
@@ -251,8 +321,18 @@ const [selectedSlot, setSelectedSlot] = useState(null);
   const handleFormChange = (newFormData) => {
     setFormData(newFormData);
     const updatedErrors = { ...errors };
+
+    // If vehicleNumber became valid, remove the validation error immediately
+    if (newFormData.vehicleNumber && isValidVehicleNumber(newFormData.vehicleNumber)) {
+      delete updatedErrors.vehicleNumber;
+    } else if (newFormData.vehicleNumber && newFormData.vehicleNumber.length === 10 && !isValidVehicleNumber(newFormData.vehicleNumber)) {
+      updatedErrors.vehicleNumber = VEHICLE_NUMBER_ERROR_MESSAGE;
+    } else if (!newFormData.vehicleNumber) {
+      delete updatedErrors.vehicleNumber;
+    }
+
     Object.keys(newFormData).forEach((key) => {
-      if (newFormData[key] && updatedErrors[key]) {
+      if (key !== 'vehicleNumber' && newFormData[key] && updatedErrors[key]) {
         delete updatedErrors[key];
       }
     });
@@ -300,16 +380,14 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   const commitConfirmedBooking = (booking) => {
     setSlotStatuses((prevStatuses) => {
-      // Map full city names to slotStatuses keys ('vja'/'hyd')
-      const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
-      const city = cityMap[booking.city || formData.city] || 'vja';
-      const cityStatuses = prevStatuses[city];
+      const cityKey = (booking.campus_id || booking.campus || booking.city || formData.city || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+      const cityStatuses = prevStatuses[cityKey] || [];
       const updatedCityStatuses = cityStatuses.map(
         (s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s)
       );
       return {
         ...prevStatuses,
-        [city]: updatedCityStatuses,
+        [cityKey]: updatedCityStatuses,
       };
     });
 
@@ -350,7 +428,11 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       bookingTime: formData.time,
       paymentMethod: 'Demo',
       transactionId: transactionId || 'DEMO-TXN-' + Date.now(),
-      city: formData.city
+      city: formData.city,
+      campus: formData.campus || (formData.city.toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada'),
+      campus_id: formData.campusId || (formData.city.toLowerCase().includes('hyd') ? 'hyd' : 'vja'),
+      zone_id: formData.zoneId || (formData.city.toLowerCase().includes('hyd') ? 'hyd-multi-level' : 'vja-multi-level'),
+      campusName: formData.city === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus'
     });
 
     pendingBookingRef.current = booking;
@@ -425,19 +507,17 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setIsCancelling(true);
 
     const booking = confirmedBooking;
-    // Map full city names to slotStatuses keys ('vja'/'hyd')
-    const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
-    const city = cityMap[booking.city || formData.city] || 'vja';
+    const cityKey = (booking.campus_id || booking.campus || booking.city || formData.city || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
     const releasedSlot = booking.parkingSlot;
 
     setSlotStatuses((prevStatuses) => {
-      const cityStatuses = prevStatuses[city];
+      const cityStatuses = prevStatuses[cityKey] || [];
       const updatedCityStatuses = cityStatuses.map(
         (s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s)
       );
       return {
         ...prevStatuses,
-        [city]: updatedCityStatuses,
+        [cityKey]: updatedCityStatuses,
       };
     });
 
@@ -450,36 +530,34 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setConfirmedBooking(cancelledBooking);
     updateRetainedBookingStatus(cancelledBooking, user?.id);
 
-    if (isBookingCancelApiConfigured()) {
-      setCancelSyncState({ status: 'syncing', error: '' });
-      cancelBookingToAdmin(cancelledBooking)
-        .then(() => {
-          setCancelSyncState({ status: 'synced', error: '' });
-        })
-        .catch((err) => {
-          const message = err && err.message ? err.message : 'Could not reach the admin dashboard.';
-          setCancelSyncState({ status: 'error', error: message });
-        })
-        .finally(() => {
-          setIsCancelling(false);
-          cancelInFlightRef.current = false;
-        });
-    } else {
-      setCancelSyncState({ status: 'not_configured', error: '' });
-      setIsCancelling(false);
-      cancelInFlightRef.current = false;
-    }
+    setCancelSyncState({ status: 'syncing', error: '' });
+    cancelBookingToAdmin(cancelledBooking)
+      .then((res) => {
+        setCancelSyncState({ status: res?.configured ? 'synced' : 'not_configured', error: '' });
+      })
+      .catch((err) => {
+        const message = err && err.message ? err.message : 'Could not reach the admin dashboard.';
+        setCancelSyncState({ status: 'error', error: message });
+      })
+      .finally(() => {
+        setIsCancelling(false);
+        cancelInFlightRef.current = false;
+      });
   };
 
   const handleResetForm = () => {
-    setFormData({
-      city: '',
+    const campusData = getInitialCampusData();
+    setFormData((prev) => ({
+      city: prev.city || campusData.city,
+      campus: prev.campus || campusData.campus,
+      campusId: prev.campusId || campusData.campusId,
+      zoneId: prev.zoneId || campusData.zoneId,
       date: '',
       time: '',
       days: '',
       vehicleType: '',
       vehicleNumber: ''
-    });
+    }));
     setSelectedSlot(null);
     setErrors({});
     setConfirmedBooking(null);
@@ -490,7 +568,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setCancelSyncState({ status: 'idle', error: '' });
     setIsCancelling(false);
     cancelInFlightRef.current = false;
-    setStep(STEP_CITY);
+    setStep(STEP_DATE_TIME);
   };
 
   const handleDone = () => {
@@ -531,7 +609,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
           <div className="stepper-row">
             <div className={`stepper-item ${step === 1 ? 'active' : step > 1 ? 'completed' : ''}`}>
               <div className="stepper-circle">1</div>
-              <span className="stepper-label">Select Location</span>
+              <span className="stepper-label">Location</span>
             </div>
             <div className={`stepper-line ${step > 1 ? 'completed' : ''}`} />
 
@@ -585,6 +663,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
               formData={formData}
               errors={errors}
               onChange={handleFormChange}
+              onError={(field, msg) => setErrors((prev) => ({ ...prev, [field]: msg }))}
               selectedSlot={selectedSlot}
               slots={slots}
               onSelectSlot={handleSelectSlot}

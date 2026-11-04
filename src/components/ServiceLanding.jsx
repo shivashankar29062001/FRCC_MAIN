@@ -142,21 +142,27 @@ export function ServiceLanding({ service = 'stay', hero }) {
     }
 
     if (normService === 'parking') {
-      return parkingZones.map((z) => ({
-        id: z.id,
-        name: z.name,
-        image: IMAGES[z.id] || IMAGES.parkingEntry,
-        facts: [
-          `${z.spots} parking slots`,
-          `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
-        ],
-        priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
-        priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
-        locationId: z.areaId === 'hyd' ? 'hyd-office' : 'vja-parking',
-        locationName: z.campusName || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
-        buttonLabel: 'Book Parking',
-        to: `/parking/book?campus=${z.campus || (z.areaId === 'hyd' ? 'hyderabad' : 'vijayawada')}`,
-      }));
+      return parkingZones.map((z) => {
+        const campusKey = z.campus || (z.areaId === 'hyd' ? 'hyderabad' : 'vijayawada');
+        const cityName = campusKey === 'hyderabad' ? 'Hyderabad' : 'Vijayawada';
+        const campusId = z.areaId || (campusKey === 'hyderabad' ? 'hyd' : 'vja');
+        const zoneId = z.id;
+        return {
+          id: z.id,
+          name: z.name,
+          image: IMAGES[z.id] || IMAGES.parkingEntry,
+          facts: [
+            `${z.spots} parking slots`,
+            `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
+          ],
+          priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
+          priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
+          locationId: z.areaId === 'hyd' ? 'hyd-office' : 'vja-parking',
+          locationName: z.campusName || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+          buttonLabel: 'Book Parking',
+          to: `/parking/book?campus_id=${campusId}&zone_id=${zoneId}&campus=${campusKey}&city=${encodeURIComponent(cityName)}`,
+        };
+      });
     }
 
     if (normService === 'activities') {
