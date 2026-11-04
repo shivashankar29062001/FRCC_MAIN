@@ -324,18 +324,7 @@ export function ServiceHero({ service = 'stay' }) {
                     <div className="flex flex-1 flex-col p-5">
                       <h3 className="font-display text-lg text-navy-900">{offer.title}</h3>
                       <p className="mt-1.5 flex-1 text-sm text-slate-600 leading-relaxed">{offer.line}</p>
-                      {service !== 'dining' && service !== 'stay' && service !== 'hall' && service !== 'membership' && service !== 'parking' && !['hall-member-savings', 'hall-full-day', 'hall-banquet-gathering', 'membership-savings', 'membership-family', 'membership-health-card', 'parking-member-privilege', 'parking-ev-priority', 'parking-valet-service'].includes(offer.id) && (
-                        <div className="mt-4 pt-1">
-                          <Link
-                            to={offer.link}
-                            onClick={() => { if (import.meta.env.DEV) console.info("[tile]", offer.title, offer.link); }}
-                            className="inline-flex items-center gap-1 text-sm font-semibold text-navy-900 transition-colors duration-150 hover:text-gold-600"
-                          >
-                            <span>View</span>
-                            <ArrowRightIcon className="h-3.5 w-3.5" />
-                          </Link>
-                        </div>
-                      )}
+                      
                     </div>
                   </article>
                 );

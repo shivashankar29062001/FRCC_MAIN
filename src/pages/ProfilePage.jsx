@@ -1743,10 +1743,6 @@ export function ProfilePage({ initialTab = 'details' }) {
                           ) : (
                             <>
                               <div className="flex justify-between gap-3">
-                                <dt className="text-slate-500">Location</dt>
-                                <dd className="font-medium text-navy-900">{b.venueName ? `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}` : (b.areaName || b.details?.areaName || b.location || 'Vijayawada Campus · Sports Complex')}</dd>
-                              </div>
-                              <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{formatDMY(b.date)}</dd>
                               </div>
@@ -1760,22 +1756,44 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                             </>
                           )}
-                          {b.subtotal > 0 && b.subtotal !== (b.total !== undefined ? b.total : b.amount) && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Subtotal</dt>
-                              <dd className="font-medium text-navy-900">{formatINR(b.subtotal)}</dd>
-                            </div>
-                          )}
-                          {b.discount > 0 && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
-                              <dd className="font-medium text-green-700">{formatINR(-b.discount)}</dd>
-                            </div>
-                          )}
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-slate-500">{b.subtotal > 0 && b.discount > 0 ? 'Total' : 'Amount'}</dt>
-                            <dd className="font-medium text-navy-900">{formatINR(b.total !== undefined ? b.total : b.amount)}</dd>
-                          </div>
+                          {(() => {
+                            const rawAmount = Number(b.total !== undefined ? b.total : b.amount) || 0;
+                            let cardSubtotal = Number(b.subtotal || 0);
+                            let cardDiscount = Number(b.discount || 0);
+
+                            if ((cardSubtotal <= 0 || cardSubtotal < rawAmount) && rawAmount > 0) {
+                              if (b.is_member || isMember || cardDiscount > 0) {
+                                cardSubtotal = Math.round(rawAmount / 0.7);
+                                cardDiscount = cardSubtotal - rawAmount;
+                              } else {
+                                cardSubtotal = rawAmount;
+                                cardDiscount = 0;
+                              }
+                            } else if (cardSubtotal > rawAmount && cardDiscount <= 0) {
+                              cardDiscount = cardSubtotal - rawAmount;
+                            }
+
+                            return (
+                              <>
+                                {cardSubtotal > 0 && cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Subtotal</dt>
+                                    <dd className="font-medium text-navy-900">{formatINR(cardSubtotal)}</dd>
+                                  </div>
+                                )}
+                                {cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
+                                    <dd className="font-medium text-green-700">{formatINR(-cardDiscount)}</dd>
+                                  </div>
+                                )}
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">{cardDiscount > 0 ? 'Total' : 'Amount'}</dt>
+                                  <dd className="font-medium text-navy-900">{formatINR(rawAmount)}</dd>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </dl>
 
                         {/* Booking Card Actions: Download Receipt & Cancel Booking */}
