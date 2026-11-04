@@ -46,7 +46,6 @@ const LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
 try {
   if (typeof window !== 'undefined' && window.sessionStorage) {
     window.sessionStorage.removeItem(LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY);
-    window.sessionStorage.removeItem(BASE_CONFIRMED_BOOKINGS_STORAGE_KEY);
   }
 } catch (_) {}
 
@@ -151,14 +150,26 @@ export default function ParkingBookingPage() {
 
   const [formData, setFormData] = useState(() => {
     const initCampus = getInitialCampusData();
+    let initDate = '';
+    let initTime = '';
+    let initDays = '';
+    try {
+      if (typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search);
+        initDate = sp.get('date') || '';
+        initTime = sp.get('time') || '';
+        initDays = sp.get('duration') || sp.get('days') || '';
+      }
+    } catch (_) {}
+
     return {
       city: initCampus.city,
       campus: initCampus.campus,
       campusId: initCampus.campusId,
       zoneId: initCampus.zoneId,
-      date: '',
-      time: '',
-      days: '',
+      date: initDate,
+      time: initTime,
+      days: initDays,
       vehicleType: '',
       vehicleNumber: ''
     };
@@ -246,29 +257,31 @@ const slots = useMemo(
     }
   }, [formData.date, formData.time, formData.days, step]);
 
-  // Synchronize slot occupancy dynamically from Supabase per campus
+  // Synchronize slot occupancy dynamically from Database & Backend API per campus
   const refreshSlots = useCallback(() => {
     const cityKey = (formData.city || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
     const campus = cityKey === 'hyd' ? 'hyderabad' : 'vijayawada';
-    if (formData.date) {
-      fetchParkingAvailability(campus, formData.date, formData.time || '09:00', formData.days || 1).then((slotData) => {
-        if (slotData && slotData.length > 0) {
-          const bookedSet = new Set(slotData.filter((s) => s.status === 'booked').map((s) => s.id));
-          setSlotStatuses((prev) => ({
-            ...prev,
-            [cityKey]: generateInitialSlots().map((s) => ({
-              ...s,
-              status: bookedSet.has(s.id) ? 'booked' : 'available',
-            }))
-          }));
-        } else {
-          setSlotStatuses((prev) => ({
-            ...prev,
-            [cityKey]: generateInitialSlots()
-          }));
-        }
-      });
-    }
+    const activeDate = formData.date ? formData.date.trim() : '';
+    const activeTime = formData.time ? formData.time.trim() : '';
+    const activeDays = formData.days ? Number(formData.days) : '';
+
+    fetchParkingAvailability(campus, activeDate, activeTime, activeDays).then((slotData) => {
+      if (slotData && slotData.length > 0) {
+        const bookedSet = new Set(slotData.filter((s) => s.status === 'booked').map((s) => s.id));
+        setSlotStatuses((prev) => ({
+          ...prev,
+          [cityKey]: generateInitialSlots().map((s) => ({
+            ...s,
+            status: bookedSet.has(s.id) ? 'booked' : 'available',
+          }))
+        }));
+      } else {
+        setSlotStatuses((prev) => ({
+          ...prev,
+          [cityKey]: generateInitialSlots()
+        }));
+      }
+    });
   }, [formData.city, formData.date, formData.time, formData.days]);
 
   useEffect(() => {
@@ -287,12 +300,11 @@ const slots = useMemo(
     }
   }, [formData.vehicleType, formData.vehicleNumber, step]);
 
-  // Clear selected slot when the city changes, since the slot inventory
-  // is independent per campus. The previously selected slot belongs to
-  // the old city and must not interfere with the new city's inventory.
+  // Clear selected slot when city, date, time, or duration changes
+  // to ensure availability and pricing are revalidated
   useEffect(() => {
     setSelectedSlot(null);
-  }, [formData.city]);
+  }, [formData.city, formData.date, formData.time, formData.days]);
 
   const pricePerDay =
     formData.vehicleType === 'Two Wheeler'
@@ -300,11 +312,74 @@ const slots = useMemo(
       : formData.vehicleType === 'Four Wheeler'
       ? 40
       : 0;
-  const numberOfDays = Number(formData.days) || 1;
+  const numberOfDays = Number(formData.days) || 0;
   const amount = pricePerDay * numberOfDays;
+
+  const handleProceedToSlots = () => {
+    const validationErrors = {};
+    if (!formData.date || !formData.date.trim()) {
+      validationErrors.date = 'Please select a booking date.';
+    }
+    if (!formData.time || !formData.time.trim()) {
+      validationErrors.time = 'Please select a booking arrival time.';
+    }
+    if (!formData.days) {
+      validationErrors.days = 'Please select number of days.';
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...validationErrors }));
+      const dtCard = document.getElementById('date-time-card');
+      if (dtCard) {
+        dtCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.date;
+      delete next.time;
+      delete next.days;
+      return next;
+    });
+
+    setStep(STEP_SLOT);
+    const slotEl = document.getElementById('parking-slot-selection-card');
+    if (slotEl) {
+      slotEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const handleSelectSlot = (slotId) => {
     if (confirmedBooking) return;
+
+    // Validate that Date, Time, and Days are selected before allowing slot selection
+    const missingErrors = {};
+    if (!formData.date || !formData.date.trim()) {
+      missingErrors.date = 'Please select a booking date.';
+    }
+    if (!formData.time || !formData.time.trim()) {
+      missingErrors.time = 'Please select a booking arrival time.';
+    }
+    if (!formData.days) {
+      missingErrors.days = 'Please select number of days.';
+    }
+
+    if (Object.keys(missingErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...missingErrors }));
+      const dtElement = document.getElementById('date-time-card');
+      if (dtElement) {
+        dtElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    if (!slotId) {
+      setSelectedSlot(null);
+      return;
+    }
+
     const targetSlot = slots.find((s) => s.id === slotId);
     if (!targetSlot || targetSlot.status === 'booked') return;
 
@@ -371,8 +446,13 @@ const slots = useMemo(
       }
     }
 
-    if (!numberOfDays || numberOfDays < 1 || numberOfDays > 7) {
-      newErrors.days = 'Please select the number of days (1 to 7).';
+    if (!formData.days) {
+      newErrors.days = 'Please select number of days.';
+    } else {
+      const d = Number(formData.days);
+      if (!d || d < 1 || d > 7) {
+        newErrors.days = 'Please select the number of days (1 to 7).';
+      }
     }
 
     return newErrors;
@@ -397,6 +477,7 @@ const slots = useMemo(
     submittingRef.current = false;
     pendingBookingRef.current = null;
     setStep(STEP_CONFIRMATION);
+    refreshSlots();
 
     // Show booking confirmation notification with user's contact details
     if (!confirmedBooking && pushToast) {
@@ -534,6 +615,7 @@ const slots = useMemo(
     cancelBookingToAdmin(cancelledBooking)
       .then((res) => {
         setCancelSyncState({ status: res?.configured ? 'synced' : 'not_configured', error: '' });
+        refreshSlots();
       })
       .catch((err) => {
         const message = err && err.message ? err.message : 'Could not reach the admin dashboard.';
@@ -542,6 +624,7 @@ const slots = useMemo(
       .finally(() => {
         setIsCancelling(false);
         cancelInFlightRef.current = false;
+        refreshSlots();
       });
   };
 
@@ -670,6 +753,7 @@ const slots = useMemo(
               amount={amount}
               numberOfDays={numberOfDays}
               onConfirmBooking={handleConfirmBooking}
+              onProceedToSlots={handleProceedToSlots}
               isSubmitting={isSubmitting}
             />
           )}

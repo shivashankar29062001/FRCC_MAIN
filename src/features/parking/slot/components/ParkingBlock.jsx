@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo } from 'react';
-import { Car, CarFront, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { Car, ChevronUp, ChevronDown } from 'lucide-react';
 import './ParkingBlock.css';
 
 const BLOCK_COLORS = {
@@ -238,18 +238,11 @@ export default function ParkingBlock({
                 >
                   {isBooked ? (
                     <span className="slot-booked-content" aria-hidden="true">
-                      <CarFront size={22} className="slot-booked-icon" />
+                      <span className="slot-booked-car">🚗</span>
                       <span className="slot-booked-label">{slot.id}</span>
                     </span>
                   ) : (
-                    <>
-                      <span className="slot-label">{slot.id}</span>
-                      {isSelected && (
-                        <span className="slot-checkmark" aria-hidden="true">
-                          <Check size={14} />
-                        </span>
-                      )}
-                    </>
+                    <span className="slot-label">{slot.id}</span>
                   )}
                 </button>
               );
