@@ -19,6 +19,20 @@ export const STAY_LOCATIONS = [
       },
     ],
   },
+  {
+    id: 'hyd',
+    name: 'Hyderabad',
+    venues: [
+      {
+        id: 'hyd-residency',
+        name: 'Hyderabad Club Residency',
+        areaName: 'Hyderabad Campus',
+        cityName: 'Hyderabad',
+        displayName: 'Hyderabad Campus — Hyderabad Club Residency',
+        address: 'Road No. 1, Banjara Hills, Hyderabad, Telangana – 500034',
+      },
+    ],
+  },
 ];
 
 export const DINING_LOCATIONS = [
@@ -33,6 +47,20 @@ export const DINING_LOCATIONS = [
         cityName: 'Vijayawada',
         displayName: 'Vijayawada Campus — Main Clubhouse',
         address: 'D.No. 24-29-210A, Gulabithota Road, Vijayawada',
+      },
+    ],
+  },
+  {
+    id: 'hyd',
+    name: 'Hyderabad',
+    venues: [
+      {
+        id: 'hyd-dining',
+        name: 'Hyderabad Club Dining',
+        areaName: 'Hyderabad Campus',
+        cityName: 'Hyderabad',
+        displayName: 'Hyderabad Campus — Hyderabad Club Dining',
+        address: 'Road No. 1, Banjara Hills, Hyderabad, Telangana – 500034',
       },
     ],
   },
@@ -53,5 +81,18 @@ export const ACTIVITY_LOCATIONS = [
       },
     ],
   },
+  {
+    id: 'hyd',
+    name: 'Hyderabad',
+    venues: [
+      {
+        id: 'hyd-activities',
+        name: 'Sports Complex',
+        areaName: 'Hyderabad Campus',
+        cityName: 'Hyderabad',
+        displayName: 'Hyderabad Campus — Sports Complex',
+        address: 'Road No. 1, Banjara Hills, Hyderabad, Telangana – 500034',
+      },
+    ],
+  },
 ];
-

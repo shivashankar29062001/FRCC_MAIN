@@ -119,13 +119,11 @@ export function generateBookingReceiptPdf(booking) {
     rows.push(['Campus Location', String(booking.areaName || 'Vijayawada Campus')]);
   } else {
     // Activity
-    const actLoc = booking.venueName
-      ? `${booking.areaName || 'Vijayawada Campus'} • ${booking.venueName}`
-      : (booking.location || booking.areaName || booking.details?.venueName || booking.details?.areaName || 'Vijayawada Campus • Sports Complex');
+
     rows.push(['Activity Date', formatDMY(booking.date)]);
     rows.push(['Time Slot', String(booking.slot || '—')]);
     rows.push(['Players / Participants', String(booking.players || 1)]);
-    rows.push(['Facility Location', String(actLoc)]);
+
   }
 
   // Pricing Breakdown

@@ -189,8 +189,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           ],
           priceDisplay,
           priceUnit,
-          locationId: 'vja-activities',
-          locationName: 'Vijayawada Campus · Sports Complex',
+
+
           buttonLabel: 'Book game',
           to: `/book/activities/process?item=${encodeURIComponent(g.id)}&game=${encodeURIComponent(g.id)}`,
         };
