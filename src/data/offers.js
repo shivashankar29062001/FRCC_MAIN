@@ -56,29 +56,8 @@ export const OFFERS_DATA = {
       link: '/book/hall#booking',
     },
   ],
-  parking: [
-    {
-      id: 'parking-member-privilege',
-      title: `${MEMBER_DISCOUNT_PERCENT}% Member Rate`,
-      line: 'Member rate on reserved parking across all campus zones.',
-      imageSlot: 'parkingEntry',
-      link: '/book/parking#booking',
-    },
-    {
-      id: 'parking-ev-priority',
-      title: 'Priority EV Charging',
-      line: 'Dedicated electric vehicle charging bays with fast turnaround.',
-      imageSlot: 'parkingEV',
-      link: '/book/parking#booking',
-    },
-    {
-      id: 'parking-valet-service',
-      title: 'Event Valet Coordination',
-      line: 'Seamless vehicle drop-off and sheltered walkway access.',
-      imageSlot: 'parkingValet',
-      link: '/book/parking#booking',
-    },
-  ],
+  // FRCC parking does not have any parking charges, so paid parking offers are not applicable.
+  parking: [],
   activities: [
     {
       id: 'activities-member-rate',

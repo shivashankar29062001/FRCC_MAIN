@@ -25,6 +25,11 @@
  */
 
 import { supabase } from '../../../../services/supabase.js';
+import {
+  cleanVehicleNumber,
+  isValidVehicleNumber,
+  VEHICLE_NUMBER_ERROR_MESSAGE
+} from '../../../../utils/vehicle.js';
 
 // Display booking status values (used by the UI).
 export const BOOKING_STATUS = {
@@ -121,7 +126,11 @@ export function createBooking({
   bookingTime,
   paymentMethod,
   transactionId,
-  city
+  city,
+  campus = null,
+  campus_id = null,
+  zone_id = null,
+  campusName = null
 }) {
   const isCash = paymentMethod === 'Cash';
   const reference = bookingReference || generateBookingReference();
@@ -130,6 +139,11 @@ export function createBooking({
     ? PAYMENT_STATUS_CODE.PENDING_AT_VENUE
     : PAYMENT_STATUS_CODE.PAID;
 
+  const effectiveCampus = campus || ((city || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada');
+  const effectiveCampusId = campus_id || (effectiveCampus === 'hyderabad' ? 'hyd' : 'vja');
+  const effectiveZoneId = zone_id || (effectiveCampus === 'hyderabad' ? 'hyd-multi-level' : 'vja-multi-level');
+  const effectiveCampusName = campusName || (effectiveCampus === 'hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus');
+
   return {
     // Reference (bookingId kept for backward compatibility with older views)
     bookingReference: reference,
@@ -137,14 +151,21 @@ export function createBooking({
     userId: userId || user_id || null,
     user_id: user_id || userId || null,
 
+    // Campus & Zone identification (strictly separated per campus)
+    campus: effectiveCampus,
+    campus_id: effectiveCampusId,
+    zone_id: effectiveZoneId,
+    campusName: effectiveCampusName,
+    location_id: effectiveCampusId,
+
     // Slot & vehicle
     parkingSlot,
     vehicleType,
-    vehicleNumber,
+    vehicleNumber: cleanVehicleNumber(vehicleNumber),
     vehicleModel,
 
     // Location & schedule
-    city: city || '',
+    city: city || (effectiveCampus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada'),
     numberOfDays,
     pricePerDay,
     totalAmount: pricePerDay * numberOfDays,
@@ -175,6 +196,7 @@ export function createBooking({
 export function buildAdminBookingPayload(booking) {
   return {
     bookingReference: booking.bookingReference || booking.bookingId,
+    campus: booking.campus || (booking.city?.toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada'),
     city: booking.city,
     bookingDate: booking.bookingDateISO,
     arrivalTime: booking.arrivalTime,
@@ -195,10 +217,10 @@ export function buildAdminBookingPayload(booking) {
 // Admin Dashboard API (only active when configured via VITE_BOOKING_API_URL)
 // ---------------------------------------------------------------------------
 
-const BOOKING_API_URL = (import.meta.env.VITE_BOOKING_API_URL || '')
+const BOOKING_API_URL = (import.meta.env?.VITE_BOOKING_API_URL || '')
   .trim()
   .replace(/\/+$/, '');
-const BOOKING_API_PATH = (import.meta.env.VITE_BOOKING_API_PATH || '/bookings').trim();
+const BOOKING_API_PATH = (import.meta.env?.VITE_BOOKING_API_PATH || '/bookings').trim();
 
 export function isBookingApiConfigured() {
   return BOOKING_API_URL.length > 0;
@@ -210,13 +232,6 @@ export function getBookingApiEndpoint() {
   return `${BOOKING_API_URL}${path}`;
 }
 
-/**
- * Sends a confirmed booking to the Admin Dashboard API.
- * Resolves when the backend accepts the booking, rejects otherwise so the UI
- * can surface a clear error and offer a safe retry.
- *
- * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
- */
 /**
  * Trigger booking confirmation notifications via server-side Edge Function.
  * Idempotent: safe to invoke multiple times.
@@ -259,9 +274,14 @@ export async function resendBookingConfirmation(bookingId) {
  * If slot is already taken, throws an error with code 'SLOT_TAKEN'.
  */
 export async function submitBookingToSupabase(booking) {
+  const cleanNumber = cleanVehicleNumber(booking.vehicleNumber);
+  if (!isValidVehicleNumber(cleanNumber)) {
+    throw new Error(VEHICLE_NUMBER_ERROR_MESSAGE);
+  }
+
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
-  const campus = (booking.city || 'Vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+  const campus = (booking.city || booking.campus || 'Vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
 
   // 1. Try atomic SECURITY DEFINER RPC create_parking_booking
   try {
@@ -403,12 +423,44 @@ export async function fetchBookedSlotsFromSupabase(date, campus = 'vijayawada') 
 }
 
 /**
+ * Cancels a parking booking in Supabase
+ */
+export async function cancelBookingInSupabase(booking) {
+  try {
+    const reference = booking.bookingReference || booking.bookingId;
+    const campus = (booking.city || booking.campus || 'vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+
+    const { data, error } = await supabase
+      .from('parking_bookings')
+      .update({
+        booking_status: 'CANCELLED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('booking_reference', reference)
+      .eq('campus', campus);
+
+    if (error) {
+      console.warn('[parkingService] Supabase cancel error:', error.message);
+    }
+    return { ok: !error, data };
+  } catch (err) {
+    console.warn('[parkingService] Supabase cancel catch:', err);
+    return { ok: false };
+  }
+}
+
+/**
  * Sends a confirmed booking to Supabase and optionally to the Admin Dashboard API.
  * Resolves when stored or accepted.
  *
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 export async function submitBookingToAdmin(booking) {
+  const cleanNumber = cleanVehicleNumber(booking.vehicleNumber);
+  if (!isValidVehicleNumber(cleanNumber)) {
+    throw new Error(VEHICLE_NUMBER_ERROR_MESSAGE);
+  }
+
   // Always persist directly to Supabase cloud
   await submitBookingToSupabase(booking);
 
@@ -462,7 +514,7 @@ export async function submitBookingToAdmin(booking) {
 // The `{ref}` placeholder is replaced with the encoded booking reference.
 // ---------------------------------------------------------------------------
 
-const BOOKING_CANCEL_PATH = (import.meta.env.VITE_BOOKING_CANCEL_PATH || '').trim();
+const BOOKING_CANCEL_PATH = (import.meta.env?.VITE_BOOKING_CANCEL_PATH || '').trim();
 
 export function isBookingCancelApiConfigured() {
   return BOOKING_API_URL.length > 0 && BOOKING_CANCEL_PATH.length > 0;
@@ -494,6 +546,8 @@ export function buildAdminCancellationPayload(booking) {
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 export async function cancelBookingToAdmin(booking) {
+  await cancelBookingInSupabase(booking);
+
   if (!isBookingCancelApiConfigured()) {
     // Frontend-only mode: nothing to call, and we never pretend the
     // dashboard was updated.
