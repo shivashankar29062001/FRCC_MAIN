@@ -324,7 +324,7 @@ export function ServiceHero({ service = 'stay' }) {
                     <div className="flex flex-1 flex-col p-5">
                       <h3 className="font-display text-lg text-navy-900">{offer.title}</h3>
                       <p className="mt-1.5 flex-1 text-sm text-slate-600 leading-relaxed">{offer.line}</p>
-                      {service !== 'stay' && service !== 'hall' && service !== 'membership' && service !== 'parking' && !['hall-member-savings', 'hall-full-day', 'hall-banquet-gathering', 'membership-savings', 'membership-family', 'membership-health-card', 'parking-member-privilege', 'parking-ev-priority', 'parking-valet-service'].includes(offer.id) && (
+                      {service !== 'dining' && service !== 'stay' && service !== 'hall' && service !== 'membership' && service !== 'parking' && !['hall-member-savings', 'hall-full-day', 'hall-banquet-gathering', 'membership-savings', 'membership-family', 'membership-health-card', 'parking-member-privilege', 'parking-ev-priority', 'parking-valet-service'].includes(offer.id) && (
                         <div className="mt-4 pt-1">
                           <Link
                             to={offer.link}

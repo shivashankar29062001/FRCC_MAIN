@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getMyStayBookings } from '../api/stay.js';
@@ -58,7 +58,6 @@ const TABS = [
   { id: 'details', label: 'Personal Details', icon: UserIcon },
   { id: 'password', label: 'Change Password', icon: ShieldIcon },
   { id: 'bookings', label: 'My Bookings', icon: CalendarIcon },
-  { id: 'payments', label: 'Payment History', icon: MembershipIcon },
 ];
 
 function PersonalDetails({ user, membership, pushToast }) {
@@ -453,7 +452,6 @@ export function ProfilePage({ initialTab = 'details' }) {
       setTab('bookings');
     }
   }, [urlTab, location.pathname, isPasswordRecovery]);
-  const [payQuery, setPayQuery] = useState('');
   const [bookingFilter, setBookingFilter] = useState('all');
   const [dbStayBookings, setDbStayBookings] = useState([]);
   const [dbTableBookings, setDbTableBookings] = useState([]);
@@ -1286,13 +1284,6 @@ export function ProfilePage({ initialTab = 'details' }) {
     return bookings;
   }, [bookings, bookingFilter]);
 
-  const filteredPayments = useMemo(() => {
-    const q = payQuery.trim().toLowerCase();
-    if (!q) return payments;
-    return payments.filter((p) =>
-      [p.id, p.bookingId, p.method].some((v) => String(v || '').toLowerCase().includes(q)),
-    );
-  }, [payments, payQuery]);
 
   const tabs = useMemo(() => {
     return TABS.map((t) => {
@@ -1968,61 +1959,16 @@ export function ProfilePage({ initialTab = 'details' }) {
           )}
           {tab === 'payments' && !isPasswordRecovery && (
             <div id="panel-payments" role="tabpanel" aria-labelledby="tab-payments">
-              {payments.length === 0 ? (
-                <EmptyState
-                  title="No payments yet"
-                  body="Payments made on the booking pages will be listed here with their receipt references."
-                  icon={MembershipIcon}
-                  action={
-                    <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
-                      Browse activities <ArrowRightIcon className="h-4 w-4" />
-                    </Link>
-                  }
-                />
-              ) : (
-                <>
-                  <SearchInput
-                    id="pay-search"
-                    name="pay-search"
-                    placeholder="Search payment, booking or method…"
-                    value={payQuery}
-                    onChange={(e) => setPayQuery(e.target.value)}
-                    aria-label="Search payments"
-                  />
-                  {filteredPayments.length === 0 ? (
-                    <div className="mt-4">
-                      <EmptyState title="No matching payments" body="Try a different search term." />
-                    </div>
-                  ) : (
-                    <div className="card mt-4 !p-0 overflow-x-auto">
-                      <table className="w-full min-w-[640px] text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200 bg-navy-50/70 text-left text-xs font-semibold text-slate-500">
-                            <th className="p-3 font-semibold">Payment</th>
-                            <th className="p-3 font-semibold">Booking</th>
-                            <th className="p-3 font-semibold">Method</th>
-                            <th className="p-3 font-semibold">Date</th>
-                            <th className="p-3 text-right font-semibold">Amount</th>
-                            <th className="p-3 font-semibold">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPayments.map((p) => (
-                            <tr key={p.id} className="border-b border-slate-100 transition last:border-0 hover:bg-navy-50/40">
-                              <td className="p-3 font-mono text-xs">{p.id}</td>
-                              <td className="p-3 font-mono text-xs">{p.bookingId}</td>
-                              <td className="p-3 capitalize">{String(p.method).replace(/_/g, ' ')}</td>
-                              <td className="p-3 text-slate-500">{formatDMYTime(p.date)}</td>
-                              <td className="p-3 text-right font-semibold text-navy-900">{formatINR(p.amount)}</td>
-                              <td className="p-3"><StatusTag status={p.status} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
+              <EmptyState
+                title="No payments yet"
+                body="Payments made on the booking pages will be listed here with their receipt references."
+                icon={MembershipIcon}
+                action={
+                  <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                    Browse activities <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
+                }
+              />
             </div>
           )}
         </div>

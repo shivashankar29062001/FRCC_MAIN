@@ -28,14 +28,17 @@ const frontend = spawn(npmCmd, ['run', 'dev'], {
   shell: isWin,
 });
 
+let isShuttingDown = false;
 function cleanup() {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   console.log('\n🛑 Shutting down...');
   if (backend && !backend.killed) {
-    if (isWin) spawn('taskkill', ['/pid', backend.pid, '/f', '/t']);
+    if (isWin) spawn('taskkill', ['/pid', String(backend.pid), '/f', '/t']);
     else backend.kill();
   }
   if (frontend && !frontend.killed) {
-    if (isWin) spawn('taskkill', ['/pid', frontend.pid, '/f', '/t']);
+    if (isWin) spawn('taskkill', ['/pid', String(frontend.pid), '/f', '/t']);
     else frontend.kill();
   }
   process.exit();
