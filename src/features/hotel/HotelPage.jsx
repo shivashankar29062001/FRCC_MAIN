@@ -1163,7 +1163,7 @@ export function HotelPage() {
               </Button>
             </div>
           </Card>
-        )}
+        ))}
 
         {/* Step 4: Guest Details */}
         {step === 3 && (
@@ -1308,7 +1308,8 @@ export function HotelPage() {
                     <span className="text-xs text-slate-500 block">Primary Guest</span>
                     <span className="font-semibold text-navy-900">{draft.name} · +91 {draft.mobile} · {draft.email}</span>
                   </div>
-                  {draft.specialRequest && (\n                    <div className="sm:col-span-2">
+                  {draft.specialRequest && (
+                    <div className="sm:col-span-2">
                       <span className="text-xs text-slate-500 block">Special Request</span>
                       <span className="text-slate-700 italic">&ldquo;{draft.specialRequest}&rdquo;</span>
                     </div>
