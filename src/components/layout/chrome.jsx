@@ -817,9 +817,16 @@ export function Footer() {
             {registration?.id ? ` · Reg. No: ${registration.id}` : ''}
           </p>
           <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
-            {['Privacy Policy', 'Accessibility', 'Sitemap'].map((label) => (
+            {[
+              { label: 'Privacy Policy', to: ROUTES.privacyPolicy },
+              { label: 'Cookie Policy', to: ROUTES.cookiePolicy },
+              { label: 'Accessibility', to: ROUTES.accessibility },
+              { label: 'Sitemap', to: ROUTES.sitemap },
+            ].map(({ label, to }) => (
               <li key={label}>
-                <span className="transition hover:text-gold-400 cursor-default">{label}</span>
+                <Link to={to} className="transition hover:text-gold-400">
+                  {label}
+                </Link>
               </li>
             ))}
           </ul>

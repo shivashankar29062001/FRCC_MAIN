@@ -45,6 +45,12 @@ import { TableBookingPage } from './features/dining/TableBookingPage.jsx';
 import { EventsPage, EventDetailPage, AdminEventsPage } from './features/events/index.js';
 import { NotFoundPage, LogoutPage } from './pages/SystemPages.jsx';
 import { ScrollToTop } from './components/ScrollToTop.jsx';
+import {
+  CookiePolicyPage,
+  PrivacyPolicyPage,
+  AccessibilityPage,
+  SitemapPage,
+} from './pages/LegalPages.jsx';
 
 export default function App() {
   return (
@@ -131,6 +137,14 @@ export default function App() {
                     <Route path="/dashboard" element={<Navigate to="/profile" replace />} />
                     <Route path="/logout" element={<LogoutPage />} />
                     <Route path="/book" element={<BookPage />} />
+
+                    {/* Legal & Policies */}
+                    <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+                    <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                    <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
+                    <Route path="/accessibility" element={<AccessibilityPage />} />
+                    <Route path="/sitemap" element={<SitemapPage />} />
+
                     <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </AppLayout>

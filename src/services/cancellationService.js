@@ -121,8 +121,8 @@ export function isBookingInPast(booking) {
     return checkoutDt.getTime() < Date.now();
   }
 
-  const dateStr = booking.checkin || booking.date;
-  const timeStr = booking.time || booking.slot || null;
+  const dateStr = booking.checkin || booking.booking_date || booking.bookingDateISO || booking.date;
+  const timeStr = booking.time || booking.arrival_time || booking.arrivalTime || booking.bookingTime || booking.slot || null;
   const dt = parseBookingDateTime(dateStr, timeStr);
   if (!dt) return false;
   return dt.getTime() < Date.now();
@@ -137,7 +137,7 @@ export function isBookingInPast(booking) {
  */
 export function canCancelBooking(booking) {
   if (!booking) return false;
-  const status = String(booking.status || '').trim().toLowerCase();
+  const status = String(booking.booking_status || booking.bookingStatus || booking.status || '').trim().toLowerCase();
   if (['cancelled', 'completed', 'rejected', 'failed'].includes(status)) {
     return false;
   }
@@ -315,6 +315,29 @@ export function getCancellationPolicyInfo(booking) {
     };
   }
 
+  const isParking =
+    booking.category === 'parking' ||
+    Boolean(booking.slot_id) ||
+    Boolean(booking.parkingSlot) ||
+    Boolean(booking.bookingId?.includes('PARK')) ||
+    Boolean(booking.bookingRef?.includes('PARK'));
+
+  if (isParking) {
+    const isWithinCutoff = hoursUntil !== null && hoursUntil < 2 && hoursUntil >= 0;
+    return {
+      type: 'parking',
+      policyText: 'Free cancellation up to 2 hours before scheduled arrival.',
+      isWithinCutoff,
+      warningText: isWithinCutoff
+        ? 'Notice: Scheduled arrival is in less than 2 hours.'
+        : undefined,
+      hoursUntilStart: hoursUntil,
+      refundPercent: 100,
+      refundAmount: Number(booking.total || booking.amount || 0),
+      refundStatusText: 'Full refund',
+    };
+  }
+
   return {
     type: booking.category || 'general',
     policyText: 'Standard cancellation policy applies. You may cancel prior to the scheduled start time.',
@@ -354,6 +377,7 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
     else if (hint.startsWith('FRCC-S-') || hint.includes('STAY')) type = 'stay';
     else if (hint.startsWith('FRCC-TAB-') || hint.startsWith('FRCC-T-') || hint.includes('TAB')) type = 'dining';
     else if (hint.startsWith('FRCC-ACT-') || hint.includes('ACT')) type = 'activity';
+    else if (hint.startsWith('FRCC-PARK-') || hint.startsWith('FRCC-P-') || hint.includes('PARK')) type = 'parking';
   }
 
   // 1. Primary: Execute unified cancel_booking RPC or specific service RPC
@@ -618,6 +642,100 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
       window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'dining' } }));
     }
     return { success: true, booking_id: refToMatch, status: 'cancelled' };
+  }
+
+  if (type === 'parking') {
+    try {
+      await supabase
+        .from('parking_bookings')
+        .update({
+          booking_status: 'CANCELLED',
+          payment_status: 'REFUNDED',
+          updated_at: nowIso,
+        })
+        .or(`booking_reference.eq.${refToMatch},id.eq.${bookingId}`);
+    } catch (e) {
+      console.warn('[cancellationService] parking_bookings update error:', e);
+    }
+
+    try {
+      await supabase
+        .from('bookings')
+        .update({ status: 'Cancelled', cancelled_at: nowIso, updated_at: nowIso })
+        .or(`booking_id.eq.${refToMatch},id.eq.${bookingId}`);
+    } catch (_) {}
+
+    try {
+      if (typeof window !== 'undefined') {
+        persistCancelledId(refToMatch);
+        persistCancelledId(bookingId);
+        if (window.localStorage) {
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key && (key.startsWith('frcc_parking') || key === 'bookings')) {
+              try {
+                const raw = window.localStorage.getItem(key);
+                if (raw) {
+                  const list = JSON.parse(raw);
+                  if (Array.isArray(list)) {
+                    let changed = false;
+                    const updated = list.map((b) => {
+                      const r = b.bookingReference || b.booking_reference || b.bookingId || b.id;
+                      if (r === refToMatch || r === bookingId) {
+                        changed = true;
+                        return { ...b, bookingStatus: 'CANCELLED', bookingStatusCode: 'CANCELLED', booking_status: 'CANCELLED', status: 'Cancelled', cancelledAt: nowIso };
+                      }
+                      return b;
+                    });
+                    if (changed) {
+                      window.localStorage.setItem(key, JSON.stringify(updated));
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        }
+        if (window.sessionStorage) {
+          for (let i = 0; i < window.sessionStorage.length; i++) {
+            const key = window.sessionStorage.key(i);
+            if (key && (key.startsWith('frcc_parking') || key === 'bookings')) {
+              try {
+                const raw = window.sessionStorage.getItem(key);
+                if (raw) {
+                  const list = JSON.parse(raw);
+                  if (Array.isArray(list)) {
+                    let changed = false;
+                    const updated = list.map((b) => {
+                      const r = b.bookingReference || b.booking_reference || b.bookingId || b.id;
+                      if (r === refToMatch || r === bookingId) {
+                        changed = true;
+                        return { ...b, bookingStatus: 'CANCELLED', bookingStatusCode: 'CANCELLED', booking_status: 'CANCELLED', status: 'Cancelled', cancelledAt: nowIso };
+                      }
+                      return b;
+                    });
+                    if (changed) {
+                      window.sessionStorage.setItem(key, JSON.stringify(updated));
+                    }
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'parking' } }));
+      window.dispatchEvent(new CustomEvent('frcc:parking-bookings-changed', { detail: { bookingId: refToMatch, status: 'CANCELLED' } }));
+    }
+
+    supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'parking' },
+    }).catch(() => {});
+
+    return { success: true, booking_id: refToMatch, status: 'Cancelled' };
   }
 
   // Activities, Parking, or general bookings
