@@ -114,16 +114,18 @@ export function ServiceLanding({ service = 'stay', hero }) {
     if (normService === 'halls') {
       let filtered = hallItems.filter((h) => !selectedArea || h.areaId === selectedArea);
       if (hallFilter !== 'all') {
-        filtered = filtered.filter((h) => h.type === hallFilter);
+        filtered = filtered.filter(
+          (h) => h.roomType === hallFilter || h.name === hallFilter || h.type === hallFilter || h.name.includes(hallFilter)
+        );
       }
       return filtered.map((h) => {
         const typeLabel =
-          h.type === 'ac' ? 'Central AC' : h.type === 'boardroom' ? 'Executive Boardroom' : 'Non AC / Natural Air';
+          h.type === 'boardroom' ? 'Executive Boardroom' : h.type === 'ac' ? 'Central AC' : 'Non AC / Natural Air';
         const capacityLabel = `Capacity: ${h.capacity?.toLocaleString('en-IN')} guests`;
         return {
           id: h.id,
           name: h.name,
-          image: IMAGES[h.id] || IMAGES.hallFunction,
+          image: (h.image ? { src: h.image, alt: h.name, name: h.name } : IMAGES[h.id]) || IMAGES.hallFunction,
           facts: [
             capacityLabel,
             `Type: ${typeLabel}`,
@@ -134,7 +136,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
           locationId: 'vja-halls',
           locationName: 'Vijayawada Campus · Convention Block',
           buttonLabel: 'Book Hall',
-          to: HALL_BOOKING_URL,
+          to: `${HALL_BOOKING_URL}?type=${encodeURIComponent(h.roomType || h.name)}`,
         };
       });
     }
@@ -268,7 +270,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
 
       {/* 2 · Main Section */}
       <section id="content" className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
-        <div className="container-x section">
+        <div className={`container-x ${normService === 'halls' ? 'py-8 sm:py-10' : 'section'}`}>
           {/* Header */}
           <div className="max-w-2xl">
             <p className="eyebrow">{sectionMeta.eyebrow}</p>
@@ -308,13 +310,15 @@ export function ServiceLanding({ service = 'stay', hero }) {
 
           {/* Filter Chips for Halls */}
           {normService === 'halls' && (
-            <div className="mt-6 flex flex-wrap items-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-medium mr-1">Type:</span>
               {[
-                { id: 'all', label: 'All Venues' },
-                { id: 'ac', label: 'AC' },
-                { id: 'non-ac', label: 'Non AC' },
-                { id: 'boardroom', label: 'Board room' },
+                { id: 'all', label: 'All Types' },
+                { id: 'Board Room', label: 'Board Room' },
+                { id: 'Meeting Room', label: 'Meeting Room' },
+                { id: 'Conference Room', label: 'Conference Room' },
+                { id: 'Convention Room', label: 'Convention Room' },
+                { id: 'Banquet Hall', label: 'Banquet Hall' },
               ].map((chip) => {
                 const isActive = hallFilter === chip.id;
                 return (
@@ -366,90 +370,121 @@ export function ServiceLanding({ service = 'stay', hero }) {
           )}
 
           {/* 3 · Option Cards Grid */}
-          <div className={cardItems.length === 1 ? "mt-8 flex justify-center" : "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"}>
-            {cardItems.map((item) => (
-              <article
-                key={item.id}
-                className={`group flex flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm ${cardItems.length === 1 ? 'w-full max-w-md' : ''}`}
-              >
-                <div className="h-48 overflow-hidden bg-slate-100">
-                  <SmartImage
-                    image={item.image}
-                    aspect="16 / 10"
-                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col p-5 sm:p-6">
-                  <h3 className="font-display text-xl font-bold text-navy-900">{item.name}</h3>
-
-                  {item.subtitle && (
-                    <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
-                  )}
-
-                  {item.locationName && (
-                    <div className="mt-1">
-                      {item.googleMapsUrl ? (
-                        <a
-                          href={item.googleMapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
-                        >
-                          {item.locationName}
-                        </a>
-                      ) : (
-                        <LocationTrigger
-                          locationId={item.locationId}
-                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
-                          showIcon={true}
-                          iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
-                        >
-                          {item.locationName}
-                        </LocationTrigger>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 2 to 3 key facts */}
-                  <ul className="mt-3.5 flex-1 space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600">
-                    {item.facts.map((fact, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gold-500 shrink-0" />
-                        <span>{fact}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {item.healthCardNote && (
-                    <p className="mt-3 rounded-lg bg-amber-50/80 border border-amber-200/60 p-2.5 text-[11px] text-amber-900 leading-tight">
-                      {item.healthCardNote}
-                    </p>
-                  )}
-
-                  {/* Price */}
-                  <div className="mt-5 flex items-baseline justify-between border-t border-slate-100 pt-3">
-                    <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Rate</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-display text-2xl font-bold text-navy-900">{item.priceDisplay}</span>
-                      {item.priceUnit && <span className="text-xs text-slate-500">{item.priceUnit}</span>}
-                    </div>
+          <div
+            className={
+              cardItems.length === 1
+                ? 'mt-6 flex justify-center'
+                : normService === 'halls'
+                  ? 'mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                  : 'mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'
+            }
+          >
+            {cardItems.map((item) => {
+              const isCompact = normService === 'halls';
+              return (
+                <article
+                  key={item.id}
+                  className={`group flex flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm ${
+                    cardItems.length === 1 ? 'w-full max-w-md' : ''
+                  }`}
+                >
+                  <div className={`${isCompact ? 'h-36 sm:h-40' : 'h-48'} overflow-hidden bg-slate-100`}>
+                    <SmartImage
+                      image={item.image}
+                      aspect={isCompact ? '16 / 9' : '16 / 10'}
+                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
                   </div>
+                  <div className={`flex flex-1 flex-col ${isCompact ? 'p-4 sm:p-5' : 'p-5 sm:p-6'}`}>
+                    <h3 className={`font-display ${isCompact ? 'text-lg' : 'text-xl'} font-bold text-navy-900`}>
+                      {item.name}
+                    </h3>
 
-                  {/* Gold Button */}
-                  <div className="mt-5 pt-1">
-                    <Link
-                      to={item.to}
-                      onClick={(e) => handleActionClick(e, item.to)}
-                      className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
+                    {item.subtitle && (
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
+                    )}
+
+                    {item.locationName && (
+                      <div className="mt-1">
+                        {item.googleMapsUrl ? (
+                          <a
+                            href={item.googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                          >
+                            {item.locationName}
+                          </a>
+                        ) : (
+                          <LocationTrigger
+                            locationId={item.locationId}
+                            className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                            showIcon={true}
+                            iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                          >
+                            {item.locationName}
+                          </LocationTrigger>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 2 to 3 key facts */}
+                    <ul
+                      className={`${
+                        isCompact ? 'mt-2.5 space-y-1.5 pt-2' : 'mt-3.5 space-y-2 pt-3'
+                      } flex-1 border-t border-slate-100 text-xs text-slate-600`}
                     >
-                      {item.buttonLabel}
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </Link>
+                      {item.facts.map((fact, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gold-500 shrink-0" />
+                          <span>{fact}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {item.healthCardNote && (
+                      <p className="mt-3 rounded-lg bg-amber-50/80 border border-amber-200/60 p-2.5 text-[11px] text-amber-900 leading-tight">
+                        {item.healthCardNote}
+                      </p>
+                    )}
+
+                    {/* Price */}
+                    <div
+                      className={`${
+                        isCompact ? 'mt-3 pt-2' : 'mt-5 pt-3'
+                      } flex items-baseline justify-between border-t border-slate-100`}
+                    >
+                      <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Rate</span>
+                      <div className="flex items-baseline gap-1">
+                        <span
+                          className={`font-display ${
+                            isCompact ? 'text-xl' : 'text-2xl'
+                          } font-bold text-navy-900`}
+                        >
+                          {item.priceDisplay}
+                        </span>
+                        {item.priceUnit && <span className="text-xs text-slate-500">{item.priceUnit}</span>}
+                      </div>
+                    </div>
+
+                    {/* Gold Button */}
+                    <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
+                      <Link
+                        to={item.to}
+                        onClick={(e) => handleActionClick(e, item.to)}
+                        className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
+                          isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
+                        } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
+                      >
+                        {item.buttonLabel}
+                        <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>

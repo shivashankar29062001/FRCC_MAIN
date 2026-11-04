@@ -126,11 +126,7 @@ export function EventDetailPage() {
               <span className={`tag ${badgeClass} !text-xs !py-1 !px-3 font-semibold shadow`}>
                 {getCategoryLabel(event.category)}
               </span>
-              {event.isSample && (
-                <span className="rounded-full bg-slate-900/80 px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase text-slate-200 backdrop-blur border border-white/20">
-                  Sample Event
-                </span>
-              )}
+              
             </div>
             <h1 className="font-display text-2xl sm:text-4xl font-bold text-white max-w-3xl leading-tight">
               {event.title}
