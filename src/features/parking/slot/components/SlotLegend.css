@@ -23,47 +23,39 @@
 }
 
 .slot-legend-indicator {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  font-size: 11px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .slot-legend-available {
-  background: #F0FDF4;
-  border: 1px solid #86EFAC;
-  color: #166534;
-}
-
-.slot-legend-available svg {
-  width: 14px;
-  height: 14px;
+  background: #FFFFFF;
+  border: 1.5px solid #D1D5DB;
 }
 
 .slot-legend-selected {
-  background: #DCFCE7;
-  border: 1px solid #4ADE80;
-  color: #166534;
-}
-
-.slot-legend-selected svg {
-  width: 14px;
-  height: 14px;
+  background: #22C55E;
+  border: 1.5px solid #16A34A;
 }
 
 .slot-legend-booked {
-  background: #FEE2E2;
-  border: 1px solid #FCA5A5;
+  background: #FECACA;
+  border: 1.5px solid #EF4444;
   color: #991B1B;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.slot-legend-booked svg {
-  width: 14px;
-  height: 14px;
+.slot-legend-car {
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Responsive */
@@ -75,8 +67,7 @@
   }
   
   .slot-legend-indicator {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
+    width: 18px;
+    height: 18px;
   }
 }

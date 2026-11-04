@@ -226,6 +226,51 @@
   z-index: 1;
 }
 
+/* Proceed to slots button inside Date & Time card */
+.date-time-actions-row {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-proceed-slots {
+  background-color: #0B1833;
+  color: #FFFFFF;
+  border: 1px solid #0B1833;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-proceed-slots:hover:not(:disabled) {
+  background-color: #1E3A8A;
+  border-color: #1E3A8A;
+  box-shadow: 0 2px 6px rgba(11, 24, 51, 0.15);
+}
+
+.btn-proceed-slots:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hint banner above slot grid when date/time not yet picked */
+.slot-selection-hint-banner {
+  background: #F0F7FF;
+  border: 1px solid #BAE6FD;
+  color: #0369A1;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
 /* 3. Full-width Card: Vehicle Details */
 .vehicle-details-card {
   width: 100%;

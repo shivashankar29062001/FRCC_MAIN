@@ -226,16 +226,18 @@ export function ServiceHero({ service = 'stay' }) {
                   headlineDone ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
               >
-                <div className="landing-hero-stat-row">
-                  <span className="landing-hero-stat-number">{MEMBER_DISCOUNT_PERCENT}%</span>
-                  <div className="landing-hero-stat-divider" aria-hidden="true" />
-                  <div className="flex flex-col justify-center">
-                    <span className="landing-hero-stat-title">Member savings</span>
-                    <span className="landing-hero-stat-subtitle">{data.statSuffix || 'on every stay'}</span>
+                {service !== 'parking' && (
+                  <div className="landing-hero-stat-row">
+                    <span className="landing-hero-stat-number">{MEMBER_DISCOUNT_PERCENT}%</span>
+                    <div className="landing-hero-stat-divider" aria-hidden="true" />
+                    <div className="flex flex-col justify-center">
+                      <span className="landing-hero-stat-title">Member savings</span>
+                      <span className="landing-hero-stat-subtitle">{data.statSuffix || 'on every stay'}</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="mt-[18px]">
+                <div className={service === 'parking' ? 'mt-7' : 'mt-[18px]'}>
                   <Link
                     to={data.to || data.linkTarget || '#content'}
                     onClick={handleExplore}

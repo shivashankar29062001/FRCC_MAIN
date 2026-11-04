@@ -26,6 +26,7 @@ export default function BookingForm({
   amount = 40,
   numberOfDays = 1,
   onConfirmBooking,
+  onProceedToSlots,
   isSubmitting = false
 }) {
   const handleInputChange = (field, value) => {
@@ -129,6 +130,7 @@ export default function BookingForm({
                     className={`form-input date-picker-field ${errors.date ? 'input-error' : ''}`}
                     value={formData.date || ''}
                     min={todayStr}
+                    placeholder="DD-MM-YYYY"
                     onChange={(e) => handleInputChange('date', e.target.value)}
                     disabled={isSubmitting}
                     aria-invalid={Boolean(errors.date)}
@@ -153,6 +155,7 @@ export default function BookingForm({
                     id="booking-time-input"
                     className={`form-input ${errors.time ? 'input-error' : ''}`}
                     value={formData.time || ''}
+                    placeholder="HH:MM"
                     onChange={(e) => handleInputChange('time', e.target.value)}
                     disabled={isSubmitting}
                     aria-invalid={Boolean(errors.time)}
@@ -179,8 +182,10 @@ export default function BookingForm({
                   value={formData.days || ''}
                   onChange={(e) => handleInputChange('days', e.target.value ? Number(e.target.value) : '')}
                   disabled={isSubmitting}
+                  aria-invalid={Boolean(errors.days)}
+                  aria-describedby={errors.days ? 'booking-days-error' : undefined}
                 >
-                  <option value="">Select Duration</option>
+                  <option value="">Select Number of Days</option>
                   <option value="1">1 Day</option>
                   <option value="2">2 Days</option>
                   <option value="3">3 Days</option>
@@ -190,7 +195,22 @@ export default function BookingForm({
                   <option value="7">7 Days</option>
                 </select>
               </div>
-              {errors.days && <span className="field-error-text">{errors.days}</span>}
+              {errors.days && (
+                <span id="booking-days-error" className="field-error-text">
+                  {errors.days}
+                </span>
+              )}
+            </div>
+
+            <div className="date-time-actions-row">
+              <button
+                type="button"
+                className="btn-proceed-slots"
+                onClick={onProceedToSlots}
+                disabled={isSubmitting}
+              >
+                Proceed to Slot Selection
+              </button>
             </div>
           </div>
         </div>
@@ -200,6 +220,12 @@ export default function BookingForm({
       <div className="slot-legend-wrapper" id="parking-slot-legend">
         <SlotLegend />
       </div>
+
+      {(!formData.date || !formData.time || !formData.days) && (
+        <div className="slot-selection-hint-banner" role="status">
+          <span>Please select <strong>Booking Date</strong>, <strong>Booking Time</strong>, and <strong>No. of Days</strong> to choose a parking slot.</span>
+        </div>
+      )}
 
       {/* ROW 2: THREE PARKING BLOCKS (A, B, C) SIDE BY SIDE */}
       <div className="booking-row-2-grid" id="parking-slot-selection-card">
@@ -348,7 +374,7 @@ export default function BookingForm({
             type="button"
             className="btn-confirm-booking-wide"
             onClick={onConfirmBooking}
-            disabled={isSubmitting || !isVehicleValid}
+            disabled={isSubmitting}
           >
             {isSubmitting ? 'Processing...' : 'Confirm Booking'}
           </button>

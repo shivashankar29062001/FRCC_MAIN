@@ -7,19 +7,19 @@
   --header-bg: #EAF3FF;
   --header-border: #BFDBFE;
   --icon-color: #1E40AF;
-  --slot-available-bg: #F0FDF4;
-  --slot-available-border: #BBF7D0;
-  --slot-available-text: #166534;
-  --slot-available-hover-bg: #DCFCE7;
-  --slot-available-hover-border: #86EFAC;
-  --slot-selected-bg: #DCFCE7;
-  --slot-selected-border: #4ADE80;
-  --slot-selected-text: #166534;
-  --slot-selected-hover-bg: #BBF7D0;
-  --slot-selected-hover-border: #4ADE80;
-  --slot-booked-bg: #FEE2E2;
-  --slot-booked-border: #F87171;
-  --slot-booked-text: #B91C1C;
+  --slot-available-bg: #FFFFFF;
+  --slot-available-border: #D1D5DB;
+  --slot-available-text: #0B1833;
+  --slot-available-hover-bg: #F9FAFB;
+  --slot-available-hover-border: #9CA3AF;
+  --slot-selected-bg: #22C55E;
+  --slot-selected-border: #16A34A;
+  --slot-selected-text: #FFFFFF;
+  --slot-selected-hover-bg: #16A34A;
+  --slot-selected-hover-border: #15803D;
+  --slot-booked-bg: #FECACA;
+  --slot-booked-border: #EF4444;
+  --slot-booked-text: #991B1B;
 }
 
 /* Block B - Lavender */
@@ -163,53 +163,12 @@
   align-items: center;
   justify-content: center;
   z-index: 1;
-}
-
-/* Booked slot content - vertical stack: car icon on top, label below */
-.slot-booked-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 100%;
-  height: 100%;
-}
-
-.slot-booked-icon {
-  color: var(--slot-booked-text);
-  flex-shrink: 0;
-}
-
-.slot-booked-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--slot-booked-text);
   line-height: 1;
-  white-space: nowrap;
 }
 
-/* Checkmark for selected slot */
-.slot-checkmark {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%) scale(0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #166534;
-  opacity: 0;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 2;
-}
-
-.slot-grid-btn.slot-btn-selected .slot-checkmark {
-  transform: translateY(-50%) scale(1);
-  opacity: 1;
-}
-
-/* Available slots: pale green */
+/* Available slots: clean white (#FFFFFF) with subtle grey border (#D1D5DB) */
 .slot-grid-btn.slot-btn-available {
   background: var(--slot-available-bg);
   border-color: var(--slot-available-border);
@@ -220,61 +179,88 @@
   background: var(--slot-available-hover-bg);
   border-color: var(--slot-available-hover-border);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.12);
+  box-shadow: 0 2px 6px rgba(11, 24, 51, 0.08);
 }
 
 .slot-grid-btn.slot-btn-available:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
 }
 
-/* Selected slot: stronger green with checkmark */
+/* Selected slot: vivid green (#22C55E) with dark green border (#16A34A) and white text */
 .slot-grid-btn.slot-btn-selected {
   background: var(--slot-selected-bg);
   border-color: var(--slot-selected-border);
   color: var(--slot-selected-text);
-  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.2);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
 }
 
 .slot-grid-btn.slot-btn-selected:hover:not(:disabled) {
   background: var(--slot-selected-hover-bg);
   border-color: var(--slot-selected-hover-border);
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.25);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
 }
 
 .slot-grid-btn.slot-btn-selected:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
 }
 
-/* Successfully booked slot: pale red */
+/* Booked slot: light red (#FECACA) with darker red border (#EF4444) and dark red text (#991B1B) */
 .slot-grid-btn.slot-btn-booked {
   background: var(--slot-booked-bg);
   border-color: var(--slot-booked-border);
   color: var(--slot-booked-text);
   cursor: not-allowed;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .slot-grid-btn.slot-btn-booked:hover {
   background: var(--slot-booked-bg);
   border-color: var(--slot-booked-border);
+  cursor: not-allowed;
+}
+
+/* Booked slot content: centered car symbol on top, slot number below */
+.slot-booked-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  height: 100%;
+}
+
+.slot-booked-car {
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-booked-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--slot-booked-text);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* Disabled state */
 .slot-grid-btn:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
 }
 
 /* Animation for slot selection */
 @keyframes slotSelectPulse {
-  0% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(22, 101, 52, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
+  70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
 
 .slot-grid-btn.slot-btn-selected {
-  animation: slotSelectPulse 0.4s ease-out;
+  animation: slotSelectPulse 0.35s ease-out;
 }
 
 /* Custom Scrollbar Styles */
