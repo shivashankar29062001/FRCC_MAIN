@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // /src/data/parking.js — FRCC Parking Areas & Zones Data
-// Locations: Vijayawada and Hyderabad
+// Independent Campuses: Vijayawada and Hyderabad
 // ---------------------------------------------------------------------------
 
 export const areas = [
@@ -9,59 +9,22 @@ export const areas = [
 ];
 
 export const zones = [
-  // --- Vijayawada Zones ---
+  // --- Vijayawada Campus ---
   {
     id: 'vja-multi-level',
     areaId: 'vja',
-    locationId: 'vja',
+    campus_id: 'vja',
+    zone_id: 'vja-multi-level',
+    locationId: 'vja-parking',
     name: 'Multi-Level Parking - Vijayawada',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
+    subtitle: 'Vijayawada Campus',
+    spots: 150,
+    vehicleTypes: ['CAR', 'BIKE'],
+    isFree: true,
     price: 0,
-    spots: 150, // FIXED: was 340
     prices: { hour: 0, day: 0, month: 0 },
     description: '4-level automated parking facility with EV charging and complimentary club parking',
     features: ['Complimentary Parking', 'EV Charging (20 points)', 'Car Wash', 'CCTV', 'ANPR Entry', 'App Booking'],
-    operatingHours: '24x7',
-    paymentMethods: ['Complimentary Pass'],
-    monthlyPass: { car: 0, bike: 0 },
-    vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-    },
-  },
-  {
-    id: 'vja-riverfront',
-    areaId: 'vja',
-    locationId: 'vja',
-    name: 'Riverfront Parking - Vijayawada',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
-    price: 0,
-    spots: 150, // FIXED: was 180
-    prices: { hour: 0, day: 0, month: 0 },
-    description: 'Open surface parking with Krishna River views and direct walkway to campus',
-    features: ['Complimentary Parking', 'River View', 'Solar Canopy (50%)', 'CCTV', 'Walking Trail'],
-    operatingHours: '6 AM - 10 PM',
-    paymentMethods: ['Complimentary Pass'],
-    monthlyPass: { car: 0, bike: 0 },
-    vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-    },
-  },
-  {
-    id: 'vja-city-center',
-    areaId: 'vja',
-    locationId: 'vja',
-    name: 'City Center Basement - Vijayawada',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
-    price: 0,
-    spots: 150, // FIXED: was 130
-    prices: { hour: 0, day: 0, month: 0 },
-    description: 'Convenient basement parking with EV points and 24/7 security',
-    features: ['Complimentary Parking', 'Direct Campus Access', 'CCTV', 'EV Charging (8 points)', '24/7 Security'],
     operatingHours: '24x7',
     paymentMethods: ['Complimentary Pass'],
     monthlyPass: { car: 0, bike: 0 },
@@ -71,59 +34,22 @@ export const zones = [
     },
   },
 
-  // --- Hyderabad Zones ---
+  // --- Hyderabad Campus ---
   {
     id: 'hyd-multi-level',
     areaId: 'hyd',
-    locationId: 'hyd',
+    campus_id: 'hyd',
+    zone_id: 'hyd-multi-level',
+    locationId: 'hyd-parking',
     name: 'Multi-Level Parking - Hyderabad',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
+    subtitle: 'Hyderabad Campus',
+    spots: 150,
+    vehicleTypes: ['CAR', 'BIKE'],
+    isFree: true,
     price: 0,
-    spots: 150, // NEW: 150 slots
     prices: { hour: 0, day: 0, month: 0 },
     description: '4-level automated parking facility with EV charging and complimentary club parking',
     features: ['Complimentary Parking', 'EV Charging (20 points)', 'Car Wash', 'CCTV', 'ANPR Entry', 'App Booking'],
-    operatingHours: '24x7',
-    paymentMethods: ['Complimentary Pass'],
-    monthlyPass: { car: 0, bike: 0 },
-    vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-    },
-  },
-  {
-    id: 'hyd-riverfront',
-    areaId: 'hyd',
-    locationId: 'hyd',
-    name: 'Riverfront Parking - Hyderabad',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
-    price: 0,
-    spots: 150, // NEW: 150 slots
-    prices: { hour: 0, day: 0, month: 0 },
-    description: 'Open surface parking with scenic views and direct walkway to campus',
-    features: ['Complimentary Parking', 'River View', 'Solar Canopy (50%)', 'CCTV', 'Walking Trail'],
-    operatingHours: '6 AM - 10 PM',
-    paymentMethods: ['Complimentary Pass'],
-    monthlyPass: { car: 0, bike: 0 },
-    vehicleTypeDetails: {
-      car: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-      bike: { pricePerHour: 0, pricePerDay: 0, totalSlots: 150, available: 150 },
-    },
-  },
-  {
-    id: 'hyd-city-center',
-    areaId: 'hyd',
-    locationId: 'hyd',
-    name: 'City Center Basement - Hyderabad',
-    vehicleTypes: ['car', 'bike'],
-    isFree: true, // Client: every zone price 0, isFree true
-    price: 0,
-    spots: 150, // NEW: 150 slots
-    prices: { hour: 0, day: 0, month: 0 },
-    description: 'Convenient basement parking with EV points and 24/7 security',
-    features: ['Complimentary Parking', 'Direct Campus Access', 'CCTV', 'EV Charging (8 points)', '24/7 Security'],
     operatingHours: '24x7',
     paymentMethods: ['Complimentary Pass'],
     monthlyPass: { car: 0, bike: 0 },
@@ -137,15 +63,15 @@ export const zones = [
 export const PARKING_ZONES = zones;
 
 export function getParkingByArea(areaId) {
-  return zones.filter((z) => z.areaId === areaId || z.locationId === areaId);
+  return zones.filter((z) => z.areaId === areaId || z.campus_id === areaId || z.locationId === areaId);
 }
 
 export function getParkingByLocation(locationId) {
-  return zones.filter((z) => z.locationId === locationId || z.areaId === locationId);
+  return zones.filter((z) => z.locationId === locationId || z.areaId === locationId || z.campus_id === locationId);
 }
 
 export function getParkingZoneById(id) {
-  return zones.find((z) => z.id === id);
+  return zones.find((z) => z.id === id || z.zone_id === id);
 }
 
 export default {

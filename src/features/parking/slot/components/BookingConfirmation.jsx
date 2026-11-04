@@ -135,6 +135,12 @@ export default function BookingConfirmation({
       value: booking.city || 'Not specified'
     },
     {
+      key: 'campus',
+      label: 'Campus',
+      icon: <MapPin size={15} />,
+      value: booking.campusName || (booking.city === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus')
+    },
+    {
       key: 'date',
       label: 'Booking Date',
       icon: <Calendar size={15} />,

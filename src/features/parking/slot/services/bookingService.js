@@ -111,6 +111,9 @@ export function createBooking({
   bookingReference,
   userId = null,
   user_id = null,
+  campus_id = 'vja',
+  zone_id = null,
+  campusName = '',
   parkingSlot,
   vehicleType,
   vehicleNumber,
@@ -130,6 +133,10 @@ export function createBooking({
     ? PAYMENT_STATUS_CODE.PENDING_AT_VENUE
     : PAYMENT_STATUS_CODE.PAID;
 
+  const effectiveCampus = campus_id || (city === 'Hyderabad' ? 'hyd' : 'vja');
+  const effectiveCity = city || (effectiveCampus === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+  const effectiveCampusName = campusName || (effectiveCity === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus');
+
   return {
     // Reference (bookingId kept for backward compatibility with older views)
     bookingReference: reference,
@@ -137,14 +144,21 @@ export function createBooking({
     userId: userId || user_id || null,
     user_id: user_id || userId || null,
 
+    // Campus & Zone identification (strictly separated per campus)
+    campus_id: effectiveCampus,
+    zone_id: zone_id || (effectiveCampus === 'hyd' ? 'hyd-multi-level' : 'vja-multi-level'),
+    campusName: effectiveCampusName,
+    location_id: effectiveCampus,
+
     // Slot & vehicle
     parkingSlot,
+    slot_id: parkingSlot,
     vehicleType,
     vehicleNumber,
     vehicleModel,
 
     // Location & schedule
-    city: city || '',
+    city: effectiveCity,
     numberOfDays,
     pricePerDay,
     totalAmount: pricePerDay * numberOfDays,
@@ -224,12 +238,15 @@ export async function submitBookingToSupabase(booking) {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
+    const campusId = booking.campus_id || (booking.city === 'Hyderabad' ? 'hyd' : 'vja');
+    const effectiveCity = booking.city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
 
     const payload = {
       booking_reference: booking.bookingReference || booking.bookingId,
       user_id: userId,
       slot_id: booking.parkingSlot,
-      city: booking.city || 'Vijayawada',
+      location_id: campusId,
+      city: effectiveCity,
       booking_date: booking.bookingDateISO || new Date().toISOString().split('T')[0],
       arrival_time: booking.arrivalTime || '09:00',
       duration_days: booking.numberOfDays || 1,
@@ -250,7 +267,7 @@ export async function submitBookingToSupabase(booking) {
       .maybeSingle();
 
     if (error) {
-      console.warn('[parkingService] Supabase insert warning (schema may need migration):', error.message);
+      console.warn('[parkingService] Supabase insert warning:', error.message);
     }
     return { ok: true, data };
   } catch (err) {
@@ -260,21 +277,53 @@ export async function submitBookingToSupabase(booking) {
 }
 
 /**
- * Fetch occupied slots for a given date from Supabase
+ * Fetch occupied slots for a given date and campus from Supabase
+ * Strictly filters by campus/city to prevent cross-campus interference.
  */
-export async function fetchBookedSlotsFromSupabase(date) {
+export async function fetchBookedSlotsFromSupabase(date, campusId, city) {
   try {
+    const effectiveCity = city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+
     const { data, error } = await supabase
       .from('parking_bookings')
-      .select('slot_id')
+      .select('slot_id, city, location_id')
       .eq('booking_date', date)
-      .eq('booking_status', 'CONFIRMED');
+      .eq('booking_status', 'CONFIRMED')
+      .eq('city', effectiveCity);
 
     if (!error && Array.isArray(data)) {
       return data.map((b) => b.slot_id);
     }
   } catch (_) {}
   return [];
+}
+
+/**
+ * Cancels a parking booking in Supabase
+ */
+export async function cancelBookingInSupabase(booking) {
+  try {
+    const reference = booking.bookingReference || booking.bookingId;
+    const campusId = booking.campus_id || (booking.city === 'Hyderabad' ? 'hyd' : 'vja');
+    const effectiveCity = booking.city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+
+    const { data, error } = await supabase
+      .from('parking_bookings')
+      .update({
+        booking_status: 'CANCELLED',
+        updated_at: new Date().toISOString()
+      })
+      .eq('booking_reference', reference)
+      .eq('city', effectiveCity);
+
+    if (error) {
+      console.warn('[parkingService] Supabase cancel error:', error.message);
+    }
+    return { ok: !error, data };
+  } catch (err) {
+    console.warn('[parkingService] Supabase cancel catch:', err);
+    return { ok: false };
+  }
 }
 
 /**
@@ -369,6 +418,7 @@ export function buildAdminCancellationPayload(booking) {
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 export async function cancelBookingToAdmin(booking) {
+  await cancelBookingInSupabase(booking);
   if (!isBookingCancelApiConfigured()) {
     // Frontend-only mode: nothing to call, and we never pretend the
     // dashboard was updated.

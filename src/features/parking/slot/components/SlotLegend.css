@@ -16,7 +16,7 @@
 .slot-legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-weight: 500;
   color: #334155;
   white-space: nowrap;
@@ -26,44 +26,44 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   font-size: 11px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
+/* Available: White background with light grey border */
 .slot-legend-available {
-  background: #F0FDF4;
-  border: 1px solid #86EFAC;
-  color: #166534;
+  background: #FFFFFF;
+  border: 1.5px solid #D1D5DB;
 }
 
-.slot-legend-available svg {
-  width: 14px;
-  height: 14px;
-}
-
+/* Selected: Green background with white checkmark */
 .slot-legend-selected {
-  background: #DCFCE7;
-  border: 1px solid #4ADE80;
-  color: #166534;
+  background: #16A34A;
+  border: 1.5px solid #15803D;
+  color: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(22, 163, 74, 0.3);
 }
 
 .slot-legend-selected svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
+  stroke: #FFFFFF;
 }
 
+/* Booked: Red background with existing red car icon */
 .slot-legend-booked {
   background: #FEE2E2;
-  border: 1px solid #FCA5A5;
+  border: 1.5px solid #FCA5A5;
   color: #991B1B;
 }
 
 .slot-legend-booked svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 /* Responsive */
@@ -75,8 +75,8 @@
   }
   
   .slot-legend-indicator {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     font-size: 10px;
   }
 }

@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
 // /src/features/parking/slot/ParkingBookingPage.jsx
 // The FRCC Parking Slot team's booking flow, merged into FRCC_MAIN as the
-// parking booking page (/book/parking). Self-contained: its own stepper,
-// slot grid (Blocks A–C, slots 01–50), vehicle details, review and
-// confirmation — all styled by ./ParkingBookingPage.css and ./components/*.
+// parking booking page (/parking/book & /book/parking). Self-contained: its own 5-step stepper,
+// independent campus slot grid (Blocks A–C, slots 01–50 per campus), vehicle details,
+// schedule, review/payment and confirmation.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../../app/store/AppContext.jsx';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
@@ -37,6 +38,7 @@ const generateInitialSlots = () => {
 
 const INITIAL_SLOTS = generateInitialSlots();
 
+const PARKING_CAMPUS_STORAGE_KEY = 'frcc_parking_selected_campus';
 const BASE_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc_parking_confirmed_bookings_v1';
 const LEGACY_CONFIRMED_BOOKINGS_STORAGE_KEY = 'frcc:confirmedBookings';
 
@@ -86,19 +88,63 @@ const updateRetainedBookingStatus = (booking, userId = null) => {
   }
 };
 
-const STEP_CITY = 1;
-const STEP_DATE_TIME = 2;
-const STEP_SLOT = 3;
-const STEP_VEHICLE = 4;
-const STEP_PAYMENT = 5;
-const STEP_CONFIRMATION = 6;
+const getInitialCampusInfo = (searchParams) => {
+  const paramCampus = searchParams ? (searchParams.get('campus') || searchParams.get('campus_id')) : null;
+  const paramCity = searchParams ? searchParams.get('city') : null;
+
+  if (paramCampus) {
+    const campusId = paramCampus.toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+    const city = campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada';
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(PARKING_CAMPUS_STORAGE_KEY, JSON.stringify({ campusId, city }));
+      }
+    } catch (_) {}
+    return { campusId, city };
+  }
+
+  if (paramCity) {
+    const campusId = paramCity.toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+    const city = campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada';
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(PARKING_CAMPUS_STORAGE_KEY, JSON.stringify({ campusId, city }));
+      }
+    } catch (_) {}
+    return { campusId, city };
+  }
+
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const saved = window.sessionStorage.getItem(PARKING_CAMPUS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.campusId && parsed?.city) return parsed;
+      }
+    }
+  } catch (_) {}
+
+  return { campusId: 'vja', city: 'Vijayawada' };
+};
+
+// 5 Active Workflow Steps as requested
+const STEP_VEHICLE = 1;
+const STEP_SLOT = 2;
+const STEP_SCHEDULE = 3;
+const STEP_PAYMENT = 4;
+const STEP_CONFIRMATION = 5;
 
 export default function ParkingBookingPage() {
-  const { user } = useApp();
+  const { user, pushToast } = useApp();
+  const [searchParams] = useSearchParams();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
+  const initialCampus = useMemo(() => getInitialCampusInfo(searchParams), []);
+  const [campusInfo, setCampusInfo] = useState(initialCampus);
+
   const [formData, setFormData] = useState({
-    city: '',
+    city: initialCampus.city,
+    campus_id: initialCampus.campusId,
     date: '',
     time: '',
     days: '',
@@ -106,24 +152,40 @@ export default function ParkingBookingPage() {
     vehicleNumber: ''
   });
 
-// Slot statuses tracked independently per city (Vijayawada and Hyderabad).
-// Each city has its own 150-slot inventory (Blocks A-C, slots 01-50).
-const [slotStatuses, setSlotStatuses] = useState(() => ({
-  vja: generateInitialSlots(),
-  hyd: generateInitialSlots(),
-}));
+  // Track searchParams changes if URL changes while on page
+  useEffect(() => {
+    const paramCampus = searchParams.get('campus') || searchParams.get('campus_id');
+    const paramCity = searchParams.get('city');
+    if (paramCampus || paramCity) {
+      const info = getInitialCampusInfo(searchParams);
+      setCampusInfo(info);
+      setFormData((prev) => ({
+        ...prev,
+        city: info.city,
+        campus_id: info.campusId
+      }));
+    }
+  }, [searchParams]);
 
-// Derive the currently displayed slots based on the selected city.
-// Defaults to Vijayawada ('vja') when the city is unspecified.
-const slots = useMemo(
-  () => {
-    const cityKey = formData.city === 'Vijayawada' ? 'vja' : formData.city === 'Hyderabad' ? 'hyd' : 'vja';
-    return slotStatuses[cityKey];
-  },
-  [slotStatuses, formData.city]
-);
-const [selectedSlot, setSelectedSlot] = useState(null);
-  const [step, setStep] = useState(STEP_CITY);
+  // Slot statuses tracked independently per campus (Vijayawada and Hyderabad).
+  // Each campus has its own 150-slot inventory (Blocks A-C, slots 01-50).
+  const [slotStatuses, setSlotStatuses] = useState(() => ({
+    vja: generateInitialSlots(),
+    hyd: generateInitialSlots(),
+  }));
+
+  const effectiveCampus = (formData.campus_id || campusInfo.campusId || 'vja').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+  const effectiveCity = effectiveCampus === 'hyd' ? 'Hyderabad' : 'Vijayawada';
+  const effectiveCampusName = effectiveCampus === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus';
+
+  // Derive the currently displayed slots based on the selected campus.
+  const slots = useMemo(
+    () => slotStatuses[effectiveCampus] || slotStatuses.vja,
+    [slotStatuses, effectiveCampus]
+  );
+
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [step, setStep] = useState(STEP_VEHICLE);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,59 +205,59 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       const matches = user?.id && (confirmedBooking.userId === user.id || confirmedBooking.user_id === user.id || confirmedBooking.userId === user.userId);
       if (!matches) {
         setConfirmedBooking(null);
-        setStep(STEP_CITY);
+        setStep(STEP_VEHICLE);
       }
     }
   }, [user?.id, user?.userId, confirmedBooking]);
 
-  // Auto-advance step based on form completion
+  // Advance / track stepper progress reactively based on completed steps
   useEffect(() => {
-    if (step === STEP_CITY && formData.city && formData.city.trim()) {
-      setStep(STEP_DATE_TIME);
-    }
-  }, [formData.city, step]);
-
-  useEffect(() => {
-    if (step === STEP_DATE_TIME && formData.date && formData.date.trim() && formData.time && formData.time.trim() && formData.days) {
-      setStep(STEP_SLOT);
-    }
-  }, [formData.date, formData.time, formData.days, step]);
-
-  // Synchronize slot occupancy dynamically from Supabase
-  useEffect(() => {
-    if (formData.date) {
-      fetchBookedSlotsFromSupabase(formData.date).then((bookedIds) => {
-        if (bookedIds && bookedIds.length > 0) {
-          const bookedSet = new Set(bookedIds);
-          setSlots(INITIAL_SLOTS.map((s) => ({
-            ...s,
-            status: bookedSet.has(s.id) ? 'booked' : 'available',
-          })));
-        } else {
-          setSlots(INITIAL_SLOTS);
-        }
-      });
-    }
-  }, [formData.date]);
-
-  useEffect(() => {
-    if (step === STEP_SLOT && selectedSlot) {
+    if (confirmedBooking) {
+      setStep(STEP_CONFIRMATION);
+    } else if (!formData.vehicleType || !formData.vehicleNumber || formData.vehicleNumber.trim().length < 4) {
       setStep(STEP_VEHICLE);
-    }
-  }, [selectedSlot, step]);
-
-  useEffect(() => {
-    if (step === STEP_VEHICLE && formData.vehicleType && formData.vehicleNumber && formData.vehicleNumber.trim().length >= 4) {
+    } else if (!selectedSlot) {
+      setStep(STEP_SLOT);
+    } else if (!formData.date || !formData.time || !formData.days) {
+      setStep(STEP_SCHEDULE);
+    } else {
       setStep(STEP_PAYMENT);
     }
-  }, [formData.vehicleType, formData.vehicleNumber, step]);
+  }, [
+    confirmedBooking,
+    formData.vehicleType,
+    formData.vehicleNumber,
+    selectedSlot,
+    formData.date,
+    formData.time,
+    formData.days
+  ]);
 
-  // Clear selected slot when the city changes, since the slot inventory
-  // is independent per campus. The previously selected slot belongs to
-  // the old city and must not interfere with the new city's inventory.
+  // Synchronize slot occupancy dynamically from Supabase for the selected campus and date
+  useEffect(() => {
+    if (formData.date) {
+      fetchBookedSlotsFromSupabase(formData.date, effectiveCampus, effectiveCity).then((bookedIds) => {
+        setSlotStatuses((prev) => {
+          const bookedSet = new Set(bookedIds || []);
+          const baseSlots = generateInitialSlots();
+          const updated = baseSlots.map((s) => ({
+            ...s,
+            status: bookedSet.has(s.id) ? 'booked' : 'available'
+          }));
+          return {
+            ...prev,
+            [effectiveCampus]: updated
+          };
+        });
+      });
+    }
+  }, [formData.date, effectiveCampus, effectiveCity]);
+
+  // Clear selected slot when switching campus, since the slot inventory
+  // is strictly independent per campus.
   useEffect(() => {
     setSelectedSlot(null);
-  }, [formData.city]);
+  }, [effectiveCampus]);
 
   const pricePerDay =
     formData.vehicleType === 'Two Wheeler'
@@ -235,22 +297,6 @@ const [selectedSlot, setSelectedSlot] = useState(null);
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.city || !formData.city.trim()) {
-      newErrors.city = 'Please select a city.';
-    }
-
-    if (!formData.date || !formData.date.trim()) {
-      newErrors.date = 'Please select a booking date.';
-    }
-
-    if (!formData.time || !formData.time.trim()) {
-      newErrors.time = 'Please select a booking arrival time.';
-    }
-
-    if (!selectedSlot) {
-      newErrors.slot = 'Please select an available parking slot from A01 to C50.';
-    }
-
     if (!formData.vehicleType) {
       newErrors.vehicleType = 'Please select Two Wheeler or Four Wheeler.';
     }
@@ -270,6 +316,18 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       }
     }
 
+    if (!selectedSlot) {
+      newErrors.slot = 'Please select an available parking slot from A01 to C50.';
+    }
+
+    if (!formData.date || !formData.date.trim()) {
+      newErrors.date = 'Please select a booking date.';
+    }
+
+    if (!formData.time || !formData.time.trim()) {
+      newErrors.time = 'Please select a booking arrival time.';
+    }
+
     if (!numberOfDays || numberOfDays < 1 || numberOfDays > 7) {
       newErrors.days = 'Please select the number of days (1 to 7).';
     }
@@ -278,17 +336,16 @@ const [selectedSlot, setSelectedSlot] = useState(null);
   };
 
   const commitConfirmedBooking = (booking) => {
+    const campusKey = (booking.campus_id || effectiveCampus).toLowerCase().includes('hyd') ? 'hyd' : 'vja';
+
     setSlotStatuses((prevStatuses) => {
-      // Map full city names to slotStatuses keys ('vja'/'hyd')
-      const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
-      const city = cityMap[booking.city || formData.city] || 'vja';
-      const cityStatuses = prevStatuses[city];
-      const updatedCityStatuses = cityStatuses.map(
+      const campusSlots = prevStatuses[campusKey] || [];
+      const updatedSlots = campusSlots.map(
         (s) => (s.id === booking.parkingSlot ? { ...s, status: 'booked' } : s)
       );
       return {
         ...prevStatuses,
-        [city]: updatedCityStatuses,
+        [campusKey]: updatedSlots,
       };
     });
 
@@ -299,8 +356,8 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     pendingBookingRef.current = null;
     setStep(STEP_CONFIRMATION);
 
-    // Show booking confirmation notification with user's contact details
-    if (!confirmedBooking && pushToast) {
+    // Show booking confirmation notification with user's dynamic contact details
+    if (typeof pushToast === 'function') {
       const { message } = getMaskedContactDetails(user, null, booking);
       pushToast(message);
     }
@@ -320,6 +377,11 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       bookingReference: generateBookingReference(),
       userId: user?.id || user?.userId || null,
       user_id: user?.id || null,
+      campus_id: effectiveCampus,
+      zone_id: effectiveCampus === 'hyd' ? 'hyd-multi-level' : 'vja-multi-level',
+      campusName: effectiveCampusName,
+      location_id: effectiveCampus,
+      city: effectiveCity,
       parkingSlot: selectedSlot,
       vehicleType: formData.vehicleType,
       vehicleNumber: formData.vehicleNumber.trim(),
@@ -329,7 +391,6 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       bookingTime: formData.time,
       paymentMethod: 'Demo',
       transactionId: transactionId || 'DEMO-TXN-' + Date.now(),
-      city: formData.city
     });
 
     pendingBookingRef.current = booking;
@@ -365,16 +426,14 @@ const [selectedSlot, setSelectedSlot] = useState(null);
       setErrors(validationErrors);
       const firstErrorKey = Object.keys(validationErrors)[0];
       let targetElement = null;
-      if (firstErrorKey === 'city') {
-        targetElement = document.getElementById('city-selection-card');
-      } else if (firstErrorKey === 'date' || firstErrorKey === 'time' || firstErrorKey === 'days') {
-        targetElement = document.getElementById('date-time-card');
-      } else if (firstErrorKey === 'slot') {
-        targetElement = document.getElementById('parking-slot-selection-card');
-      } else if (firstErrorKey === 'vehicleType') {
+      if (firstErrorKey === 'vehicleType') {
         targetElement = document.getElementById('vehicle-type-select');
       } else if (firstErrorKey === 'vehicleNumber') {
         targetElement = document.getElementById('vehicle-number');
+      } else if (firstErrorKey === 'slot') {
+        targetElement = document.getElementById('parking-slot-selection-card');
+      } else if (firstErrorKey === 'date' || firstErrorKey === 'time' || firstErrorKey === 'days') {
+        targetElement = document.getElementById('date-time-card');
       }
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -399,19 +458,17 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setIsCancelling(true);
 
     const booking = confirmedBooking;
-    // Map full city names to slotStatuses keys ('vja'/'hyd')
-    const cityMap = { Vijayawada: 'vja', Hyderabad: 'hyd' };
-    const city = cityMap[booking.city || formData.city] || 'vja';
+    const campusKey = (booking.campus_id || effectiveCampus).toLowerCase().includes('hyd') ? 'hyd' : 'vja';
     const releasedSlot = booking.parkingSlot;
 
     setSlotStatuses((prevStatuses) => {
-      const cityStatuses = prevStatuses[city];
-      const updatedCityStatuses = cityStatuses.map(
+      const campusSlots = prevStatuses[campusKey] || [];
+      const updatedCampusSlots = campusSlots.map(
         (s) => (s.id === releasedSlot ? { ...s, status: 'available' } : s)
       );
       return {
         ...prevStatuses,
-        [city]: updatedCityStatuses,
+        [campusKey]: updatedCampusSlots,
       };
     });
 
@@ -447,7 +504,8 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   const handleResetForm = () => {
     setFormData({
-      city: '',
+      city: effectiveCity,
+      campus_id: effectiveCampus,
       date: '',
       time: '',
       days: '',
@@ -464,7 +522,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
     setCancelSyncState({ status: 'idle', error: '' });
     setIsCancelling(false);
     cancelInFlightRef.current = false;
-    setStep(STEP_CITY);
+    setStep(STEP_VEHICLE);
   };
 
   const handleDone = () => {
@@ -475,7 +533,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
   const handleBookAnotherSlot = () => {
     handleResetForm();
     setTimeout(() => {
-      const el = document.getElementById('city-selection-card');
+      const el = document.getElementById('step-vehicle-details');
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
@@ -486,7 +544,7 @@ const [selectedSlot, setSelectedSlot] = useState(null);
 
   return (
     <div className="booking-page">
-      {/* 1. HERO SECTION - PRESERVED UNCHANGED */}
+      {/* 1. HERO SECTION */}
       <div className="hero-section">
         <div className="hero-content">
           <div className="hero-breadcrumb">
@@ -494,47 +552,41 @@ const [selectedSlot, setSelectedSlot] = useState(null);
           </div>
           <div className="hero-label">VEHICLE PARKING</div>
           <h1 className="hero-heading">Parking Slot Booking</h1>
-          <p className="hero-description">Select city, date, time, parking slot, vehicle details, payment and confirmation.</p>
-          <p className="hero-description">Quick and easy booking experience.</p>
+          <p className="hero-description">Select parking slot, vehicle details, schedule, payment and confirmation.</p>
+          <p className="hero-description">Quick and easy booking experience across campuses.</p>
         </div>
       </div>
 
-      {/* 2. SIX-STEP PROGRESS INDICATOR & CONTENT CONTAINER */}
+      {/* 2. FIVE-STEP PROGRESS INDICATOR & CONTENT CONTAINER */}
       <div className="booking-main-container">
         <div className="stepper-section">
           <div className="stepper-row">
             <div className={`stepper-item ${step === 1 ? 'active' : step > 1 ? 'completed' : ''}`}>
               <div className="stepper-circle">1</div>
-              <span className="stepper-label">Select Location</span>
+              <span className="stepper-label">Vehicle Details</span>
             </div>
             <div className={`stepper-line ${step > 1 ? 'completed' : ''}`} />
 
             <div className={`stepper-item ${step === 2 ? 'active' : step > 2 ? 'completed' : ''}`}>
               <div className="stepper-circle">2</div>
-              <span className="stepper-label">Select Date & Time</span>
+              <span className="stepper-label">Select Slot</span>
             </div>
             <div className={`stepper-line ${step > 2 ? 'completed' : ''}`} />
 
             <div className={`stepper-item ${step === 3 ? 'active' : step > 3 ? 'completed' : ''}`}>
               <div className="stepper-circle">3</div>
-              <span className="stepper-label">Select Slot</span>
+              <span className="stepper-label">Schedule</span>
             </div>
             <div className={`stepper-line ${step > 3 ? 'completed' : ''}`} />
 
             <div className={`stepper-item ${step === 4 ? 'active' : step > 4 ? 'completed' : ''}`}>
               <div className="stepper-circle">4</div>
-              <span className="stepper-label">Vehicle Details</span>
+              <span className="stepper-label">Payment</span>
             </div>
             <div className={`stepper-line ${step > 4 ? 'completed' : ''}`} />
 
-            <div className={`stepper-item ${step === 5 ? 'active' : step > 5 ? 'completed' : ''}`}>
+            <div className={`stepper-item ${step === 5 ? 'active' : ''}`}>
               <div className="stepper-circle">5</div>
-              <span className="stepper-label">Review</span>
-            </div>
-            <div className={`stepper-line ${step > 5 ? 'completed' : ''}`} />
-
-            <div className={`stepper-item ${step === 6 ? 'active' : ''}`}>
-              <div className="stepper-circle">6</div>
               <span className="stepper-label">Confirmation</span>
             </div>
           </div>

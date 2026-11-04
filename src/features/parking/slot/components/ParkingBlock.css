@@ -7,16 +7,16 @@
   --header-bg: #EAF3FF;
   --header-border: #BFDBFE;
   --icon-color: #1E40AF;
-  --slot-available-bg: #F0FDF4;
-  --slot-available-border: #BBF7D0;
-  --slot-available-text: #166534;
-  --slot-available-hover-bg: #DCFCE7;
-  --slot-available-hover-border: #86EFAC;
-  --slot-selected-bg: #DCFCE7;
-  --slot-selected-border: #4ADE80;
-  --slot-selected-text: #166534;
-  --slot-selected-hover-bg: #BBF7D0;
-  --slot-selected-hover-border: #4ADE80;
+  --slot-available-bg: #FFFFFF;
+  --slot-available-border: #D1D5DB;
+  --slot-available-text: #0B1833;
+  --slot-available-hover-bg: #F8FAFC;
+  --slot-available-hover-border: #94A3B8;
+  --slot-selected-bg: #16A34A;
+  --slot-selected-border: #15803D;
+  --slot-selected-text: #FFFFFF;
+  --slot-selected-hover-bg: #15803D;
+  --slot-selected-hover-border: #166534;
   --slot-booked-bg: #FEE2E2;
   --slot-booked-border: #F87171;
   --slot-booked-text: #B91C1C;
@@ -159,7 +159,7 @@
 
 /* Slot label */
 .slot-label {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
@@ -191,65 +191,90 @@
 
 /* Checkmark for selected slot */
 .slot-checkmark {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%) scale(0);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #166534;
-  opacity: 0;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #FFFFFF;
   z-index: 2;
+  flex-shrink: 0;
 }
 
-.slot-grid-btn.slot-btn-selected .slot-checkmark {
-  transform: translateY(-50%) scale(1);
-  opacity: 1;
+.slot-checkmark svg {
+  stroke: #FFFFFF;
 }
 
-/* Available slots: pale green */
+/* 1. Available slots (Default State):
+   - All parking slots appear in normal white colour by default.
+   - Background: White (#FFFFFF).
+   - Border: Light grey (#D1D5DB).
+   - Text: Dark navy (#0B1833).
+   - No green background or green status indicator.
+   - Available slots remain clickable.
+*/
 .slot-grid-btn.slot-btn-available {
-  background: var(--slot-available-bg);
-  border-color: var(--slot-available-border);
-  color: var(--slot-available-text);
+  background: #FFFFFF;
+  border: 1.5px solid #D1D5DB;
+  color: #0B1833;
 }
 
 .slot-grid-btn.slot-btn-available:hover:not(:disabled) {
-  background: var(--slot-available-hover-bg);
-  border-color: var(--slot-available-hover-border);
+  background: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0B1833;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(22, 101, 52, 0.12);
+  box-shadow: 0 2px 6px rgba(11, 24, 51, 0.08);
 }
 
 .slot-grid-btn.slot-btn-available:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
 }
 
-/* Selected slot: stronger green with checkmark */
+/* 2. Selected slot:
+   - Background: Green (#16A34A).
+   - Border: Dark green (#15803D).
+   - Text: White (#FFFFFF).
+   - Display a white checkmark icon.
+   - Subtle green shadow or highlight.
+   - Clearly distinguishable from all other available slots.
+*/
 .slot-grid-btn.slot-btn-selected {
-  background: var(--slot-selected-bg);
-  border-color: var(--slot-selected-border);
-  color: var(--slot-selected-text);
-  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.2);
+  background: #16A34A !important;
+  border: 1.5px solid #15803D !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35), 0 0 0 1px #15803D;
 }
 
 .slot-grid-btn.slot-btn-selected:hover:not(:disabled) {
-  background: var(--slot-selected-hover-bg);
-  border-color: var(--slot-selected-hover-border);
+  background: #15803D !important;
+  border-color: #166534 !important;
+  color: #FFFFFF !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(22, 101, 52, 0.25);
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.45);
 }
 
 .slot-grid-btn.slot-btn-selected:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
 }
 
-/* Successfully booked slot: pale red */
+.slot-grid-btn.slot-btn-selected .slot-label {
+  color: #FFFFFF !important;
+}
+
+.slot-grid-btn.slot-btn-selected .slot-checkmark {
+  color: #FFFFFF !important;
+}
+
+/* 3. Booked slots:
+   - Maintain the existing booked slot design exactly as it is:
+   - Background: Light red.
+   - Border: Red.
+   - Text: Dark red.
+   - Keep the existing red car icon.
+   - Booked slots are disabled and non-clickable.
+*/
 .slot-grid-btn.slot-btn-booked {
   background: var(--slot-booked-bg);
-  border-color: var(--slot-booked-border);
+  border: 1.5px solid var(--slot-booked-border);
   color: var(--slot-booked-text);
   cursor: not-allowed;
   opacity: 0.9;
@@ -262,19 +287,19 @@
 
 /* Disabled state */
 .slot-grid-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.85;
   cursor: not-allowed;
 }
 
 /* Animation for slot selection */
 @keyframes slotSelectPulse {
-  0% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(22, 101, 52, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(22, 101, 52, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
 }
 
 .slot-grid-btn.slot-btn-selected {
-  animation: slotSelectPulse 0.4s ease-out;
+  animation: slotSelectPulse 0.35s ease-out;
 }
 
 /* Custom Scrollbar Styles */

@@ -246,7 +246,7 @@ export default function ParkingBlock({
                       <span className="slot-label">{slot.id}</span>
                       {isSelected && (
                         <span className="slot-checkmark" aria-hidden="true">
-                          <Check size={14} />
+                          <Check size={13} strokeWidth={2.5} />
                         </span>
                       )}
                     </>

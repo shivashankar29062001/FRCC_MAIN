@@ -161,7 +161,7 @@ export function ServiceHero({ service = 'stay' }) {
   const data = SERVICE_HERO_DATA[service] || SERVICE_HERO_DATA.stay;
   const slot = getSlot(service);
   const isHub = service === 'hub';
-  const offers = OFFERS_DATA[service] || null;
+  const offers = service === 'parking' ? null : (OFFERS_DATA[service] || null);
   const navigate = useNavigate();
   const location = useLocation();
 

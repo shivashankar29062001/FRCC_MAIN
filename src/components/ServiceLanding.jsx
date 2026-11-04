@@ -142,22 +142,21 @@ export function ServiceLanding({ service = 'stay', hero }) {
     }
 
     if (normService === 'parking') {
-      const filtered = parkingZones.filter((z) => !selectedArea || z.areaId === selectedArea);
-      return filtered.map((z) => ({
+      return parkingZones.map((z) => ({
         id: z.id,
         name: z.name,
-        image: IMAGES[z.id] || IMAGES.parkingEntry,
+        subtitle: z.subtitle || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+        image: IMAGES[z.id] || (z.areaId === 'hyd' ? IMAGES['hyd-basement'] || IMAGES.parkingSecurity : IMAGES['vja-multi-level'] || IMAGES.parkingEntry),
         facts: [
-          `${z.spots} parking slots`,
-          `Vehicles: ${(z.vehicleTypes || []).join(', ').toUpperCase()}`,
-          `Hours: ${z.operatingHours || '24x7'}`,
+          `Total parking slots: ${z.spots || 150}`,
+          `Supported vehicles: ${(z.vehicleTypes || ['CAR', 'BIKE']).join(', ')}`,
         ],
-        priceDisplay: z.isFree || z.prices?.hour === 0 ? 'Free' : formatInr(z.prices?.hour || 0),
-        priceUnit: z.isFree || z.prices?.hour === 0 ? '' : ' / hr',
-        locationId: 'vja-parking',
-        locationName: 'Vijayawada Campus · Automated Parking',
+        priceDisplay: 'Free',
+        priceUnit: '',
+        locationId: z.locationId || (z.areaId === 'hyd' ? 'hyd-parking' : 'vja-parking'),
+        locationName: z.subtitle || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
         buttonLabel: 'Book Parking',
-        to: PARKING_BOOKING_URL,
+        to: `/parking/book?campus=${z.areaId}&city=${encodeURIComponent(z.areaId === 'hyd' ? 'Hyderabad' : 'Vijayawada')}`,
       }));
     }
 
@@ -370,7 +369,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
           )}
 
           {/* 3 · Option Cards Grid */}
-          <div className={cardItems.length === 1 ? "mt-8 flex justify-center" : "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"}>
+          <div className={cardItems.length === 1 ? "mt-8 flex justify-center" : cardItems.length === 2 ? "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-4xl mx-auto" : "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"}>
             {cardItems.map((item) => (
               <article
                 key={item.id}
