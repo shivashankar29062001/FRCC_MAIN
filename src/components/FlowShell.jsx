@@ -47,10 +47,12 @@ function SelectionSummaryCard({ summary = {} }) {
   if (summary.guests && !rows.some((r) => r.label?.toLowerCase().includes('guest'))) {
     extraRows.push({ label: 'Guests', value: String(summary.guests) });
   }
-  if (!rows.some((r) => r.label?.toLowerCase().includes('location'))) {
-    const locVal = summary.location || summary.area || summary.locationName || summary.areaName || 'Vijayawada Campus';
-    const locId = summary.locationId || (summary.service === 'parking' ? 'vja-parking' : summary.service === 'hall' || summary.service === 'halls' ? 'vja-halls' : summary.service === 'stay' || summary.service === 'hotel' ? 'vja-hotel' : summary.service === 'activities' ? 'vja-activities' : 'vja-club');
-    extraRows.push({ label: 'Location', value: locVal, locationId: locId });
+  if (!summary.hideLocation && summary.location !== false && !rows.some((r) => r.label?.toLowerCase().includes('location'))) {
+    const locVal = summary.location || summary.area || summary.locationName || summary.areaName;
+    if (locVal) {
+      const locId = summary.locationId || (summary.service === 'parking' ? 'vja-parking' : summary.service === 'hall' || summary.service === 'halls' ? 'vja-halls' : summary.service === 'stay' || summary.service === 'hotel' ? 'vja-hotel' : summary.service === 'activities' ? 'vja-activities' : 'vja-club');
+      extraRows.push({ label: 'Location', value: locVal, locationId: locId });
+    }
   }
   const allRows = [...extraRows, ...rows];
 

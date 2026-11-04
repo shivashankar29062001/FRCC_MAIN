@@ -8,6 +8,7 @@ import { roomImage, roomSlot } from '../config/images.js';
 // The club has ONE location, Vijayawada. (Array kept so it can grow later)
 export const areas = [
   { id: 'vijayawada', name: 'Vijayawada' },
+  { id: 'hyderabad', name: 'Hyderabad' },
 ];
 
 export const checkInTime = '12:00 PM'; // SAMPLE

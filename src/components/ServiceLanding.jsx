@@ -133,8 +133,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           ],
           priceDisplay: formatInr(h.price || h.prices?.fullDay || 50000),
           priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
-          locationId: 'vja-halls',
-          locationName: 'Vijayawada Campus · Convention Block',
+
+
           buttonLabel: 'Book Hall',
           to: `${HALL_BOOKING_URL}?type=${encodeURIComponent(h.roomType || h.name)}`,
         };
@@ -195,8 +195,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
           ],
           priceDisplay,
           priceUnit,
-          locationId: 'vja-activities',
-          locationName: 'Vijayawada Campus · Sports Complex',
+
+
           buttonLabel: 'Book game',
           to: `/book/activities/process?item=${encodeURIComponent(g.id)}&game=${encodeURIComponent(g.id)}`,
         };

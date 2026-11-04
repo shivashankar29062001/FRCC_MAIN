@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useApp } from '../../../app/store/AppContext.jsx';
+import { cancelBooking } from '../../../services/cancellationService.js';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
 import BookingConfirmation, { getMaskedContactDetails } from './components/BookingConfirmation.jsx';
@@ -55,9 +56,19 @@ const getConfirmedBookingsKey = (userId = null) =>
 const retainConfirmedBooking = (booking, userId = null) => {
   try {
     const key = getConfirmedBookingsKey(userId);
-    const raw = window.sessionStorage.getItem(key);
+    const raw = (typeof window !== 'undefined' && window.localStorage) ? window.localStorage.getItem(key) : null;
     const existing = raw ? JSON.parse(raw) : [];
-    window.sessionStorage.setItem(key, JSON.stringify([...existing, booking]));
+    const updated = [...existing, booking];
+    if (typeof window !== 'undefined') {
+      if (window.localStorage) {
+        window.localStorage.setItem(key, JSON.stringify(updated));
+        window.localStorage.setItem('frcc_parking_bookings', JSON.stringify(updated));
+      }
+      if (window.sessionStorage) {
+        window.sessionStorage.setItem(key, JSON.stringify(updated));
+      }
+      window.dispatchEvent(new CustomEvent('frcc:parking-bookings-changed', { detail: booking }));
+    }
   } catch (_) {
     // Storage unavailable
   }
@@ -66,7 +77,7 @@ const retainConfirmedBooking = (booking, userId = null) => {
 const updateRetainedBookingStatus = (booking, userId = null) => {
   try {
     const key = getConfirmedBookingsKey(userId);
-    const raw = window.sessionStorage.getItem(key);
+    const raw = (typeof window !== 'undefined' && window.localStorage) ? window.localStorage.getItem(key) : null;
     const existing = raw ? JSON.parse(raw) : [];
     const reference = booking.bookingReference || booking.bookingId;
     const updated = existing.map((b) => {
@@ -76,12 +87,22 @@ const updateRetainedBookingStatus = (booking, userId = null) => {
           ...b,
           bookingStatus: BOOKING_STATUS.CANCELLED,
           bookingStatusCode: BOOKING_STATUS_CODE.CANCELLED,
+          status: 'Cancelled',
           cancelledAt: new Date().toISOString()
         };
       }
       return b;
     });
-    window.sessionStorage.setItem(key, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      if (window.localStorage) {
+        window.localStorage.setItem(key, JSON.stringify(updated));
+        window.localStorage.setItem('frcc_parking_bookings', JSON.stringify(updated));
+      }
+      if (window.sessionStorage) {
+        window.sessionStorage.setItem(key, JSON.stringify(updated));
+      }
+      window.dispatchEvent(new CustomEvent('frcc:parking-bookings-changed', { detail: { bookingId: reference, status: 'CANCELLED' } }));
+    }
   } catch (_) {
     // Storage unavailable
   }
@@ -145,7 +166,7 @@ const getInitialCampusData = () => {
 };
 
 export default function ParkingBookingPage() {
-  const { user, pushToast } = useApp();
+  const { user, pushToast, addBooking } = useApp();
   const [confirmedBooking, setConfirmedBooking] = useState(null);
 
   const [formData, setFormData] = useState(() => {
@@ -479,6 +500,37 @@ const slots = useMemo(
     setStep(STEP_CONFIRMATION);
     refreshSlots();
 
+    const confirmationRecord = {
+      ...booking,
+      id: booking.bookingReference || booking.bookingId,
+      bookingId: booking.bookingReference || booking.bookingId,
+      bookingRef: booking.bookingReference || booking.bookingId,
+      category: 'parking',
+      title: `Parking Slot ${booking.parkingSlot}`,
+      slot: booking.parkingSlot,
+      parkingSlot: booking.parkingSlot,
+      date: booking.bookingDateISO || booking.bookingDate,
+      time: booking.arrivalTime || booking.bookingTime,
+      areaName: booking.city?.toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
+      details: {
+        vehicleType: booking.vehicleType,
+        vehicleNumber: booking.vehicleNumber,
+        vehicleModel: booking.vehicleModel,
+        city: booking.city,
+        durationDays: booking.numberOfDays,
+      },
+      amount: booking.totalAmount,
+      total: booking.totalAmount,
+      status: 'Confirmed',
+      payment: {
+        method: booking.paymentMethod || 'UPI',
+        amount: booking.totalAmount,
+      },
+    };
+    if (addBooking) {
+      addBooking(confirmationRecord).catch(() => {});
+    }
+
     // Show booking confirmation notification with user's contact details
     if (!confirmedBooking && pushToast) {
       const { message } = getMaskedContactDetails(user, null, booking);
@@ -610,6 +662,11 @@ const slots = useMemo(
     };
     setConfirmedBooking(cancelledBooking);
     updateRetainedBookingStatus(cancelledBooking, user?.id);
+    cancelBooking({
+      bookingType: 'parking',
+      bookingId: booking.bookingReference || booking.bookingId,
+      bookingRef: booking.bookingReference,
+    }).catch(() => {});
 
     setCancelSyncState({ status: 'syncing', error: '' });
     cancelBookingToAdmin(cancelledBooking)

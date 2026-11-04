@@ -29,11 +29,13 @@ import {
   ClockIcon,
 } from '../../components/ui/icons.jsx';
 import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+import { LocationSelector } from '../../components/booking/LocationSelector.jsx';
+import { STAY_LOCATIONS } from '../../data/bookingLocations.js';
 
 const STORAGE_KEY = 'frcc_stay_booking_draft';
 
 const STEPS = [
-  'Dates',
+  'Location & Dates',
   'Guests',
   'Choose Room',
   'Guest Details',
@@ -128,6 +130,11 @@ export function HotelPage() {
 
     return {
       step: isFreshRoomSelection ? 0 : ((saved?.step !== undefined && saved.step < 5) ? saved.step : 0),
+      cityId: saved?.cityId || 'vja',
+      cityName: saved?.cityName || 'Vijayawada',
+      venueId: saved?.venueId || 'vja-residency',
+      venueName: saved?.venueName || 'FRCC Riverfront',
+      areaName: saved?.areaName || 'Vijayawada Campus',
       areaId: initialArea,
       checkin: searchParams.get('checkin') || saved?.checkin || getTodayISO(),
       checkout: searchParams.get('checkout') || saved?.checkout || getTomorrowISO(),
@@ -293,7 +300,7 @@ export function HotelPage() {
 
   const effectiveSteps = useMemo(() => {
     if (itemParam) {
-      return ['Dates', 'Guests', 'Room Details', 'Guest Details', 'Review & Pay', 'Confirmation'];
+      return ['Location & Dates', 'Guests', 'Room Details', 'Guest Details', 'Review & Pay', 'Confirmation'];
     }
     return STEPS;
   }, [itemParam]);
@@ -404,18 +411,18 @@ export function HotelPage() {
     return {
       name: selectedRoom?.name || 'Hotel Room',
       image: roomImage(selectedRoom?.id || selectedRoom?.type),
-      detail: `Vijayawada Campus · ${draft.roomsCount} Room${Number(draft.roomsCount) > 1 ? 's' : ''}`,
+      detail: `${draft.areaName || 'Vijayawada Campus'} · ${draft.roomsCount} Room${Number(draft.roomsCount) > 1 ? 's' : ''}`,
       date: draft.checkin && draft.checkout ? `${formatDMY(draft.checkin)} – ${formatDMY(draft.checkout)}` : undefined,
       slot: `${nights} Night${nights > 1 ? 's' : ''}`,
       guests: `${draft.adults} Adults${Number(draft.children) > 0 ? `, ${draft.children} Children` : ''}`,
-      location: 'Vijayawada Campus · Riverfront Hotel',
+      location: draft.venueName && draft.areaName ? `${draft.areaName} — ${draft.venueName}` : (draft.venueName || draft.areaName || 'Vijayawada Campus'),
       locationId: 'vja-hotel',
       price: basePrice,
       memberDiscount: memberDiscount > 0 ? memberDiscount : undefined,
       couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
       total,
     };
-  }, [selectedRoom, draft.roomsCount, draft.checkin, draft.checkout, nights, draft.adults, draft.children, basePrice, memberDiscount, couponDiscount, total]);
+  }, [selectedRoom, draft.roomsCount, draft.checkin, draft.checkout, nights, draft.adults, draft.children, draft.areaName, draft.venueName, basePrice, memberDiscount, couponDiscount, total]);
 
   // Step 1 Validation (Dates)
   const isStep1Valid = useMemo(() => {
@@ -562,7 +569,11 @@ export function HotelPage() {
         title: selectedRoom.name,
         roomName: selectedRoom.name,
         roomId: selectedRoom.id,
-        areaName: 'Vijayawada',
+        areaName: draft.areaName || 'Vijayawada Campus',
+        venueName: draft.venueName || 'FRCC Riverfront',
+        cityName: draft.cityName || 'Vijayawada',
+        cityId: draft.cityId || 'vja',
+        venueId: draft.venueId || 'vja-residency',
         checkin: draft.checkin,
         checkout: draft.checkout,
         checkinTime: '12:00 PM',
@@ -796,29 +807,44 @@ export function HotelPage() {
       summary={staySummary}
     >
       <div>
-        {/* Step 1: Dates */}
+        {/* Step 1: Location & Dates */}
         {step === 0 && (
           <Card>
-            <p className="eyebrow">Step 1 · Stay Dates</p>
-            <h2 className="h-sub mt-1">Select location and travel dates</h2>
+            <p className="eyebrow">Step 1 · Location &amp; Dates</p>
+            <h2 className="h-sub mt-1">Step 1: Select Location &amp; Dates</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-              <span>Choose your check-in and check-out dates (minimum 1, maximum 30 nights).</span>
+              <span>Choose your location, venue, and stay dates (minimum 1, maximum 30 nights).</span>
               <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
-                Vijayawada Campus · View on map
+                {draft.areaName || 'Vijayawada Campus'} · View on map
               </LocationTrigger>
             </div>
 
             <div className="mt-6 space-y-6">
-              {/* Area selector — preselected and read-only while only one exists */}
+              {/* Location selector matching Halls pattern */}
               <div>
-                <label className="label">Campus Location</label>
-                <div className="mt-1.5 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-100/90 px-4 py-3 text-sm font-semibold text-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                    <span>Vijayawada Campus</span>
-                  </div>
-                  <span className="text-xs text-slate-500 font-normal">Preselected · Single location</span>
-                </div>
+                <LocationSelector
+                  locations={STAY_LOCATIONS}
+                  cityId={draft.cityId || 'vja'}
+                  venueId={draft.venueId || 'vja-residency'}
+                  cityLabel="Select City"
+                  venueLabel="Select Venue / Campus"
+                  onCityChange={(cid, cityObj, firstVenue) => {
+                    updateDraft({
+                      cityId: cid,
+                      cityName: cityObj?.name || '',
+                      venueId: firstVenue?.id || '',
+                      venueName: firstVenue?.displayName || firstVenue?.name || '',
+                      areaName: firstVenue?.areaName || 'Vijayawada Campus',
+                    });
+                  }}
+                  onVenueChange={(vid, venueObj) => {
+                    updateDraft({
+                      venueId: vid,
+                      venueName: venueObj?.displayName || venueObj?.name || '',
+                      areaName: venueObj?.areaName || 'Vijayawada Campus',
+                    });
+                  }}
+                />
               </div>
 
               {/* Dates & Times Grid */}
@@ -877,7 +903,7 @@ export function HotelPage() {
         {step === 1 && (
           <Card>
             <p className="eyebrow">Step 2 · Guests</p>
-            <h2 className="h-sub mt-1">Party size &amp; room count</h2>
+            <h2 className="h-sub mt-1">Step 2: Party size &amp; room count</h2>
             <p className="mt-1 text-sm text-slate-600">Specify adults, children, and how many rooms you require.</p>
 
             <div className="mt-6 space-y-6 max-w-xl">
@@ -973,7 +999,7 @@ export function HotelPage() {
                   {hasPreselectedRoom && !showAllRooms ? 'Step 3 · Room Details' : 'Step 3 · Choose Room'}
                 </p>
                 <h2 className="h-sub mt-1">
-                  {hasPreselectedRoom && !showAllRooms ? 'Your selected room' : 'Available rooms for your stay'}
+                  {hasPreselectedRoom && !showAllRooms ? 'Step 3: Your selected room' : 'Step 3: Available rooms for your stay'}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Showing availability for {formatDMY(draft.checkin)} to {formatDMY(draft.checkout)} ({nights} {nights === 1 ? 'night' : 'nights'}) · {draft.roomsCount} {Number(draft.roomsCount) > 1 ? 'rooms' : 'room'}.
@@ -1143,7 +1169,7 @@ export function HotelPage() {
         {step === 3 && (
           <Card>
             <p className="eyebrow">Step 4 · Guest Details</p>
-            <h2 className="h-sub mt-1">Primary guest information</h2>
+            <h2 className="h-sub mt-1">Step 4: Primary guest information</h2>
             <p className="mt-1 text-sm text-slate-600">Provide contact details for booking confirmation and check-in verification.</p>
 
             <div className="mt-6 max-w-xl space-y-5">
@@ -1248,7 +1274,7 @@ export function HotelPage() {
         {step === 4 && (
           <Card>
             <p className="eyebrow">Step 5 · Review &amp; Pay</p>
-            <h2 className="h-sub mt-1">Review reservation and payment</h2>
+            <h2 className="h-sub mt-1">Step 5: Review reservation and payment</h2>
             <p className="mt-1 text-sm text-slate-600">Confirm stay details, review discounts, and complete reservation.</p>
 
             <div className="mt-6 max-w-xl space-y-6">
@@ -1264,7 +1290,7 @@ export function HotelPage() {
                   </div>
                   <div>
                     <span className="text-xs text-slate-500 block">Location</span>
-                    <span className="font-semibold text-navy-900">Vijayawada Campus</span>
+                    <span className="font-semibold text-navy-900">{draft.venueName && draft.areaName ? `${draft.areaName} — ${draft.venueName}` : (draft.venueName || draft.areaName || 'Vijayawada Campus')}</span>
                   </div>
                   <div>
                     <span className="text-xs text-slate-500 block">Stay Dates</span>
@@ -1577,8 +1603,12 @@ export function HotelPage() {
                   <h4 className="font-display text-base font-bold text-navy-900 truncate">
                     {confirmedBooking.roomName}
                   </h4>
-                  <p className="text-xs text-slate-500 truncate">Vijayawada Campus · Riverfront Hotel</p>
+                  <p className="text-xs text-slate-500 truncate">{confirmedBooking.venueName || confirmedBooking.areaName || 'Vijayawada Campus'}</p>
                 </div>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Location</span>
+                <span className="font-semibold text-navy-900">{confirmedBooking.venueName || confirmedBooking.areaName || 'Vijayawada Campus'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Room</span>

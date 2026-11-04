@@ -36,7 +36,9 @@ import {
   ChevronLeftIcon,
   ArrowRightIcon,
 } from '../../components/ui/icons.jsx';
-import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+
+
+
 
 // ---------------------------------------------------------------------------
 // /book/activities/process — the Activities booking page (redirect target of
@@ -124,6 +126,11 @@ const STORAGE_KEY = 'frcc_activities_booking_draft';
 function blankDraft(gameId, user) {
   const prefilledMobile = user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
   return {
+
+
+
+
+
     gameId: gameId || '',
     date: '',
     slot: '',
@@ -515,6 +522,7 @@ export function ActivitiesProcessPage() {
       'FRCC — Activities Booking Receipt',
       `Booking ID: ${confirmed.bookingId}`,
       `Game: ${confirmed.gameName || g?.name || confirmed.game}`,
+
       `Date: ${prettyDate(confirmed.date)}`,
       `Slot: ${confirmed.slot}`,
       `Players: ${confirmed.players}`,
@@ -633,8 +641,8 @@ export function ActivitiesProcessPage() {
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
       guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
-      location: 'Vijayawada Campus · Sports Complex',
-      locationId: 'vja-activities',
+      hideLocation: true,
+
       price: quote.subtotal,
       memberDiscount: quote.discount > 0 ? quote.discount : undefined,
       total: quote.total,
@@ -662,12 +670,10 @@ export function ActivitiesProcessPage() {
             <Card>
               <p className="eyebrow">Step 1 · Select Game</p>
               <h2 className="h-sub mt-1">Which game are you booking?</h2>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                <span>All facilities and courts are open daily at FRCC.</span>
-                <LocationTrigger locationId="vja-activities" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
-                  Vijayawada Campus · View on map &amp; get directions
-                </LocationTrigger>
-              </div>
+              <p className="mt-1 text-sm text-slate-600">
+                All facilities and courts are open daily at FRCC.
+              </p>
+
               {paramGame && !paramValid && (
                 <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
                   “{paramGame}” isn’t a known game — pick one below to start.
@@ -986,6 +992,7 @@ export function ActivitiesProcessPage() {
                     </div>
 
                     <div className="mx-auto mt-4 max-w-md rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2">
+                      
                       <div className="flex justify-between">
                         <span className="text-slate-500">Date</span>
                         <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>

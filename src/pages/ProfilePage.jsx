@@ -32,6 +32,7 @@ import {
   XIcon,
 } from '../components/ui/icons.jsx';
 import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
+import { generateBookingReceiptPdf } from '../utils/receiptGenerator.js';
 import {
   normalizeMobile,
   isValidMobile,
@@ -422,6 +423,20 @@ export function ProfilePage({ initialTab = 'details' }) {
     }
   });
 
+  const isMember = Boolean(
+    user?.isMember || user?.membershipId || membership?.status === 'ACTIVE' || membership?.active
+  );
+
+  const handleDownloadReceipt = (booking) => {
+    try {
+      generateBookingReceiptPdf(booking);
+      pushToast('Receipt downloaded successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to generate receipt:', err);
+      pushToast('Unable to generate receipt. Please try again.', 'error');
+    }
+  };
+
   const isLegacyAccount = Boolean(
     user && (user.isLegacy || isLegacySyntheticEmail(user.email || user.emailOrPhone))
   );
@@ -441,6 +456,7 @@ export function ProfilePage({ initialTab = 'details' }) {
   const [dbStayBookings, setDbStayBookings] = useState([]);
   const [dbTableBookings, setDbTableBookings] = useState([]);
   const [dbConventionBookings, setDbConventionBookings] = useState([]);
+  const [dbParkingBookings, setDbParkingBookings] = useState([]);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
@@ -488,6 +504,9 @@ export function ProfilePage({ initialTab = 'details' }) {
       setDbConventionBookings((prev) =>
         prev.map((c) => (c.bookingRef === ref || c.id === bookingUuid || c.id === ref ? { ...c, status: 'CANCELLED' } : c))
       );
+      setDbParkingBookings((prev) =>
+        prev.map((p) => (p.bookingRef === ref || p.booking_reference === ref || p.id === bookingUuid || p.id === ref ? { ...p, status: 'CANCELLED', booking_status: 'CANCELLED' } : p))
+      );
       pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
       setBookingToCancel(null);
     } catch (err) {
@@ -510,6 +529,9 @@ export function ProfilePage({ initialTab = 'details' }) {
         );
         setDbTableBookings((prev) =>
           prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+        );
+        setDbParkingBookings((prev) =>
+          prev.map((p) => (p.bookingRef === ref || p.booking_reference === ref || p.id === bookingUuid || p.id === ref ? { ...p, status: 'CANCELLED', booking_status: 'CANCELLED' } : p))
         );
         pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
         setBookingToCancel(null);
@@ -549,7 +571,9 @@ export function ProfilePage({ initialTab = 'details' }) {
             userId: r.user_id || user.id,
             roomName: r.room_types?.name || 'Hotel Room',
             title: r.room_types?.name || 'Hotel Room',
-            areaName: 'Vijayawada Campus',
+            areaName: r.area_name || r.areaName || r.location || r.details?.areaName || 'Vijayawada Campus',
+            venueName: r.venue_name || r.venueName || r.details?.venueName || 'FRCC Riverfront',
+            cityName: r.city_name || r.cityName || r.details?.cityName || 'Vijayawada',
             checkin: r.check_in,
             checkout: r.check_out,
             date: r.check_in,
@@ -734,6 +758,157 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
+  // Load parking slot bookings for user (Supabase + localStorage fallback + real-time reactivity)
+  useEffect(() => {
+    if (!user) {
+      setDbParkingBookings([]);
+      return undefined;
+    }
+    let mounted = true;
+
+    async function fetchParkingBookings() {
+      const currentUid = user.id || user.userId;
+      const userPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (user.email || '').trim().toLowerCase();
+      const merged = [];
+      const seenIds = new Set();
+
+      const addRecord = (r) => {
+        const ref = r.booking_reference || r.bookingReference || r.bookingId || r.bookingRef || r.id;
+        if (!ref || seenIds.has(ref)) return;
+        seenIds.add(ref);
+
+        const status = r.booking_status || r.bookingStatus || r.status || 'CONFIRMED';
+        const isCancelled =
+          String(status).toUpperCase() === 'CANCELLED' ||
+          cancelledIds.has(ref) ||
+          isBookingCancelledLocally(ref);
+
+        merged.push({
+          ...r,
+          id: ref,
+          bookingId: ref,
+          bookingRef: ref,
+          booking_reference: ref,
+          bookingReference: ref,
+          category: 'parking',
+          title: `Parking Slot ${r.slot_id || r.parkingSlot || r.slot || ''}`,
+          slot: r.slot_id || r.parkingSlot || r.slot || '',
+          slot_id: r.slot_id || r.parkingSlot || r.slot || '',
+          parkingSlot: r.slot_id || r.parkingSlot || r.slot || '',
+          date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
+          booking_date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
+          time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
+          arrival_time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
+          duration: `${r.duration_days || r.numberOfDays || r.durationDays || 1} Day${(Number(r.duration_days || r.numberOfDays || r.durationDays) || 1) > 1 ? 's' : ''}`,
+          durationDays: Number(r.duration_days || r.numberOfDays || r.durationDays) || 1,
+          vehicleType: r.vehicle_type || r.vehicleType || 'Vehicle',
+          vehicleNumber: r.vehicle_number || r.vehicleNumber || '',
+          vehicleModel: r.vehicle_model || r.vehicleModel || '',
+          amount: Number(r.total_amount || r.totalAmount || r.amount || r.total || 0),
+          total: Number(r.total_amount || r.totalAmount || r.amount || r.total || 0),
+          status: isCancelled ? 'CANCELLED' : status,
+          booking_status: isCancelled ? 'CANCELLED' : status,
+          areaName: (r.campus || r.city || '').toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
+          user_id: r.user_id || r.userId || currentUid,
+          userId: r.userId || currentUid,
+          createdAt: r.created_at || r.createdAt,
+        });
+      };
+
+      // 1. Supabase parking_bookings
+      if (user.id) {
+        try {
+          const { data, error } = await supabase
+            .from('parking_bookings')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            data.forEach(addRecord);
+          }
+        } catch (err) {
+          console.warn('Unable to load parking bookings from Supabase:', err);
+        }
+      }
+
+      // 2. Local storage keys
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const keys = [
+            `frcc_parking_confirmed_bookings_v1.${currentUid}`,
+            'frcc_parking_confirmed_bookings_v1',
+            'frcc_parking_bookings',
+          ];
+          keys.forEach((storageKey) => {
+            const raw = window.localStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                list.forEach((r) => {
+                  const rPhone = (r.phone || r.mobile || r.vehicleNumber || '').replace(/\D/g, '').slice(-10);
+                  const rEmail = (r.email || '').trim().toLowerCase();
+                  const matchesThisUser =
+                    (currentUid && (r.user_id === currentUid || r.userId === currentUid)) ||
+                    (userPhone && rPhone === userPhone) ||
+                    (userEmail && rEmail === userEmail) ||
+                    storageKey.includes(String(currentUid));
+                  if (matchesThisUser || !r.user_id) {
+                    addRecord(r);
+                  }
+                });
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      // 3. Session storage check
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const keys = [
+            `frcc_parking_confirmed_bookings_v1.${currentUid}`,
+            'frcc_parking_confirmed_bookings_v1',
+          ];
+          keys.forEach((storageKey) => {
+            const raw = window.sessionStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                list.forEach(addRecord);
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setDbParkingBookings(merged);
+      }
+    }
+
+    fetchParkingBookings();
+
+    const reloadListener = () => fetchParkingBookings();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frcc:parking-bookings-changed', reloadListener);
+      window.addEventListener('frcc:booking-cancelled', reloadListener);
+      window.addEventListener('frcc:booking-created', reloadListener);
+      window.addEventListener('storage', reloadListener);
+    }
+
+    return () => {
+      mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('frcc:parking-bookings-changed', reloadListener);
+        window.removeEventListener('frcc:booking-cancelled', reloadListener);
+        window.removeEventListener('frcc:booking-created', reloadListener);
+        window.removeEventListener('storage', reloadListener);
+      }
+    };
+  }, [user?.id, user?.userId, user?.phone, user?.email, cancelledIds]);
+
 
 
   // Merged unique bookings strictly isolated to the authenticated user
@@ -760,6 +935,7 @@ export function ProfilePage({ initialTab = 'details' }) {
     const userStayBookings = (dbStayBookings || []).filter(matchesUser);
     const userTableBookings = (dbTableBookings || []).filter(matchesUser);
     const userConventionBookings = (dbConventionBookings || []).filter(matchesUser);
+    const userParkingBookings = (dbParkingBookings || []).filter(matchesUser);
 
     const bookingsByRef = new Map();
     const idToRef = new Map();
@@ -846,6 +1022,15 @@ export function ProfilePage({ initialTab = 'details' }) {
       if (ref && !bookingsByRef.has(ref)) {
         bookingsByRef.set(ref, conv);
         registerKeys(ref, conv);
+      }
+    });
+
+    // 3c. Parking bookings
+    userParkingBookings.forEach((prk) => {
+      const ref = prk.bookingRef || prk.bookingReference || prk.bookingId || prk.id;
+      if (ref && !bookingsByRef.has(ref)) {
+        bookingsByRef.set(ref, prk);
+        registerKeys(ref, prk);
       }
     });
 
@@ -973,13 +1158,35 @@ export function ProfilePage({ initialTab = 'details' }) {
       dedupedList.push(b);
     }
 
-    const unique = dedupedList;
+    const unique = dedupedList.map((item) => {
+      const amount = Number(item.total !== undefined ? item.total : (item.amount ?? 0));
+      let subtotal = Number(item.subtotal || 0);
+      let discount = Number(item.discount || 0);
+      if ((subtotal <= 0 || subtotal < amount) && amount > 0) {
+        if (item.is_member || item.isMember || isMember) {
+          subtotal = Math.round(amount / 0.7);
+          discount = subtotal - amount;
+        } else {
+          subtotal = amount;
+          discount = 0;
+        }
+      } else if (subtotal > amount && discount <= 0) {
+        discount = subtotal - amount;
+      }
+      return {
+        ...item,
+        amount,
+        total: amount,
+        subtotal,
+        discount,
+      };
+    });
     return unique.sort((a, b) => {
       const timeA = new Date(a.createdAt || a.created_at || a.date || 0).getTime();
       const timeB = new Date(b.createdAt || b.created_at || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings]);
+  }, [user, isMember, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings, dbParkingBookings]);
 
   // Merged unique payments strictly isolated to the authenticated user
   const payments = useMemo(() => {
@@ -1037,6 +1244,11 @@ export function ProfilePage({ initialTab = 'details' }) {
             !b.bookingRef?.includes('TAB') &&
             b.category !== 'dining' &&
             b.category !== 'hall' &&
+            b.category !== 'parking' &&
+            !b.slot_id &&
+            !b.parkingSlot &&
+            !b.bookingId?.startsWith('FRCC-PARK-') &&
+            !b.bookingRef?.startsWith('FRCC-PARK-') &&
             !b.bookingId?.startsWith('FRCC-H-') &&
             !b.bookingRef?.startsWith('FRCC-H-'))
       );
@@ -1055,6 +1267,18 @@ export function ProfilePage({ initialTab = 'details' }) {
           b.category === 'hall' ||
           b.bookingId?.startsWith('FRCC-H-') ||
           b.bookingRef?.startsWith('FRCC-H-')
+      );
+    }
+    if (bookingFilter === 'parking') {
+      return bookings.filter(
+        (b) =>
+          b.category === 'parking' ||
+          Boolean(b.slot_id) ||
+          Boolean(b.parkingSlot) ||
+          b.bookingId?.startsWith('FRCC-PARK-') ||
+          b.bookingRef?.startsWith('FRCC-PARK-') ||
+          b.bookingId?.includes('PARK') ||
+          b.bookingRef?.includes('PARK')
       );
     }
     return bookings;
@@ -1256,8 +1480,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                     { id: 'all', label: `All Bookings (${bookings.length})` },
                     { id: 'stay', label: `Stays (${bookings.filter((b) => b.category === 'hotel' || b.category === 'stay' || b.checkin || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY')).length})` },
                     { id: 'dining', label: `Dining (${bookings.filter((b) => b.category === 'dining' || b.bookingId?.includes('TAB') || b.bookingRef?.includes('TAB')).length})` },
-                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining' && b.category !== 'hall')).length})` },
+                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining' && b.category !== 'hall' && b.category !== 'parking' && !b.slot_id && !b.parkingSlot && !b.bookingId?.startsWith('FRCC-PARK-') && !b.bookingRef?.startsWith('FRCC-PARK-'))).length})` },
                     { id: 'halls', label: `Halls (${bookings.filter((b) => b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-')).length})` },
+                    { id: 'parking', label: `Parking (${bookings.filter((b) => b.category === 'parking' || Boolean(b.slot_id) || Boolean(b.parkingSlot) || b.bookingId?.startsWith('FRCC-PARK-') || b.bookingRef?.startsWith('FRCC-PARK-') || b.bookingId?.includes('PARK') || b.bookingRef?.includes('PARK')).length})` },
                   ].map((filter) => {
                     const active = (bookingFilter || 'all') === filter.id;
                     return (
@@ -1289,6 +1514,8 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'No activity bookings yet'
                       : bookingFilter === 'halls'
                       ? 'No convention hall bookings yet'
+                      : bookingFilter === 'parking'
+                      ? 'No parking reservations yet'
                       : 'No bookings yet'
                   }
                   body={
@@ -1300,7 +1527,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'Sports, courts and recreational bookings will appear here with their status.'
                       : bookingFilter === 'halls'
                       ? 'Convention halls and banquet spaces reserved will appear here with their status.'
-                      : 'Stays, dining reservations and sports activities booked will appear here with their status.'
+                      : bookingFilter === 'parking'
+                      ? 'Reserved parking bays and slots will appear here with their status.'
+                      : 'Stays, dining reservations, sports activities and parking booked will appear here with their status.'
                   }
                   icon={CalendarIcon}
                   action={
@@ -1320,6 +1549,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                       <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
                         Browse activities <ArrowRightIcon className="h-4 w-4" />
                       </Link>
+                    ) : bookingFilter === 'parking' ? (
+                      <Link to="/book/parking" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                        Book a parking slot <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
                     ) : (
                       <div className="flex flex-wrap justify-center gap-3">
                         <Link to="/stay" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
@@ -1331,6 +1564,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                         <Link to="/book/activities" className="btn-base px-5 py-2.5 border border-slate-300 bg-white text-navy-900 hover:bg-slate-50">
                           Browse activities
                         </Link>
+                        <Link to="/book/parking" className="btn-base px-5 py-2.5 border border-slate-300 bg-white text-navy-900 hover:bg-slate-50">
+                          Book parking
+                        </Link>
                       </div>
                     )
                   }
@@ -1338,15 +1574,27 @@ export function ProfilePage({ initialTab = 'details' }) {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {filteredBookings.map((b) => {
-                    const isHall = b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-');
-                    const isDining = !isHall && (b.category === 'dining' || Boolean(b.bookingId?.includes('TAB')));
-                    const isStay = !isHall && !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
+                    const isParking =
+                      b.category === 'parking' ||
+                      Boolean(b.slot_id) ||
+                      Boolean(b.parkingSlot) ||
+                      b.bookingId?.startsWith('FRCC-PARK-') ||
+                      b.bookingRef?.startsWith('FRCC-PARK-') ||
+                      b.bookingId?.includes('PARK') ||
+                      b.bookingRef?.includes('PARK');
+                    const isHall = !isParking && (b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-'));
+                    const isDining = !isParking && !isHall && (b.category === 'dining' || Boolean(b.bookingId?.includes('TAB')));
+                    const isStay = !isParking && !isHall && !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
                     return (
                       <Card key={b.bookingRef || b.bookingId || b.id} className="card-hover">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-1.5 mb-1">
-                              {isHall ? (
+                              {isParking ? (
+                                <span className="inline-block rounded bg-teal-100 text-teal-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                  Parking
+                                </span>
+                              ) : isHall ? (
                                 <span className="inline-block rounded bg-indigo-100 text-indigo-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                                   Hall
                                 </span>
@@ -1365,7 +1613,11 @@ export function ProfilePage({ initialTab = 'details' }) {
                                 </span>
                               )}
                             </div>
-                            <p className="font-semibold text-navy-900">{b.venue_name || b.venueName || b.roomName || b.gameName || b.title || b.game}</p>
+                            <p className="font-semibold text-navy-900">
+                              {isParking
+                                ? (b.title || `Parking Slot ${b.slot_id || b.parkingSlot || b.slot || ''}`)
+                                : (b.venue_name || b.venueName || b.roomName || b.gameName || b.title || b.game)}
+                            </p>
                           </div>
                           {(() => {
                             const ref = b.bookingRef || b.bookingId || b.id;
@@ -1375,7 +1627,43 @@ export function ProfilePage({ initialTab = 'details' }) {
                         </div>
                         <p className="mt-2 font-mono text-xs text-slate-500">{b.bookingRef || b.bookingId}</p>
                         <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-                          {isHall ? (
+                          {isParking ? (
+                            <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Date</dt>
+                                <dd className="font-medium text-navy-900">{formatDMY(b.date || b.booking_date)}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Slot</dt>
+                                <dd className="font-medium text-navy-900">{b.slot_id || b.parkingSlot || b.slot}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Arrival Time</dt>
+                                <dd className="font-medium text-navy-900">{b.time || b.arrival_time}</dd>
+                              </div>
+                              {(b.vehicleNumber || b.details?.vehicleNumber) && (
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">Vehicle</dt>
+                                  <dd className="font-medium text-navy-900">
+                                    {b.vehicleNumber || b.details?.vehicleNumber}
+                                    {(b.vehicleType || b.details?.vehicleType) ? ` (${b.vehicleType || b.details?.vehicleType})` : ''}
+                                  </dd>
+                                </div>
+                              )}
+                              {(b.duration || b.durationDays || b.details?.durationDays) && (
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">Duration</dt>
+                                  <dd className="font-medium text-navy-900">
+                                    {b.duration || `${b.durationDays || b.details?.durationDays} Day${(Number(b.durationDays || b.details?.durationDays) || 1) > 1 ? 's' : ''}`}
+                                  </dd>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Campus</dt>
+                                <dd className="font-medium text-navy-900">{b.areaName || 'Vijayawada Campus'}</dd>
+                              </div>
+                            </>
+                          ) : isHall ? (
                             <>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
@@ -1402,6 +1690,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                             </>
                           ) : isDining ? (
                             <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Location</dt>
+                                <dd className="font-medium text-navy-900">{b.location || b.areaName || b.venueLocationName || b.venue_location || b.details?.areaName || 'Vijayawada Campus'}</dd>
+                              </div>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{b.date}</dd>
@@ -1443,8 +1735,8 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                               {(b.areaName || b.details?.area) && (
                                 <div className="flex justify-between gap-3">
-                                  <dt className="text-slate-500">Campus</dt>
-                                  <dd className="font-medium text-navy-900">{b.areaName || b.details?.area}</dd>
+                                  <dt className="text-slate-500">Location</dt>
+                                  <dd className="font-medium text-navy-900">{b.venueName ? `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}` : (b.areaName || b.details?.area || b.location || 'Vijayawada Campus')}</dd>
                                 </div>
                               )}
                             </>
@@ -1464,52 +1756,96 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                             </>
                           )}
-                          {b.subtotal !== undefined && b.subtotal !== b.amount && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Subtotal</dt>
-                              <dd className="font-medium text-navy-900">{formatINR(b.subtotal)}</dd>
-                            </div>
-                          )}
-                          {b.discount > 0 && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
-                              <dd className="font-medium text-green-700">{formatINR(-b.discount)}</dd>
-                            </div>
-                          )}
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-slate-500">{b.subtotal ? 'Total' : 'Amount'}</dt>
-                            <dd className="font-medium text-navy-900">{formatINR(b.total !== undefined ? b.total : b.amount)}</dd>
-                          </div>
+                          {(() => {
+                            const rawAmount = Number(b.total !== undefined ? b.total : b.amount) || 0;
+                            let cardSubtotal = Number(b.subtotal || 0);
+                            let cardDiscount = Number(b.discount || 0);
+
+                            if ((cardSubtotal <= 0 || cardSubtotal < rawAmount) && rawAmount > 0) {
+                              if (b.is_member || isMember || cardDiscount > 0) {
+                                cardSubtotal = Math.round(rawAmount / 0.7);
+                                cardDiscount = cardSubtotal - rawAmount;
+                              } else {
+                                cardSubtotal = rawAmount;
+                                cardDiscount = 0;
+                              }
+                            } else if (cardSubtotal > rawAmount && cardDiscount <= 0) {
+                              cardDiscount = cardSubtotal - rawAmount;
+                            }
+
+                            return (
+                              <>
+                                {cardSubtotal > 0 && cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Subtotal</dt>
+                                    <dd className="font-medium text-navy-900">{formatINR(cardSubtotal)}</dd>
+                                  </div>
+                                )}
+                                {cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
+                                    <dd className="font-medium text-green-700">{formatINR(-cardDiscount)}</dd>
+                                  </div>
+                                )}
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">{cardDiscount > 0 ? 'Total' : 'Amount'}</dt>
+                                  <dd className="font-medium text-navy-900">{formatINR(rawAmount)}</dd>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </dl>
 
-                        {/* Cancel Booking Action (Only for upcoming, cancellable bookings) */}
+                        {/* Booking Card Actions: Download Receipt & Cancel Booking */}
                         {(() => {
                           const ref = b.bookingRef || b.bookingId || b.id;
-                          const effectiveStatus = cancelledIds.has(ref) ? 'Cancelled' : b.status;
+                          const isCancelled =
+                            cancelledIds.has(ref) ||
+                            String(b.status).toLowerCase() === 'cancelled';
+                          const effectiveStatus = isCancelled ? 'Cancelled' : (b.status || 'Confirmed');
                           const effectiveBooking = { ...b, status: effectiveStatus };
-                          const canCancel = canCancelBooking(effectiveBooking) && !cancelledIds.has(ref);
-                          if (!canCancel) return null;
-                          const policy = getCancellationPolicyInfo(effectiveBooking);
+                          const canCancel = canCancelBooking(effectiveBooking) && !isCancelled;
+                          if (isCancelled && !canCancel) return null;
+                          const policy = canCancel ? getCancellationPolicyInfo(effectiveBooking) : null;
 
                           return (
                             <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                               <span className="text-[11px] text-slate-500">
-                                {policy.isWithinCutoff
-                                  ? policy.type === 'stay'
-                                    ? '⚠️ Late cancellation (1-night charge)'
-                                    : '⚠️ Cutoff notice'
-                                  : 'Eligible for cancellation'}
+                                {canCancel ? (
+                                  policy?.isWithinCutoff
+                                    ? policy.type === 'stay'
+                                      ? '⚠️ Late cancellation (1-night charge)'
+                                      : '⚠️ Cutoff notice'
+                                    : 'Eligible for cancellation'
+                                ) : (
+                                  'FRCC Confirmed Booking'
+                                )}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCancelError('');
-                                  setBookingToCancel(effectiveBooking);
-                                }}
-                                className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
-                              >
-                                Cancel booking
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {!isCancelled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadReceipt(effectiveBooking)}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-navy-900 hover:border-gold-500 hover:bg-gold-50/60 transition cursor-pointer"
+                                    title="Download PDF Receipt"
+                                  >
+                                    <DownloadIcon className="h-3.5 w-3.5 text-gold-600" />
+                                    Download Receipt
+                                  </button>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCancelError('');
+                                      setBookingToCancel(effectiveBooking);
+                                    }}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
+                                  >
+                                    Cancel booking
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
@@ -1556,17 +1892,19 @@ export function ProfilePage({ initialTab = 'details' }) {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Service</span>
                           <span className="font-semibold text-navy-900">
-                            {bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || bookingToCancel.title || 'Booking'}
+                            {bookingToCancel.title || bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || 'Booking'}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Date</span>
-                          <span className="font-semibold text-navy-900">{formatDMY(bookingToCancel.checkin || bookingToCancel.date)}</span>
+                          <span className="font-semibold text-navy-900">{formatDMY(bookingToCancel.checkin || bookingToCancel.booking_date || bookingToCancel.date)}</span>
                         </div>
-                        {(bookingToCancel.slot || bookingToCancel.time) && (
+                        {(bookingToCancel.slot || bookingToCancel.parkingSlot || bookingToCancel.slot_id || bookingToCancel.time || bookingToCancel.arrival_time) && (
                           <div className="flex justify-between">
-                            <span className="text-slate-500">Time / Slot</span>
-                            <span className="font-semibold text-navy-900">{bookingToCancel.slot || bookingToCancel.time}</span>
+                            <span className="text-slate-500">{bookingToCancel.parkingSlot || bookingToCancel.slot_id ? 'Slot / Time' : 'Time / Slot'}</span>
+                            <span className="font-semibold text-navy-900">
+                              {[bookingToCancel.slot_id || bookingToCancel.parkingSlot, bookingToCancel.arrival_time || bookingToCancel.time || bookingToCancel.slot].filter(Boolean).join(' • ')}
+                            </span>
                           </div>
                         )}
                       </div>

@@ -32,7 +32,10 @@ import {
   ClockIcon,
 } from '../../components/ui/icons.jsx';
 
-const STEPS = ['Venue', 'Date & Time', 'Your Details', 'Confirmation'];
+import { LocationSelector } from '../../components/booking/LocationSelector.jsx';
+import { DINING_LOCATIONS } from '../../data/bookingLocations.js';
+
+const STEPS = ['Location & Venue', 'Date & Time', 'Your Details', 'Confirmation'];
 
 function getFutureDateISO(daysAhead) {
   const d = new Date();
@@ -59,13 +62,24 @@ export function TableBookingPage() {
 
   const effectiveSteps = useMemo(() => {
     if (hasPreselectedVenue) {
-      return ['Venue Details', 'Date & Time', 'Your Details', 'Confirmation'];
+      return ['Location & Venue', 'Date & Time', 'Your Details', 'Confirmation'];
     }
     return STEPS;
   }, [hasPreselectedVenue]);
 
   // Form state
+  const [selectedCityId, setSelectedCityId] = useState('vja');
+  const [selectedVenueLocationId, setSelectedVenueLocationId] = useState('vja-dining');
   const [selectedVenueId, setSelectedVenueId] = useState(initialVenueParam);
+
+  const selectedCity = useMemo(
+    () => DINING_LOCATIONS.find((c) => String(c.id) === String(selectedCityId)) || DINING_LOCATIONS[0],
+    [selectedCityId]
+  );
+  const selectedVenueLocation = useMemo(
+    () => selectedCity?.venues?.find((v) => String(v.id) === String(selectedVenueLocationId)) || selectedCity?.venues?.[0] || null,
+    [selectedCity, selectedVenueLocationId]
+  );
 
   const displayedVenues = useMemo(() => {
     if (hasPreselectedVenue && !showAllVenues) {
@@ -222,6 +236,12 @@ export function TableBookingPage() {
         email: guestEmail.trim().toLowerCase(),
         notes: notes.trim(),
         ageConfirmed: Boolean(ageConfirmed),
+        cityId: selectedCityId,
+        cityName: selectedCity?.name || 'Vijayawada',
+        venueLocationId: selectedVenueLocationId,
+        venueLocationName: selectedVenueLocation?.name || 'FRCC Clubhouse Dining',
+        areaName: selectedVenueLocation?.areaName || 'Vijayawada Campus',
+        location: selectedVenueLocation?.displayName || selectedVenueLocation?.areaName || 'Vijayawada Campus',
       };
       const booking = await createTableBooking(payload);
       setConfirmedBooking(booking);
@@ -250,6 +270,7 @@ export function TableBookingPage() {
     detail: venue.cuisine,
     isFree: true,
     rows: [
+      { label: 'Location', value: selectedVenueLocation?.displayName || selectedVenueLocation?.areaName || 'Vijayawada Campus' },
       { label: 'Venue', value: venue.name },
       { label: 'Date', value: dateStr || '—' },
       { label: 'Time slot', value: selectedSlot || 'Not chosen' },
@@ -271,7 +292,7 @@ export function TableBookingPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
             <div>
               <h2 className="font-display text-xl sm:text-2xl font-bold text-navy-900">
-                {hasPreselectedVenue && !showAllVenues ? 'Your Selected Venue' : 'Choose a Venue'}
+                {hasPreselectedVenue && !showAllVenues ? 'Step 1: Your Selected Venue' : 'Step 1: Select Location & Venue'}
               </h2>
               <p className="mt-1 text-xs text-slate-500">
                 {hasPreselectedVenue && !showAllVenues
@@ -289,6 +310,19 @@ export function TableBookingPage() {
               </button>
             )}
           </div>
+
+          <LocationSelector
+            locations={DINING_LOCATIONS}
+            cityId={selectedCityId}
+            venueId={selectedVenueLocationId}
+            onCityChange={(nextCityId, cityObj, firstVenue) => {
+              setSelectedCityId(nextCityId);
+              if (firstVenue) setSelectedVenueLocationId(firstVenue.id);
+            }}
+            onVenueChange={(nextVenueId) => setSelectedVenueLocationId(nextVenueId)}
+            cityLabel="Select City"
+            venueLabel="Select Campus / Location"
+          />
 
           <div className={`grid grid-cols-1 gap-4 ${hasPreselectedVenue && !showAllVenues ? 'max-w-md' : 'sm:grid-cols-2'}`}>
             {displayedVenues.map((v) => {
@@ -700,7 +734,11 @@ export function TableBookingPage() {
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-left text-xs space-y-2 mb-6">
             <div className="flex justify-between">
               <span className="text-slate-500">Venue</span>
-              <span className="font-bold text-navy-900">{confirmedBooking.venue_name}</span>
+              <span className="font-bold text-navy-900">{confirmedBooking.venue_name || confirmedBooking.venueName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Location</span>
+              <span className="font-semibold text-navy-900">{confirmedBooking.location || confirmedBooking.areaName || confirmedBooking.area_name || 'Vijayawada Campus'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Date</span>
