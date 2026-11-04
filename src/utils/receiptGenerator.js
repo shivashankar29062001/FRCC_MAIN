@@ -38,6 +38,7 @@ export function generateBookingReceiptPdf(booking) {
   else if (isParking) serviceType = 'Reserved Campus Parking';
 
   const title =
+    (isStay ? (booking.roomName || (booking.title !== 'FRCC Riverfront' ? booking.title : null) || 'Standard Room') : null) ||
     booking.title ||
     booking.venue_name ||
     booking.venueName ||

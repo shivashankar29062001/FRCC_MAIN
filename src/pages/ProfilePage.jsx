@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getMyStayBookings } from '../api/stay.js';
+import { rooms as HOTEL_ROOMS } from '../data/hotel.js';
 import { supabase } from '../services/supabase.js';
 import { getMyTableBookings } from '../api/dining.js';
 import { useActivityBookings } from '../features/activities/bookings.store.js';
@@ -53,6 +54,28 @@ import {
 // /profile — EVERY logged-in user. Reached only from the navbar avatar menu.
 // Tabs: Personal Details (editable) · Change Password · My Bookings · Payment History.
 // ---------------------------------------------------------------------------
+
+
+function getRoomTypeName(record) {
+  const fromJoin = Array.isArray(record?.room_types) ? record.room_types[0]?.name : record?.room_types?.name;
+  if (fromJoin && fromJoin !== 'Hotel Room' && fromJoin !== 'FRCC Riverfront') return fromJoin;
+  if (record?.roomName && record.roomName !== 'Hotel Room' && record.roomName !== 'FRCC Riverfront') return record.roomName;
+  if (record?.title && record.title !== 'Hotel Room' && record.title !== 'FRCC Riverfront') return record.title;
+  const typeId = record?.room_type_id || record?.roomTypeId || record?.roomId || record?.room_id;
+  if (typeId) {
+    const found = (HOTEL_ROOMS || []).find((rm) => rm.id === typeId || rm.type === typeId || rm.name === typeId);
+    if (found?.name) return found.name;
+    const lower = String(typeId).toLowerCase();
+    if (lower.includes('deluxe')) return 'Deluxe Room';
+    if (lower.includes('presidential')) return 'Presidential Suite';
+    if (lower.includes('executive')) return 'Executive Suite';
+    if (lower.includes('junior')) return 'Junior Suite';
+    if (lower.includes('premium')) return 'Premium Room';
+    if (lower.includes('standard')) return 'Standard Room';
+    if (lower.includes('suite')) return 'Suite Room';
+  }
+  return 'Standard Room';
+}
 
 const TABS = [
   { id: 'details', label: 'Personal Details', icon: UserIcon },
@@ -569,8 +592,8 @@ export function ProfilePage({ initialTab = 'details' }) {
             category: 'hotel',
             user_id: r.user_id || user.id,
             userId: r.user_id || user.id,
-            roomName: r.room_types?.name || 'Hotel Room',
-            title: r.room_types?.name || 'Hotel Room',
+            roomName: getRoomTypeName(r),
+            title: getRoomTypeName(r),
             areaName: r.area_name || r.areaName || r.location || r.details?.areaName || 'Vijayawada Campus',
             venueName: r.venue_name || r.venueName || r.details?.venueName || 'FRCC Riverfront',
             cityName: r.city_name || r.cityName || r.details?.cityName || 'Vijayawada',
@@ -1082,9 +1105,13 @@ export function ProfilePage({ initialTab = 'details' }) {
       if (matchedRef && bookingsByRef.has(matchedRef)) {
         const existing = bookingsByRef.get(matchedRef);
         const uuid = existing.uuid || appB.uuid || existing.rawId || appB.rawId || appB.id;
+        const resolvedRoom = isStay
+          ? (getRoomTypeName(appB) !== 'Standard Room' ? getRoomTypeName(appB) : getRoomTypeName(existing))
+          : null;
         bookingsByRef.set(matchedRef, {
           ...appB,
           ...existing,
+          ...(resolvedRoom ? { roomName: resolvedRoom, title: resolvedRoom } : {}),
           bookingRef: matchedRef,
           bookingId: matchedRef,
           id: matchedRef,
@@ -1616,7 +1643,13 @@ export function ProfilePage({ initialTab = 'details' }) {
                             <p className="font-semibold text-navy-900">
                               {isParking
                                 ? (b.title || `Parking Slot ${b.slot_id || b.parkingSlot || b.slot || ''}`)
-                                : (b.venue_name || b.venueName || b.roomName || b.gameName || b.title || b.game)}
+                                : isStay
+                                ? (b.roomName || b.title || 'Standard Room')
+                                : isDining
+                                ? (b.venue_name || b.venueName || b.restaurant_name || b.title || 'Dining Table')
+                                : isHall
+                                ? (b.hallName || b.hall_name || b.title || b.venue_name || 'Convention Hall')
+                                : (b.gameName || b.title || b.game || 'Activity')}
                             </p>
                           </div>
                           {(() => {
@@ -1892,7 +1925,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Service</span>
                           <span className="font-semibold text-navy-900">
-                            {bookingToCancel.title || bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || 'Booking'}
+                            {bookingToCancel.category === 'hotel' || bookingToCancel.category === 'stay' || bookingToCancel.roomName
+                              ? (bookingToCancel.roomName || (bookingToCancel.title !== 'FRCC Riverfront' ? bookingToCancel.title : null) || 'Standard Room')
+                              : (bookingToCancel.title || bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || 'Booking')}
                           </span>
                         </div>
                         <div className="flex justify-between">
