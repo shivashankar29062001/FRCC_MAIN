@@ -204,7 +204,7 @@ export async function createBooking(payload) {
       payment_method: payload.paymentMethod || payload.payment_method || 'upi',
       status: total === 0 || payload.isMockPaid ? 'confirmed' : 'pending',
       hold_expires_at: total === 0 ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      is_test: Boolean(couponDiscount > 0 || payload.isTest),
+      is_test: false,
       created_at: new Date().toISOString(),
     };
 

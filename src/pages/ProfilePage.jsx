@@ -1762,12 +1762,7 @@ export function ProfilePage({ initialTab = 'details' }) {
                                   Stay
                                 </span>
                               ) : null}
-                              {b.is_test && (
-                                <span className="inline-block rounded bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                  Test
-                                </span>
-                              )}
-                            </div>
+                                                          </div>
                             <p className="font-semibold text-navy-900">
                               {isParking
                                 ? (b.title || `Parking Slot ${b.slot_id || b.parkingSlot || b.slot || ''}`)
