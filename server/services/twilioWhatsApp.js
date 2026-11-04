@@ -6,7 +6,12 @@
  * rich-text fallback.
  */
 
-const twilio = require('twilio');
+let twilio = null;
+try {
+  twilio = require('twilio');
+} catch {
+  twilio = null;
+}
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
@@ -17,6 +22,9 @@ const MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID || '';
 let twilioClient = null;
 function getClient() {
   if (!twilioClient) {
+    if (!twilio) {
+      throw new Error('Twilio package is not installed. Run "npm install" in the server directory.');
+    }
     if (!ACCOUNT_SID || !AUTH_TOKEN) {
       throw new Error('Twilio credentials missing: TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN');
     }

@@ -647,9 +647,9 @@ export function HotelPage() {
               <p className="eyebrow">Accommodations</p>
               <h2 className="h-section mt-1">Choose your room</h2>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                <span>Normal rooms ₹2,500 to ₹4,500 per night</span>
+                <span>Normal rooms starting from ₹2,500 per night</span>
                 <span className="text-slate-300">·</span>
-                <span>Suites ₹4,500 to ₹10,000 per night</span>
+                <span>Suites starting from ₹6,000 per night</span>
               </div>
             </div>
             <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-semibold hover:text-gold-600 inline-flex self-start sm:self-end">
