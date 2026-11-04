@@ -88,8 +88,15 @@ export function generateBookingReceiptPdf(booking) {
     if (booking.checkout) rows.push(['Check-out Date', formatDMY(booking.checkout)]);
     if (booking.nights) rows.push(['Duration', `${booking.nights} Night${Number(booking.nights) > 1 ? 's' : ''}`]);
     if (booking.guests) rows.push(['Guests', String(booking.guests)]);
-    rows.push(['Campus Location', String(booking.areaName || 'Vijayawada Campus')]);
+    const stayLoc = booking.venueName
+      ? `${booking.areaName || 'Vijayawada Campus'} • ${booking.venueName}`
+      : (booking.location || booking.areaName || booking.details?.venueName || booking.details?.areaName || 'Vijayawada Campus');
+    rows.push(['Campus Location', String(stayLoc)]);
   } else if (isDining) {
+    const diningLoc = booking.venueLocationName
+      ? `${booking.areaName || 'Vijayawada Campus'} • ${booking.venueLocationName}`
+      : (booking.location || booking.areaName || booking.details?.areaName || 'Vijayawada Campus');
+    rows.push(['Dining Location', String(diningLoc)]);
     rows.push(['Reservation Date', String(booking.date || '—')]);
     rows.push(['Time Slot', String(booking.time || booking.slot || '—')]);
     rows.push(['Party Size', String(booking.guests || '2 Guests')]);
@@ -112,10 +119,13 @@ export function generateBookingReceiptPdf(booking) {
     rows.push(['Campus Location', String(booking.areaName || 'Vijayawada Campus')]);
   } else {
     // Activity
+    const actLoc = booking.venueName
+      ? `${booking.areaName || 'Vijayawada Campus'} • ${booking.venueName}`
+      : (booking.location || booking.areaName || booking.details?.venueName || booking.details?.areaName || 'Vijayawada Campus • Sports Complex');
     rows.push(['Activity Date', formatDMY(booking.date)]);
     rows.push(['Time Slot', String(booking.slot || '—')]);
     rows.push(['Players / Participants', String(booking.players || 1)]);
-    rows.push(['Facility Location', String(booking.areaName || 'Vijayawada Campus • Sports Complex')]);
+    rows.push(['Facility Location', String(actLoc)]);
   }
 
   // Pricing Breakdown

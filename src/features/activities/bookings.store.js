@@ -141,6 +141,15 @@ async function fallbackCreateActivityBooking({
     date: String(date),
     slot: String(slot),
     players: Number(players || 1),
+    area_name: details?.areaName || 'Vijayawada Campus',
+    areaName: details?.areaName || 'Vijayawada Campus',
+    venue_name: details?.venueName || 'Sports Complex',
+    venueName: details?.venueName || 'Sports Complex',
+    city_name: details?.cityName || 'Vijayawada',
+    cityName: details?.cityName || 'Vijayawada',
+    city_id: details?.cityId || 'vja',
+    cityId: details?.cityId || 'vja',
+    location: details?.location || `${details?.areaName || 'Vijayawada Campus'} · ${details?.venueName || 'Sports Complex'}`,
     details: {
       ...(details || {}),
       ...(currentUserId && !validDbUserId ? { memberUserId: currentUserId } : {}),
@@ -315,6 +324,10 @@ export async function createActivityBookingRemote({
     });
 
     if (!error && data) {
+      data.areaName = details?.areaName || data.area_name || 'Vijayawada Campus';
+      data.venueName = details?.venueName || data.venue_name || 'Sports Complex';
+      data.cityName = details?.cityName || data.city_name || 'Vijayawada';
+      data.location = details?.location || `${data.areaName} · ${data.venueName}`;
       saveLocalActiveActivityBooking(data);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));

@@ -573,7 +573,9 @@ export function ProfilePage({ initialTab = 'details' }) {
             userId: r.user_id || user.id,
             roomName: r.room_types?.name || 'Hotel Room',
             title: r.room_types?.name || 'Hotel Room',
-            areaName: 'Vijayawada Campus',
+            areaName: r.area_name || r.areaName || r.location || r.details?.areaName || 'Vijayawada Campus',
+            venueName: r.venue_name || r.venueName || r.details?.venueName || 'FRCC Riverfront',
+            cityName: r.city_name || r.cityName || r.details?.cityName || 'Vijayawada',
             checkin: r.check_in,
             checkout: r.check_out,
             date: r.check_in,
@@ -1698,6 +1700,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                           ) : isDining ? (
                             <>
                               <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Location</dt>
+                                <dd className="font-medium text-navy-900">{b.location || b.areaName || b.venueLocationName || b.venue_location || b.details?.areaName || 'Vijayawada Campus'}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{b.date}</dd>
                               </div>
@@ -1738,13 +1744,17 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                               {(b.areaName || b.details?.area) && (
                                 <div className="flex justify-between gap-3">
-                                  <dt className="text-slate-500">Campus</dt>
-                                  <dd className="font-medium text-navy-900">{b.areaName || b.details?.area}</dd>
+                                  <dt className="text-slate-500">Location</dt>
+                                  <dd className="font-medium text-navy-900">{b.venueName ? `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}` : (b.areaName || b.details?.area || b.location || 'Vijayawada Campus')}</dd>
                                 </div>
                               )}
                             </>
                           ) : (
                             <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Location</dt>
+                                <dd className="font-medium text-navy-900">{b.venueName ? `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}` : (b.areaName || b.details?.areaName || b.location || 'Vijayawada Campus · Sports Complex')}</dd>
+                              </div>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{formatDMY(b.date)}</dd>

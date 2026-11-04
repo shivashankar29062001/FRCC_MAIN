@@ -37,6 +37,8 @@ import {
   ArrowRightIcon,
 } from '../../components/ui/icons.jsx';
 import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+import { LocationSelector } from '../../components/booking/LocationSelector.jsx';
+import { ACTIVITY_LOCATIONS } from '../../data/bookingLocations.js';
 
 // ---------------------------------------------------------------------------
 // /book/activities/process — the Activities booking page (redirect target of
@@ -50,7 +52,7 @@ import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 // ---------------------------------------------------------------------------
 
 const STEPS = [
-  { id: 'game', title: 'Select Game' },
+  { id: 'game', title: 'Location & Game' },
   { id: 'date', title: 'Date & Time' },
   { id: 'slot', title: 'Available Slot' },
   { id: 'details', title: 'Player Details' },
@@ -124,6 +126,11 @@ const STORAGE_KEY = 'frcc_activities_booking_draft';
 function blankDraft(gameId, user) {
   const prefilledMobile = user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
   return {
+    cityId: 'vja',
+    cityName: 'Vijayawada',
+    venueId: 'vja-activities',
+    venueName: 'Sports Complex',
+    areaName: 'Vijayawada Campus',
     gameId: gameId || '',
     date: '',
     slot: '',
@@ -429,7 +436,7 @@ export function ActivitiesProcessPage() {
   }
 
   function selectGame(id) {
-    setDraft((d) => ({ ...blankDraft(id, user), name: d.name, mobile: d.mobile }));
+    setDraft((d) => ({ ...blankDraft(id, user), name: d.name, mobile: d.mobile, cityId: d.cityId, cityName: d.cityName, venueId: d.venueId, venueName: d.venueName, areaName: d.areaName }));
     setErrors({});
   }
 
@@ -457,6 +464,12 @@ export function ActivitiesProcessPage() {
           ...draft.extras,
           equipment: draft.equipment,
           gameName: game?.name,
+          cityId: draft.cityId || 'vja',
+          cityName: draft.cityName || 'Vijayawada',
+          venueId: draft.venueId || 'vja-activities',
+          venueName: draft.venueName || 'Sports Complex',
+          areaName: draft.areaName || 'Vijayawada Campus',
+          location: draft.venueName && draft.areaName ? `${draft.areaName} · ${draft.venueName}` : (draft.areaName || 'Vijayawada Campus · Sports Complex'),
         },
       });
 
@@ -468,6 +481,12 @@ export function ActivitiesProcessPage() {
         gameName: created.title || game?.name,
         userId: created.user_id,
         user_id: created.user_id,
+        cityId: draft.cityId || created.city_id || 'vja',
+        cityName: draft.cityName || created.city_name || 'Vijayawada',
+        venueId: draft.venueId || created.venue_id || 'vja-activities',
+        venueName: draft.venueName || created.venue_name || 'Sports Complex',
+        areaName: draft.areaName || created.area_name || 'Vijayawada Campus',
+        location: draft.venueName && draft.areaName ? `${draft.areaName} · ${draft.venueName}` : (draft.areaName || 'Vijayawada Campus · Sports Complex'),
       };
 
       try {
@@ -515,6 +534,7 @@ export function ActivitiesProcessPage() {
       'FRCC — Activities Booking Receipt',
       `Booking ID: ${confirmed.bookingId}`,
       `Game: ${confirmed.gameName || g?.name || confirmed.game}`,
+      `Location: ${confirmed.venueName ? `${confirmed.areaName || 'Vijayawada Campus'} · ${confirmed.venueName}` : (confirmed.location || confirmed.areaName || 'Vijayawada Campus · Sports Complex')}`,
       `Date: ${prettyDate(confirmed.date)}`,
       `Slot: ${confirmed.slot}`,
       `Players: ${confirmed.players}`,
@@ -633,13 +653,13 @@ export function ActivitiesProcessPage() {
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
       guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
-      location: 'Vijayawada Campus · Sports Complex',
+      location: draft.venueName && draft.areaName ? `${draft.areaName} · ${draft.venueName}` : (draft.areaName || 'Vijayawada Campus · Sports Complex'),
       locationId: 'vja-activities',
       price: quote.subtotal,
       memberDiscount: quote.discount > 0 ? quote.discount : undefined,
       total: quote.total,
     };
-  }, [game, draft.date, draft.slot, draft.players, draft.extras, quote]);
+  }, [game, draft.date, draft.slot, draft.players, draft.extras, draft.venueName, draft.areaName, draft.venueId, quote]);
 
   return (
     <FlowShell
@@ -660,14 +680,40 @@ export function ActivitiesProcessPage() {
         {step === 0 && (
           <Reveal>
             <Card>
-              <p className="eyebrow">Step 1 · Select Game</p>
-              <h2 className="h-sub mt-1">Which game are you booking?</h2>
+              <p className="eyebrow">Step 1 · Location &amp; Game</p>
+              <h2 className="h-sub mt-1">Step 1: Select Location &amp; Game</h2>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
                 <span>All facilities and courts are open daily at FRCC.</span>
-                <LocationTrigger locationId="vja-activities" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
-                  Vijayawada Campus · View on map &amp; get directions
+                <LocationTrigger locationId={draft.venueId || 'vja-activities'} className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+                  {draft.areaName || 'Vijayawada Campus'} · View on map
                 </LocationTrigger>
               </div>
+              <div className="mt-5">
+                <LocationSelector
+                  locations={ACTIVITY_LOCATIONS}
+                  cityId={draft.cityId || 'vja'}
+                  venueId={draft.venueId || 'vja-activities'}
+                  cityLabel="Select City"
+                  venueLabel="Select Venue / Complex"
+                  onCityChange={(cid, cityObj, firstVenue) => {
+                    patch({
+                      cityId: cid,
+                      cityName: cityObj?.name || '',
+                      venueId: firstVenue?.id || '',
+                      venueName: firstVenue?.displayName || firstVenue?.name || '',
+                      areaName: firstVenue?.areaName || 'Vijayawada Campus',
+                    });
+                  }}
+                  onVenueChange={(vid, venueObj) => {
+                    patch({
+                      venueId: vid,
+                      venueName: venueObj?.displayName || venueObj?.name || '',
+                      areaName: venueObj?.areaName || 'Vijayawada Campus',
+                    });
+                  }}
+                />
+              </div>
+
               {paramGame && !paramValid && (
                 <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
                   “{paramGame}” isn’t a known game — pick one below to start.
@@ -986,6 +1032,10 @@ export function ActivitiesProcessPage() {
                     </div>
 
                     <div className="mx-auto mt-4 max-w-md rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Location</span>
+                        <span className="font-semibold text-navy-900">{confirmed.venueName ? `${confirmed.areaName || 'Vijayawada Campus'} · ${confirmed.venueName}` : (confirmed.location || confirmed.areaName || 'Vijayawada Campus · Sports Complex')}</span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Date</span>
                         <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>
