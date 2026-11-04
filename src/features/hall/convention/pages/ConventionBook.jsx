@@ -158,9 +158,10 @@ export default function ConventionBook() {
       <Stepper current={0} />
       <h1 className="text-3xl mb-6">Step 1: Select Location & Hall</h1>
 
-      {/* Location selector */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <select className="border rounded p-2 w-full sm:flex-1" value={cityId}
+      {/* Location, filters & sort */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <select className="border rounded p-2 w-full bg-white text-navy-900" value={cityId}
+          aria-label="City"
           onChange={e => {
             const val = e.target.value;
             setCityId(val); setAreaId(''); setVenueId(''); setRoomType('ALL'); setCooling('ALL');
@@ -170,52 +171,24 @@ export default function ConventionBook() {
           {Array.isArray(citiesData) && citiesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
-        {areas.length > 1 && (
-          <select className="border rounded p-2 w-full sm:flex-1" value={areaId} disabled={!cityId}
-            onChange={e => {
-              const val = e.target.value;
-              setAreaId(val); setVenueId('');
-              const found = Array.isArray(areas) ? areas.find(a => a.id === val) : null;
-              updateBooking({ areaId: val, areaName: found ? found.name : '', venueId: '', venueName: '', hallId: null });
-            }}>
-            <option value="">-- Select Area --</option>
-            <option value="ALL">All areas</option>
-            {Array.isArray(areas) && areas.map(a => (
-              <option key={a.id} value={a.id}>{a.name} {a.rating ? `⭐ ${a.rating}` : ''}</option>
-            ))}
-          </select>
-        )}
-
-        <select className="border rounded p-2 w-full sm:flex-1" value={venueId} disabled={!cityId}
-          onChange={e => {
-            const val = e.target.value;
-            setVenueId(val);
-            const v = Array.isArray(venues) ? venues.find(x => x.id === val) : null;
-            updateBooking({ venueId: val, venueName: v ? v.name : '', hallId: null });
-          }}>
-          <option value="">-- Select Venue --</option>
-          {Array.isArray(venues) && venues.map(v => (
-            <option key={v.id} value={v.id}>{v.name} — {v.areaName}, {v.cityName}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Filters & sort */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <select className="border rounded p-2 w-full sm:w-56" value={roomType}
+        <select className="border rounded p-2 w-full bg-white text-navy-900" value={roomType}
           aria-label="Room type"
           onChange={e => { setRoomType(e.target.value); updateBooking({ hallId: null }); }}>
           <option value="ALL">All types</option>
           {roomTypes.map(rt => <option key={rt} value={rt}>{rt}</option>)}
         </select>
-        <select className="border rounded p-2 w-full sm:w-56" value={cooling}
+
+        <select className="border rounded p-2 w-full bg-white text-navy-900" value={cooling}
           aria-label="Cooling"
           onChange={e => { setCooling(e.target.value); updateBooking({ hallId: null }); }}>
           <option value="ALL">All cooling</option>
           <option value="AC">AC</option>
           <option value="NON_AC">Non-AC</option>
         </select>
-        <select className="border rounded p-2 w-full sm:w-56" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+
+        <select className="border rounded p-2 w-full bg-white text-navy-900" value={sortBy}
+          aria-label="Sort by"
+          onChange={e => setSortBy(e.target.value)}>
           <option value="price-asc">Price: Low to High</option>
           <option value="price-desc">Price: High to Low</option>
           <option value="capacity-asc">Capacity: Low to High</option>
@@ -267,7 +240,18 @@ export default function ConventionBook() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {sortedHalls.map((h, i) => (
           <HallCard key={h.id} hall={h} selected={booking.hallId === h.id} guests={guestsNum} eager={i < 3}
-            onSelect={(hall) => updateBooking({ hallId: hall.id, hallName: hall.name, cooling: hall.cooling, capacity: hall.capacity })} />
+            onSelect={(hall) => updateBooking({
+            hallId: hall.id,
+            hallName: hall.name,
+            cooling: hall.cooling,
+            capacity: hall.capacity,
+            venueId: hall.venueId,
+            venueName: hall.venueName,
+            cityId: hall.cityId,
+            cityName: hall.cityName,
+            areaId: hall.areaId,
+            areaName: hall.areaName,
+          })} />
         ))}
       </div>
 
