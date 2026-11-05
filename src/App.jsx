@@ -113,13 +113,16 @@ export default function App() {
 
                     {/* Activities */}
                     <Route path="/activities" element={<ActivitiesPage />} />
+                    <Route path="/book/activity" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
                     <Route path="/book/activities" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
+                    <Route path="/activities/book" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
                     <Route path="/book/activities/process" element={<RequireAuth forceGated><ActivitiesProcessPage /></RequireAuth>} />
 
                     {/* Membership */}
                     <Route path="/membership" element={<MembershipLandingPage />} />
                     <Route path="/book/membership" element={<Navigate to="/membership" replace />} />
                     <Route path="/membership/join" element={<RequireAuth forceGated><MembershipJoinPage /></RequireAuth>} />
+                    <Route path="/membership/apply" element={<RequireAuth forceGated><MembershipJoinPage /></RequireAuth>} />
                     <Route path="/application-form" element={<RequireAuth forceGated><MembershipJoinPage /></RequireAuth>} />
                     <Route path="/membership/dashboard" element={<RequireAuth forceGated><MembershipDashboardPage /></RequireAuth>} />
 

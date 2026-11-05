@@ -31,10 +31,10 @@ function getPublicFallback(pathname) {
   if (pathname.startsWith('/parking/book') || pathname.startsWith('/book/parking')) {
     return '/parking';
   }
-  if (pathname.startsWith('/book/activities')) {
+  if (pathname.startsWith('/book/activit') || pathname.startsWith('/activities/book')) {
     return '/activities';
   }
-  if (pathname.startsWith('/membership/join') || pathname.startsWith('/membership/dashboard')) {
+  if (pathname.startsWith('/membership/join') || pathname.startsWith('/membership/apply') || pathname.startsWith('/membership/dashboard')) {
     return '/membership';
   }
   return '/';

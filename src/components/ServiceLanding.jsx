@@ -210,7 +210,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
         locationId: 'vja-club',
         locationName: 'FRCC Main Campus',
         buttonLabel: 'Apply for membership',
-        to: '/membership/apply',
+        to: `/membership/join?plan=${encodeURIComponent(p.id)}`,
       }));
     }
 
