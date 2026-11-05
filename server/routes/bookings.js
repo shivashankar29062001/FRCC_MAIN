@@ -19,6 +19,14 @@ router.get('/availability', (req, res) => {
 
 // Create booking - user comes from authenticated token
 router.post('/', auth, (req, res) => {
+  // Validate vehicle registration number if provided (parking or transport)
+  if (req.body && req.body.vehicleNumber) {
+    const cleanNum = String(req.body.vehicleNumber).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    if (!/^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/.test(cleanNum)) {
+      return res.status(400).json({ error: 'Invalid vehicle registration number. Expected format: AP74HU7654' });
+    }
+  }
+
   const { hallId, date, startTime, endTime, guests, eventType, eventDetails, organizerName, phone, email, specialRequests, upiIdMasked, transactionRef } = req.body || {};
   if (!hallId || !date || !startTime || !endTime || !guests || !eventType || !organizerName)
     return res.status(400).json({ error: 'Missing required booking fields.' });

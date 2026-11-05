@@ -7,18 +7,25 @@
 import { MapPin, Calendar, Clock, Car } from 'lucide-react';
 import ParkingBlock from './ParkingBlock.jsx';
 import SlotLegend from './SlotLegend.jsx';
+import {
+  isValidVehicleNumber,
+  cleanVehicleNumber,
+  VEHICLE_NUMBER_ERROR_MESSAGE,
+} from '../../../../utils/vehicle.js';
 import './BookingForm.css';
 
 export default function BookingForm({
   formData,
   errors = {},
   onChange,
+  onError,
   selectedSlot,
   slots,
   onSelectSlot,
   amount = 0,
   numberOfDays = 1,
   onConfirmBooking,
+  onProceedToSlots,
   isSubmitting = false
 }) {
   const handleInputChange = (field, value) => {
@@ -29,8 +36,16 @@ export default function BookingForm({
   };
 
   const handleVehicleNumberChange = (e) => {
-    const raw = e.target.value.toUpperCase().replace(/\s+/g, '');
+    const raw = cleanVehicleNumber(e.target.value);
     handleInputChange('vehicleNumber', raw);
+  };
+
+  const handleVehicleNumberBlur = () => {
+    if (formData.vehicleNumber && formData.vehicleNumber.trim().length > 0 && !isValidVehicleNumber(formData.vehicleNumber)) {
+      if (typeof onError === 'function') {
+        onError('vehicleNumber', VEHICLE_NUMBER_ERROR_MESSAGE);
+      }
+    }
   };
 
   const formatDisplayDate = (dateStr) => {
@@ -63,6 +78,7 @@ export default function BookingForm({
   const todayStr = new Date().toISOString().split('T')[0];
   const effectiveCity = formData.city || (formData.campus_id === 'hyd' ? 'Hyderabad' : 'Vijayawada');
   const campusLabel = effectiveCity === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus';
+  const isVehicleValid = isValidVehicleNumber(formData.vehicleNumber);
 
   return (
     <div className="booking-forms-wrapper">
@@ -79,14 +95,16 @@ export default function BookingForm({
               <label className="field-label" htmlFor="city-select">
                 City <span className="req-star">*</span>
               </label>
-              <div className="select-wrapper">
+              <div className="city-input-wrapper select-wrapper">
                 <input
                   type="text"
                   id="city-select"
-                  className="form-input read-only-input"
+                  className="form-input read-only-input read-only-city-input"
                   value={effectiveCity}
                   readOnly
                   disabled
+                  aria-readonly="true"
+                  tabIndex={-1}
                 />
               </div>
               <p className="field-info-text text-xs text-slate-500 mt-1.5 flex items-center gap-1">
@@ -135,10 +153,17 @@ export default function BookingForm({
                   placeholder="Enter vehicle number (e.g. AP39AB1234)"
                   value={formData.vehicleNumber || ''}
                   onChange={handleVehicleNumberChange}
+                  onBlur={handleVehicleNumberBlur}
                   disabled={isSubmitting}
                   maxLength={10}
+                  aria-invalid={Boolean(errors.vehicleNumber)}
+                  aria-describedby={errors.vehicleNumber ? 'vehicle-number-error' : undefined}
                 />
-                {errors.vehicleNumber && <span className="field-error-text">{errors.vehicleNumber}</span>}
+                {errors.vehicleNumber && (
+                  <span id="vehicle-number-error" className="field-error-text">
+                    {errors.vehicleNumber}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -208,7 +233,7 @@ export default function BookingForm({
           <div className="slot-booking-card-body">
             <div className="date-time-inputs-row">
               <div className="form-field-group">
-                <label className="field-label">
+                <label className="field-label" htmlFor="booking-date-input">
                   Booking Date <span className="req-star">*</span>
                 </label>
                 <div className="input-with-icon">
@@ -218,16 +243,23 @@ export default function BookingForm({
                     className={`form-input date-picker-field ${errors.date ? 'input-error' : ''}`}
                     value={formData.date || ''}
                     min={todayStr}
+                    placeholder="DD-MM-YYYY"
                     onChange={(e) => handleInputChange('date', e.target.value)}
                     disabled={isSubmitting}
+                    aria-invalid={Boolean(errors.date)}
+                    aria-describedby={errors.date ? 'booking-date-error' : undefined}
                   />
-                  <Calendar size={16} className="input-right-icon pointer-events-none" />
+                  <Calendar size={18} className="input-right-icon pointer-events-none" aria-hidden="true" />
                 </div>
-                {errors.date && <span className="field-error-text">{errors.date}</span>}
+                {errors.date && (
+                  <span id="booking-date-error" className="field-error-text">
+                    {errors.date}
+                  </span>
+                )}
               </div>
 
               <div className="form-field-group">
-                <label className="field-label">
+                <label className="field-label" htmlFor="booking-time-input">
                   Booking Time <span className="req-star">*</span>
                 </label>
                 <div className="input-with-icon">
@@ -236,12 +268,19 @@ export default function BookingForm({
                     id="booking-time-input"
                     className={`form-input ${errors.time ? 'input-error' : ''}`}
                     value={formData.time || ''}
+                    placeholder="HH:MM"
                     onChange={(e) => handleInputChange('time', e.target.value)}
                     disabled={isSubmitting}
+                    aria-invalid={Boolean(errors.time)}
+                    aria-describedby={errors.time ? 'booking-time-error' : undefined}
                   />
-                  <Clock size={16} className="input-right-icon" />
+                  <Clock size={18} className="input-right-icon pointer-events-none" aria-hidden="true" />
                 </div>
-                {errors.time && <span className="field-error-text">{errors.time}</span>}
+                {errors.time && (
+                  <span id="booking-time-error" className="field-error-text">
+                    {errors.time}
+                  </span>
+                )}
               </div>
 
               <div className="form-field-group duration-field-group">
@@ -255,6 +294,8 @@ export default function BookingForm({
                     value={formData.days || ''}
                     onChange={(e) => handleInputChange('days', e.target.value ? Number(e.target.value) : '')}
                     disabled={isSubmitting}
+                    aria-invalid={Boolean(errors.days)}
+                    aria-describedby={errors.days ? 'booking-days-error' : undefined}
                   >
                     <option value="">Select Duration</option>
                     <option value="1">1 Day</option>
@@ -266,7 +307,11 @@ export default function BookingForm({
                     <option value="7">7 Days</option>
                   </select>
                 </div>
-                {errors.days && <span className="field-error-text">{errors.days}</span>}
+                {errors.days && (
+                  <span id="booking-days-error" className="field-error-text">
+                    {errors.days}
+                  </span>
+                )}
               </div>
             </div>
           </div>

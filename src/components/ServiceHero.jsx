@@ -226,16 +226,18 @@ export function ServiceHero({ service = 'stay' }) {
                   headlineDone ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
               >
-                <div className="landing-hero-stat-row">
-                  <span className="landing-hero-stat-number">{MEMBER_DISCOUNT_PERCENT}%</span>
-                  <div className="landing-hero-stat-divider" aria-hidden="true" />
-                  <div className="flex flex-col justify-center">
-                    <span className="landing-hero-stat-title">Member savings</span>
-                    <span className="landing-hero-stat-subtitle">{data.statSuffix || 'on every stay'}</span>
+                {service !== 'parking' && (
+                  <div className="landing-hero-stat-row">
+                    <span className="landing-hero-stat-number">{MEMBER_DISCOUNT_PERCENT}%</span>
+                    <div className="landing-hero-stat-divider" aria-hidden="true" />
+                    <div className="flex flex-col justify-center">
+                      <span className="landing-hero-stat-title">Member savings</span>
+                      <span className="landing-hero-stat-subtitle">{data.statSuffix || 'on every stay'}</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="mt-[18px]">
+                <div className={service === 'parking' ? 'mt-7' : 'mt-[18px]'}>
                   <Link
                     to={data.to || data.linkTarget || '#content'}
                     onClick={handleExplore}
@@ -324,16 +326,7 @@ export function ServiceHero({ service = 'stay' }) {
                     <div className="flex flex-1 flex-col p-5">
                       <h3 className="font-display text-lg text-navy-900">{offer.title}</h3>
                       <p className="mt-1.5 flex-1 text-sm text-slate-600 leading-relaxed">{offer.line}</p>
-                      <div className="mt-4 pt-1">
-                        <Link
-                          to={offer.link}
-                          onClick={() => { if (import.meta.env.DEV) console.info("[tile]", offer.title, offer.link); }}
-                          className="inline-flex items-center gap-1 text-sm font-semibold text-navy-900 transition-colors duration-150 hover:text-gold-600"
-                        >
-                          <span>View</span>
-                          <ArrowRightIcon className="h-3.5 w-3.5" />
-                        </Link>
-                      </div>
+                      
                     </div>
                   </article>
                 );

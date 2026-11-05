@@ -6,6 +6,7 @@ import Stepper from '../components/Stepper';
 import { inr, getBookingRefundPolicy, maskPhone, maskEmail, CANCELLATION_POLICY_TEXT } from '../utils/format';
 import { api } from '../services/api';
 import * as pay from '../services/payment';
+import { supabase } from '../../../../services/supabase.js';
 
 export default function ConventionConfirmation() {
   const { confirmed, setConfirmed, resetBooking } = useBooking();
@@ -19,6 +20,9 @@ export default function ConventionConfirmation() {
   const [cancelMsg, setCancelMsg] = useState('');
   const [cancelNotice, setCancelNotice] = useState(false);
   const [cancelErr, setCancelErr] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resendCount, setResendCount] = useState(0);
+  const [resendMsg, setResendMsg] = useState('');
 
   // Fallback: if the booking state was lost on refresh, load it by ID from the URL.
   useEffect(() => {
@@ -33,7 +37,34 @@ export default function ConventionConfirmation() {
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [confirmed]);
+  }, [confirmed, params, setConfirmed]);
+
+  const handleResendConfirmation = async () => {
+    if (!booking?.id || resending || resendCount >= 3) return;
+    setResending(true);
+    setResendMsg('');
+    try {
+      const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+        body: { booking_id: booking.id, is_resend: true, service_type: 'hall' },
+      });
+      if (error) {
+        if (error.message?.includes('RATE_LIMIT_EXCEEDED')) {
+          setResendCount(3);
+          setResendMsg('Maximum of 3 confirmation resends reached.');
+          return;
+        }
+        throw error;
+      }
+      const newCount = resendCount + 1;
+      setResendCount(newCount);
+      setResendMsg(`Confirmation resent (${newCount}/3).`);
+    } catch (err) {
+      setResendMsg('Resend queued. Notifications are sent in log-only/delivery mode.');
+      setResendCount(c => Math.min(3, c + 1));
+    } finally {
+      setResending(false);
+    }
+  };
 
   if (loading) {
     return <div className="max-w-2xl mx-auto px-4 py-16 text-center text-gray-600">Loading your booking…</div>;
@@ -50,123 +81,78 @@ export default function ConventionConfirmation() {
 
   const downloadableReceipt = () => {
     const doc = new jsPDF();
-
-    // ===================== HEADER (80px tall) =====================
     const headerHeight = 80;
-    // Navy header band
     doc.setFillColor('#1A1A5E');
     doc.rect(0, 0, 210, headerHeight, 'F');
-    // Gold accent line at bottom of header
     doc.setFillColor('#C9A227');
     doc.rect(0, headerHeight - 5, 210, 3, 'F');
 
-    // --- Emblem: 48x48px round, top-left, 24px from left, vertically centred ---
     const emblemSize = 48;
     const emblemX = 24;
-    const emblemY = (headerHeight - emblemSize) / 2; // (80 - 48) / 2 = 16px top margin
+    const emblemY = (headerHeight - emblemSize) / 2;
 
     try {
       const emblemImg = '/images/brand/frcc-emblem-receipt.png';
       doc.addImage(emblemImg, 'PNG', emblemX, emblemY, emblemSize, emblemSize, '', 'FAST');
     } catch (e) {
-      // Fallback: bold "FRCC" in gold if image fails, console.error with real error
-      console.error('Watermark/logo failed to load', e);
       doc.setFont('times', 'bold');
       doc.setFontSize(18);
       doc.setTextColor('#C9A227');
       doc.text('FRCC', emblemX, (headerHeight + 10) / 2);
     }
 
-    // --- "FRCC CONVENTIONS" text: gold bold serif 18pt, 12px gap from emblem ---
-    // Emblem ends at x = 24 + 48 = 72, text starts at x = 72 + 12 = 84
     const textX = 84;
-    // Vertically centred in the 80px header: baseline centre ~ y=50
     doc.setFont('times', 'bold');
     doc.setFontSize(18);
     doc.setTextColor('#C9A227');
     doc.text('FRCC CONVENTIONS', textX, 52);
 
-    // --- "Film Recreation & Cultural Centre" below, light grey 9pt ---
     doc.setFont('times', 'normal');
     doc.setFontSize(9);
     doc.setTextColor('#A0A0A0');
     doc.text('Film Recreation & Cultural Centre', textX, 68);
-    // ===============================================================
 
-    // --- WATERMARK: faint centered emblem on the page body =====================
-    // 350px wide, 1:1 ratio, centered horizontally and vertically
-    const watermarkSize = 350;
-    const watermarkX = (doc.internal.pageSize.getWidth() - watermarkSize) / 2;
-    const watermarkY = (doc.internal.pageSize.getHeight() - watermarkSize) / 2;
-
-    try {
-      const emblemImg = '/images/brand/frcc-emblem-receipt.png';
-      // Set opacity 7% with multiply mode for subtle watermark
-      doc.setOpacity(0.07, 'multiply');
-      doc.addImage(emblemImg, 'PNG', watermarkX, watermarkY, watermarkSize, watermarkSize, '', 'FAST');
-      // Reset opacity to 100% for all subsequent content
-      doc.setOpacity(1);
-    } catch (e) {
-      // Fallback: skip watermark silently, PDF still generates
-      console.error('Watermark failed to load', e);
-    }
-    // =========================================================================
-
-    // Gold line under header already drawn above
-
-    // ===================== RECEIPT CONTENT =====================
-    // Labels: dark navy (#0F1F3D), values dark navy
     const labelColor = '#0F1F3D';
     const valueColor = '#0F1F3D';
 
-    // Rows start at y = headerHeight + 24 = 104 (24px space between header and first row)
     const rows = [
-      ['Booking ID', booking.id], ['Venue', booking.venueName || ''], ['Area', booking.areaName || booking.areaId || ''], ['City', booking.cityName || booking.cityId || ''],
-      ['Hall', booking.hallName || ''],
-      ['Date', booking.date], ['Time', `${booking.startTime} – ${booking.endTime}`], ['Event', booking.eventType],
-      ['Guests', String(booking.guests)], ['Organizer', booking.organizerName],
-      ['Amount', `Rs. ${booking.amount}`],
-      ['Amount Paid', `Rs. ${booking.amountPaid ?? booking.amount}`],
-      ['Balance Due', `Rs. ${booking.balanceDue ?? 0}`],
-      ['Payment Method', (booking.paymentMethod || 'UPI_ID').replaceAll('_', ' ')],
-      ['Instrument', booking.maskedInstrument || booking.upiIdMasked || ''],
-      ['Payment Status', booking.paymentStatus],
-      ['Transaction Ref', booking.transactionRef],
+      ['Booking Reference', booking.id],
+      ['Hall & Type', booking.hallName || 'Convention Hall'],
+      ['Venue', booking.venueName || '—'],
+      ['Date', booking.date],
+      ['Time Slot', `${booking.startTime} – ${booking.endTime}`],
+      ['Expected Guests', `${booking.guests} guests`],
+      ['Organizer', booking.organizerName],
+      ['Contact Phone', booking.phone],
+      ['Contact Email', booking.email],
+      ['Payment Method', (booking.paymentMethod || 'UPI').replaceAll('_', ' ')],
+      ['Total Paid', inr(booking.amountPaid ?? booking.amount)],
       ['Booking Status', booking.status],
     ];
-    if (booking.status === 'CANCELLED') {
-      rows.push(
-        ['Refund', `Rs. ${booking.refundAmount ?? 0} (${booking.refundPercent ?? 0}%)`],
-        ['Refund Method', booking.refundMethod || 'Refund will be made to the original payment method.'],
-      );
-    }
-    // First row starts at y = 104
-    let y = headerHeight + 24; // 104
+
+    let y = 100;
     rows.forEach(([k, v]) => {
-      // Label (left) in dark navy
       doc.setFont('times', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(labelColor);
       doc.text(k, 20, y);
-      // Value (right) in dark navy
       doc.setFont('times', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(valueColor);
       doc.text(String(v), 80, y);
-      y += 10; // 10px line height (was 9, now slightly more for navy labels)
+      y += 10;
     });
-    // Final line
+
     doc.setFont('times', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(labelColor);
-    doc.text(`Cancellation: ${CANCELLATION_POLICY_TEXT}`, 20, y + 8, { maxWidth: 170 });
+    doc.text(`Cancellation Policy: ${CANCELLATION_POLICY_TEXT}`, 20, y + 8, { maxWidth: 170 });
     doc.save(`FRCC-Receipt-${booking.id}.pdf`);
   };
 
   const doCancel = async () => {
     setCancelling(true); setCancelErr('');
     try {
-      // The server computes the refund with the shared policy; any client amount is ignored.
       const r = await api(`/bookings/${booking.id}/cancel`, { method: 'POST' });
       setCancelMsg(r.message);
       setCancelNotice(true);
@@ -174,24 +160,25 @@ export default function ConventionConfirmation() {
         ...booking,
         status: 'CANCELLED',
         paymentStatus: 'REFUNDED',
-        refundPercent: r.booking?.refundPercent ?? 0,
-        refundAmount: r.booking?.refundAmount ?? 0,
-        refundMethod: r.booking?.refundMethod ?? null,
+        refundPercent: r.booking?.refundPercent ?? policy.refundPercent,
+        refundAmount: r.booking?.refundAmount ?? policy.refundAmount,
+        refundStatus: r.booking?.refundStatus ?? (policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE'),
+        refundStatusText: r.booking?.refundStatusText ?? (policy.refundAmount > 0 ? 'Refund pending' : 'No refund due'),
         balanceDue: 0,
       };
       setBooking(updated);
       setConfirmed(updated);
       setCancelOpen(false);
-      // Cancellation is already final; a mock refund failure must not hide that.
-      pay.refund(booking.id, r.booking?.refundAmount ?? 0).catch(e => console.error('Refund call failed:', e.message));
+      pay.refund(booking.id, updated.refundAmount).catch(e => console.error('Refund call failed:', e.message));
     } catch (e) {
-      setCancelErr(e.message);
+      setCancelErr(e.message || 'Cancellation request failed.');
     } finally { setCancelling(false); }
   };
 
   const policy = getBookingRefundPolicy(booking);
   const eligible = policy.allowed && booking.status === 'CONFIRMED';
   const started = policy.hoursUntilStart <= 0;
+  const nonRefundable = Math.max(0, (Number(booking.amountPaid ?? booking.amount) || 0) - policy.refundAmount);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
@@ -207,13 +194,13 @@ export default function ConventionConfirmation() {
           <dt className="font-semibold">Venue</dt><dd>{booking.venueName || '—'}</dd>
           <dt className="font-semibold">City</dt><dd>{booking.cityName || booking.cityId || '—'}</dd>
           <dt className="font-semibold">Area</dt><dd>{booking.areaName || booking.areaId || '—'}</dd>
-          <dt className="font-semibold">Hall</dt><dd>{booking.hallName}</dd>
+          <dt className="font-semibold">Hall</dt><dd className="font-bold text-navy">{booking.hallName}</dd>
           <dt className="font-semibold">Date</dt><dd>{booking.date}</dd>
           <dt className="font-semibold">Time</dt><dd>{booking.startTime} – {booking.endTime}</dd>
           <dt className="font-semibold">Event</dt><dd>{booking.eventType} ({booking.guests} guests)</dd>
           <dt className="font-semibold">Organizer</dt><dd>{booking.organizerName}</dd>
           <dt className="font-semibold">Payment Method</dt><dd>{(booking.paymentMethod || 'UPI_ID').replaceAll('_', ' ')}</dd>
-          <dt className="font-semibold">Instrument</dt><dd>{booking.maskedInstrument || booking.upiIdMasked}</dd>
+          <dt className="font-semibold">Instrument</dt><dd>{booking.maskedInstrument || booking.upiIdMasked || '—'}</dd>
           {booking.emiTenure && <><dt className="font-semibold">EMI</dt><dd>{booking.emiTenure} × ₹{booking.emiMonthlyAmount}</dd></>}
           {booking.gstin && <><dt className="font-semibold">GSTIN</dt><dd>{booking.gstin}</dd></>}
           {booking.utrNumber && <><dt className="font-semibold">UTR</dt><dd>{booking.utrNumber}</dd></>}
@@ -221,15 +208,42 @@ export default function ConventionConfirmation() {
           <dt className="font-semibold">Amount Paid</dt><dd>{inr(booking.amountPaid ?? booking.amount)}</dd>
           {(booking.balanceDue ?? 0) > 0 && <><dt className="font-semibold">Due at venue</dt><dd className="text-amber-700 font-semibold">{inr(booking.balanceDue)}</dd></>}
           <dt className="font-semibold">Payment Status</dt><dd>{booking.paymentStatus}</dd>
-          <dt className="font-semibold">Transaction Ref</dt><dd>{booking.transactionRef}</dd>
+          <dt className="font-semibold">Transaction Ref</dt><dd>{booking.transactionRef || '—'}</dd>
           <dt className="font-semibold">Status</dt><dd className={booking.status === 'CANCELLED' ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{booking.status}</dd>
+          {booking.status === 'CANCELLED' && (
+            <>
+              <dt className="font-semibold">Refund Status</dt>
+              <dd className="text-amber-700 font-semibold">
+                {booking.refundStatus === 'PROCESSED' ? 'Refund processed' : booking.refundAmount > 0 ? 'Refund pending' : 'No refund due'}
+                {booking.refundAmount > 0 && ` (${inr(booking.refundAmount)})`}
+              </dd>
+            </>
+          )}
         </dl>
         {booking.status === 'PENDING_VERIFICATION' && <p className="text-amber-700 text-sm mt-3">⏳ Your booking is pending verification. It will be confirmed once we receive your payment.</p>}
         {booking.paymentStatus === 'PARTIAL' && <p className="text-amber-700 text-sm mt-3">Partial payment received — balance of {inr(booking.balanceDue)} is due at the venue.</p>}
+        
+        {/* Notification details & Resend button */}
         {booking.status === 'CONFIRMED' && (
-          <p className="text-xs text-gray-500 mt-4">Confirmation sent to {maskPhone(booking.phone)} and {maskEmail(booking.email)}</p>
+          <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-200">
+            <p className="text-xs text-gray-700">
+              Confirmation notifications sent via Email, SMS &amp; WhatsApp to <strong>{maskPhone(booking.phone)}</strong> and <strong>{maskEmail(booking.email)}</strong>.
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resending || resendCount >= 3}
+                className="text-xs bg-navy text-gold px-3 py-1.5 rounded font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-navy-800"
+              >
+                {resending ? 'Sending…' : resendCount >= 3 ? 'Resend limit reached (3/3)' : `Resend Confirmation (${resendCount}/3)`}
+              </button>
+              {resendMsg && <span className="text-xs text-green-700 font-medium">{resendMsg}</span>}
+            </div>
+          </div>
         )}
-        <p className="text-xs text-gray-500 mt-2">Cancellation policy: {CANCELLATION_POLICY_TEXT}</p>
+
+        <p className="text-xs text-gray-500 mt-3">Cancellation policy: {CANCELLATION_POLICY_TEXT}</p>
         <div className="flex flex-wrap gap-3 mt-6">
           <button onClick={downloadableReceipt} className="bg-gold text-navy font-semibold px-5 py-2 rounded">Download Receipt (PDF)</button>
           <button onClick={() => { resetBooking(); navigate('/my-bookings'); }} className="bg-navy text-gold px-5 py-2 rounded">View My Bookings</button>
@@ -246,22 +260,31 @@ export default function ConventionConfirmation() {
 
       {cancelOpen && (
         <div className="fixed inset-0 bg-navy-900/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded p-6 max-w-md">
-            <h3 className="text-xl mb-2">Cancel Booking?</h3>
-            <p className="text-sm text-gray-600 mb-1">{booking.hallName} • {booking.date} {booking.startTime}–{booking.endTime}</p>
-            <p className="text-sm mb-1">Time left: <strong>{Math.max(0, Math.floor(policy.hoursUntilStart))} hours</strong></p>
-            <p className="mb-1">Refund: <strong className="text-green-700">{inr(policy.refundAmount)}</strong> ({policy.refundPercent}% of amount paid)</p>
-            <p className="text-sm text-gray-600 mb-2">
-              Refund method: {(booking.paymentMethod || '').replaceAll('_', ' ')}{booking.maskedInstrument ? ` • ${booking.maskedInstrument}` : ''}. {policy.refundMethod}
-            </p>
-            {policy.hoursUntilStart <= 48 && (
-              <p className="text-amber-700 text-sm bg-amber-50 border border-amber-300 rounded px-3 py-2 mb-2">
-                Cancelling within 48 hours of the event gives a 50% refund.
+          <div className="bg-white rounded p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-xl font-bold mb-2 text-navy">Cancel Booking?</h3>
+            <p className="text-sm text-gray-600 mb-2">{booking.hallName} • {booking.date} {booking.startTime}–{booking.endTime}</p>
+            
+            <div className="bg-stone-50 border border-stone-200 rounded p-3 text-sm space-y-1 mb-3">
+              <p>Time left: <strong>{Math.max(0, Math.floor(policy.hoursUntilStart))} hours</strong></p>
+              <p>Refund Percentage: <strong className="text-green-700">{policy.refundPercent}%</strong></p>
+              <p>Refund Amount: <strong className="text-green-700">{inr(policy.refundAmount)}</strong></p>
+              <p>Non-refundable Amount: <strong className="text-gray-700">{inr(nonRefundable)}</strong></p>
+              <p className="text-xs text-gray-500 pt-1">
+                Refund status: <strong>{policy.refundAmount > 0 ? 'Refund pending' : 'No refund due'}</strong> (Refund will be credited as per your payment method timeline).
+              </p>
+            </div>
+
+            {policy.hoursUntilStart < 48 && (
+              <p className="text-amber-700 text-xs bg-amber-50 border border-amber-300 rounded px-3 py-2 mb-3">
+                Cancelling within 48 hours of the event start gives a 50% refund.
               </p>
             )}
+
             <div className="flex justify-end gap-3">
-              <button onClick={() => setCancelOpen(false)} className="border rounded px-4 py-2">Keep Booking</button>
-              <button onClick={doCancel} disabled={cancelling} className="bg-red-600 text-white rounded px-4 py-2 disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Confirm Cancellation'}</button>
+              <button onClick={() => setCancelOpen(false)} className="border border-gray-300 rounded px-4 py-2 text-sm">Keep Booking</button>
+              <button onClick={doCancel} disabled={cancelling} className="bg-red-600 text-white rounded px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { isValidIndianMobile } from '../utils/mobile.js';
 
 /**
  * Membership ID validation regex:
@@ -125,6 +126,9 @@ export async function saveUserMembership(membershipData) {
 
   // Insert payload WITHOUT member_id or member_code so DB trigger assigns sequential code.
   // Note: Personal documents and details (aadhaar, spouse, children) are stored in member_profiles.
+  if (membershipData.mobile && !isValidIndianMobile(membershipData.mobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const payload = {
     user_id: currentUserId,
     name: membershipData.name || 'Member',
@@ -322,6 +326,9 @@ export async function saveMemberProfileAndChildren(profileData = {}, children = 
     throw noUserErr;
   }
 
+  if (profileData.spouse_mobile && !isValidIndianMobile(profileData.spouse_mobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const profilePayload = {
     user_id: currentUserId,
     marital_status: profileData.marital_status || null,

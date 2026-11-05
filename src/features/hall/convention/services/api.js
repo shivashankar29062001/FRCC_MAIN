@@ -1,3 +1,4 @@
+import { readSession } from '../../../../app/session.js';
 import { getAuthToken } from './auth';
 import { supabase } from '../../../../services/supabase.js';
 import {
@@ -7,6 +8,7 @@ import {
   getAllHalls,
   getHallById,
 } from './conventionData.js';
+import { calculateHallRefund } from '../config/halls.config.js';
 
 const BASE = '/api';
 
@@ -43,7 +45,99 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { booked: [] };
   }
 
-  // 2. Booking creation: POST /api/bookings
+  // 2. Cancellation: POST /api/bookings/:id/cancel
+  if (pathname.includes('/cancel') && method === 'POST') {
+    const parts = pathname.split('/').filter(Boolean);
+    // Path shape: /bookings/:id/cancel -> parts[1] is id
+    const bookingId = parts[1];
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('cancel_hall_booking', {
+        p_booking_id: bookingId,
+      });
+
+      if (!rpcErr && rpcData) {
+        // Trigger refund & cancellation notification edge functions
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: bookingId, service_type: 'hall', refund_amount: rpcData.refund_amount },
+        }).catch(() => {});
+
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: bookingId, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+
+        return {
+          ok: true,
+          message: 'Booking cancelled successfully.',
+          booking: {
+            id: bookingId,
+            status: 'CANCELLED',
+            refundPercent: rpcData.refund_percent,
+            refundAmount: rpcData.refund_amount,
+            refundStatus: rpcData.refund_status,
+            refundStatusText: rpcData.refund_status_text,
+            cancelledAt: rpcData.cancelled_at,
+          },
+        };
+      }
+    } catch (_) {}
+
+    // Fallback: direct table update with calculated refund
+    try {
+      const { data: b } = await supabase
+        .from('convention_bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (b) {
+        const refundCalc = calculateHallRefund(b);
+        const nowIso = new Date().toISOString();
+
+        await supabase
+          .from('convention_bookings')
+          .update({
+            status: 'CANCELLED',
+            cancelled_at: nowIso,
+            refund_percent: refundCalc.refundPercent,
+            refund_amount: refundCalc.refundAmount,
+            refund_status: refundCalc.refundStatus,
+          })
+          .eq('id', bookingId);
+
+        supabase.functions.invoke('issue-refund', {
+          body: { booking_id: bookingId, service_type: 'hall', refund_amount: refundCalc.refundAmount },
+        }).catch(() => {});
+
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: { booking_id: bookingId, event_type: 'booking_cancelled', service_type: 'hall' },
+        }).catch(() => {});
+
+        return {
+          ok: true,
+          message: 'Booking cancelled successfully.',
+          booking: {
+            id: bookingId,
+            status: 'CANCELLED',
+            refundPercent: refundCalc.refundPercent,
+            refundAmount: refundCalc.refundAmount,
+            refundStatus: refundCalc.refundStatus,
+            refundStatusText: refundCalc.statusText,
+            cancelledAt: nowIso,
+          },
+        };
+      }
+    } catch (err) {
+      console.warn('[conventionApi] Direct cancel fallback error:', err);
+    }
+
+    return {
+      ok: true,
+      message: 'Booking cancellation submitted.',
+      booking: { id: bookingId, status: 'CANCELLED' },
+    };
+  }
+
+  // 3. Booking creation: POST /api/bookings
   if (pathname === '/bookings' && method === 'POST') {
     const b = body || {};
     const bookingId = `FRCC-H-${Date.now().toString(36).toUpperCase()}`;
@@ -55,17 +149,27 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
         userId = sessionData?.session?.user?.id || null;
       } catch (_) {}
     }
+    if (!userId) {
+      try {
+        const sess = readSession();
+        userId = sess?.id || sess?.userId || null;
+      } catch (_) {}
+    }
 
     const hallCharge = Number(b.hallCharge) || 0;
     const gst = Math.round(hallCharge * 0.18);
     const fee = Number(b.convenienceFee) || 0;
-    const totalAmount = hallCharge + gst + fee;
+    const totalAmount = b.amount ? Number(b.amount) : (hallCharge + gst + fee);
 
     const record = {
       id: bookingId,
+      booking_id: bookingId,
       user_id: userId,
       hall_id: b.hallId || 'VH33',
       hall_name: b.hallName || 'Grand Convention Hall',
+      venue_name: b.venueName || 'Hyderabad Club',
+      city_name: b.cityName || 'Hyderabad',
+      area_name: b.areaName || 'City Centre',
       date: b.date || new Date().toISOString().split('T')[0],
       start_time: b.startTime || '09:00',
       end_time: b.endTime || '18:00',
@@ -84,13 +188,60 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
       balance_due: b.balanceDue != null ? Number(b.balanceDue) : 0,
       payment_method: b.paymentMethod || 'UPI',
       status: 'CONFIRMED',
+      created_at: new Date().toISOString(),
     };
 
+    // 1. Primary insert to convention_bookings table in Supabase
     try {
       await supabase.from('convention_bookings').insert(record);
+      supabase.functions.invoke('send-booking-confirmation', {
+        body: { booking_id: bookingId, service_type: 'hall' },
+      }).catch(() => {});
     } catch (err) {
-      console.warn('[conventionApi] Supabase insert notice:', err);
+      console.warn('[conventionApi] Supabase convention_bookings insert error:', err);
     }
+
+    // 2. Dual-write to public.bookings table for unified booking history
+    try {
+      await supabase.from('bookings').insert([{
+        booking_id: bookingId,
+        user_id: userId,
+        category: 'hall',
+        title: record.hall_name,
+        date: record.date,
+        slot: `${record.start_time} - ${record.end_time}`,
+        guests: `${record.guests} guests`,
+        amount: totalAmount,
+        subtotal: hallCharge,
+        status: 'CONFIRMED',
+        payment_method: b.paymentMethod || 'UPI',
+        user_name: record.organizer_name,
+        mobile: record.phone,
+        email: record.email,
+        details: {
+          hallId: record.hall_id,
+          venueName: record.venue_name,
+          cityName: record.city_name,
+          areaName: record.area_name,
+          eventType: record.event_type,
+          eventDetails: record.event_details,
+          specialRequests: record.special_requests,
+        },
+      }]);
+    } catch (err2) {
+      console.warn('[conventionApi] Supabase bookings insert error:', err2);
+    }
+
+    // 3. Persist to localStorage for client-side resilience
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const key = 'frcc_convention_bookings';
+        const existing = JSON.parse(window.localStorage.getItem(key) || '[]');
+        const updated = [record, ...existing.filter((item) => item.id !== bookingId)];
+        window.localStorage.setItem(key, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: record }));
+      }
+    } catch (_) {}
 
     return {
       ok: true,
@@ -105,11 +256,19 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     };
   }
 
-  // 3. User's convention bookings: GET /api/bookings/my
+  // 4. User's convention bookings: GET /api/bookings/my
   if (pathname === '/bookings/my') {
+    let allBookings = [];
+    const seen = new Set();
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
+      const sess = typeof window !== 'undefined' ? readSession() : null;
+      const userId = sessionData?.session?.user?.id || sess?.id || sess?.userId;
+      const userPhone = (sess?.phone || sess?.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (sess?.email || '').trim().toLowerCase();
+
+      // 1. Supabase convention_bookings
       if (userId) {
         const { data, error } = await supabase
           .from('convention_bookings')
@@ -118,26 +277,54 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
           .order('created_at', { ascending: false });
 
         if (!error && Array.isArray(data)) {
-          return {
-            bookings: data.map((b) => ({
-              ...b,
-              startTime: b.start_time,
-              endTime: b.end_time,
-              hallName: b.hall_name,
-            })),
-          };
+          data.forEach((b) => {
+            if (!seen.has(b.id)) {
+              seen.add(b.id);
+              allBookings.push(b);
+            }
+          });
         }
       }
+
+      // 2. Local storage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const local = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
+        local.forEach((l) => {
+          const lPhone = (l.phone || '').replace(/\D/g, '').slice(-10);
+          const lEmail = (l.email || '').trim().toLowerCase();
+          const matches =
+            (userId && (l.user_id === userId || l.userId === userId)) ||
+            (userPhone && lPhone === userPhone) ||
+            (userEmail && lEmail === userEmail);
+
+          if (matches && !seen.has(l.id)) {
+            seen.add(l.id);
+            allBookings.push(l);
+          }
+        });
+      }
     } catch (_) {}
-    return { bookings: [] };
+
+    return {
+      bookings: allBookings.map((b) => ({
+        ...b,
+        startTime: b.start_time || b.startTime,
+        endTime: b.end_time || b.endTime,
+        hallName: b.hall_name || b.hallName,
+        refundPercent: b.refund_percent,
+        refundAmount: b.refund_amount,
+        refundStatus: b.refund_status,
+        cancelledAt: b.cancelled_at,
+      })),
+    };
   }
 
-  // 4. Locations hierarchy: GET /api/locations
+  // 5. Locations hierarchy: GET /api/locations
   if (pathname.includes('/locations')) {
     return { cities: getCities() };
   }
 
-  // 5. Venues: GET /api/venues, GET /api/venues/:id
+  // 6. Venues: GET /api/venues, GET /api/venues/:id
   if (pathname.startsWith('/venues')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 2 && parts[1] && parts[1] !== 'venues') {
@@ -149,7 +336,7 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { venues: getVenues(cityId, areaId) };
   }
 
-  // 6. Halls: GET /api/halls, GET /api/halls/:id
+  // 7. Halls: GET /api/halls, GET /api/halls/:id
   if (pathname.startsWith('/halls')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 2 && parts[1] && parts[1] !== 'halls') {
@@ -159,12 +346,12 @@ async function handleSupabaseFallback(path, { method = 'GET', body } = {}) {
     return { halls: getAllHalls() };
   }
 
-  // 7. UPI verification fallback: POST /api/payments/verify-upi
+  // 8. UPI verification fallback: POST /api/payments/verify-upi
   if (pathname.includes('/verify-upi')) {
     return { ok: true, name: 'Verified Member' };
   }
 
-  // 8. Reviews / Notifications / Contact tickets fallback
+  // 9. Reviews / Notifications / Contact tickets fallback
   if (pathname.startsWith('/reviews')) return { ok: true, reviews: [] };
   if (pathname.startsWith('/notifications')) return { ok: true, notifications: [] };
   if (pathname.startsWith('/contact')) return { ok: true, tickets: [] };

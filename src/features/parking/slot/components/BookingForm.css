@@ -110,6 +110,21 @@
   width: 100%;
 }
 
+.city-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.form-input.read-only-city-input {
+  background-color: #F8FAFC;
+  color: #0B1833;
+  font-weight: 500;
+  cursor: default;
+  user-select: none;
+  border: 1px solid #CBD5E1;
+  pointer-events: none;
+}
+
 .form-input,
 .form-select {
   width: 100%;
@@ -181,15 +196,79 @@
 }
 
 .input-with-icon .form-input {
-  padding-right: 34px;
+  position: relative;
+  width: 100%;
+  padding-right: 38px;
+}
+
+/* Hide native WebKit picker indicators and stretch across input so click anywhere opens picker */
+.input-with-icon input[type="date"]::-webkit-calendar-picker-indicator,
+.input-with-icon input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .input-right-icon {
   position: absolute;
-  right: 10px;
+  right: 12px;
   pointer-events: none;
-  /* Blue secondary icon removed - only the black header icon remains visible */
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e293b;
+  z-index: 1;
+}
+
+/* Proceed to slots button inside Date & Time card */
+.date-time-actions-row {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-proceed-slots {
+  background-color: #0B1833;
+  color: #FFFFFF;
+  border: 1px solid #0B1833;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-proceed-slots:hover:not(:disabled) {
+  background-color: #1E3A8A;
+  border-color: #1E3A8A;
+  box-shadow: 0 2px 6px rgba(11, 24, 51, 0.15);
+}
+
+.btn-proceed-slots:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hint banner above slot grid when date/time not yet picked */
+.slot-selection-hint-banner {
+  background: #F0F7FF;
+  border: 1px solid #BAE6FD;
+  color: #0369A1;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
 }
 
 /* 3. Full-width Card: Vehicle Details */

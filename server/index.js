@@ -11,6 +11,7 @@ try {
 const express = require('express');
 const cors = require('cors');
 const bookingRoutes = require('./routes/bookings');
+const parkingRoutes = require('./routes/parking');
 const miscRoutes = require('./routes/misc');
 const paymentRoutes = require('./routes/payments');
 const membershipRoutes = require('./routes/membership');
@@ -19,6 +20,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/parking', parkingRoutes);
+app.use('/api/bookings/parking', parkingRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/membership', membershipRoutes);

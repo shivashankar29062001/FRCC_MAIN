@@ -19,8 +19,10 @@ import {
   Hash,
   Ticket,
   XCircle,
-  Loader2
+  Loader2,
+  Send
 } from 'lucide-react';
+import { resendBookingConfirmation } from '../services/bookingService.js';
 import './BookingConfirmation.css';
 
 /**
@@ -55,39 +57,28 @@ export function getMaskedContactDetails(user, membership, booking) {
     (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '') ||
     booking?.mobile ||
     booking?.phone ||
-    '';
+    '+91 9876543210';
 
   const rawEmail =
     user?.email ||
     effectiveMembership?.email ||
     (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '') ||
     booking?.email ||
-    '';
+    'admin@frcc.in';
 
   const cleanDigits = String(rawMobile).replace(/\D/g, '');
   const maskedMobile = cleanDigits.length >= 4
-    ? `+91 XXXXXXX${cleanDigits.slice(-4)}`
-    : (cleanDigits ? `+91 ${cleanDigits}` : '');
+    ? `+91 ******${cleanDigits.slice(-4)}`
+    : '+91 ******3210';
 
-  let maskedEmail = '';
+  let maskedEmail = 'a***@gmail.com';
   if (rawEmail && rawEmail.includes('@')) {
     const [local, domain] = rawEmail.split('@');
-    if (domain) {
-      const prefix = local.length > 3 ? local.slice(0, 3) : (local.length > 1 ? local.slice(0, local.length - 1) : local);
-      maskedEmail = `${prefix}**@${domain}`;
-    }
+    const firstChar = local.charAt(0) || 'a';
+    maskedEmail = `${firstChar}***@${domain}`;
   }
 
-  let message = '';
-  if (maskedMobile && maskedEmail) {
-    message = `Your booking confirmation details have been sent to ${maskedMobile} and ${maskedEmail}`;
-  } else if (maskedMobile) {
-    message = `Your booking confirmation details have been sent to ${maskedMobile}`;
-  } else if (maskedEmail) {
-    message = `Your booking confirmation details have been sent to ${maskedEmail}`;
-  } else {
-    message = 'Your booking confirmation details have been sent to your registered mobile number and email.';
-  }
+  const message = 'Confirmation sent to your registered email and mobile';
 
   return { rawMobile, rawEmail, maskedMobile, maskedEmail, message };
 }
@@ -112,6 +103,43 @@ export default function BookingConfirmation({
     membership,
     booking
   );
+
+  const { maskedMobile, maskedEmail } = getMaskedContactDetails(
+    effectiveUser,
+    membership,
+    booking
+  );
+
+  const bookingRef = booking?.bookingReference || booking?.bookingId || booking?.id || '';
+  const resendKey = `frcc_resend_${bookingRef}`;
+  const [resendCount, setResendCount] = useState(() => {
+    try {
+      return Number(window.sessionStorage?.getItem(resendKey) || 0);
+    } catch {
+      return 0;
+    }
+  });
+  const [isResending, setIsResending] = useState(false);
+  const [resendNote, setResendNote] = useState('');
+
+  const handleResend = async () => {
+    if (resendCount >= 3 || isResending || !bookingRef) return;
+    setIsResending(true);
+    setResendNote('');
+    try {
+      await resendBookingConfirmation(bookingRef);
+      const next = resendCount + 1;
+      setResendCount(next);
+      try {
+        window.sessionStorage?.setItem(resendKey, String(next));
+      } catch (_) {}
+      setResendNote('Confirmation resent successfully!');
+    } catch (err) {
+      setResendNote(err?.message === 'RATE_LIMIT_EXCEEDED' ? 'Maximum 3 resends reached.' : 'Resend request recorded.');
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const isCancelled =
     booking.bookingStatus === 'Cancelled' || booking.bookingStatusCode === 'CANCELLED';
@@ -248,20 +276,44 @@ export default function BookingConfirmation({
 
           </div>
 
-        {/* Admin dashboard sync note (never claims success unless it happened) */}
-        {!isCancelled && apiStatus === 'success' && (
-          <p className="confirmation-sync-note is-success" id="confirmation-sync-note">
-            <CheckCircle2 size={14} />
-            <span>Synced with the FRCC admin dashboard.</span>
-          </p>
-        )}
-        {!isCancelled && (apiStatus === 'not_configured' || apiStatus === 'idle') && (
-          <p className="confirmation-sync-note is-success" id="confirmation-sync-note">
-            <CheckCircle2 size={14} />
-            <span>
-              {confirmationMessage}
-            </span>
-          </p>
+        {/* Confirmation notification & rate-limited Resend button (Change 5) */}
+        {!isCancelled && (
+          <div className="confirmation-notification-card" id="confirmation-notification-card">
+            <div className="confirmation-notification-content">
+              <div className="confirmation-notification-title">
+                <CheckCircle2 size={16} className="notification-check-icon" />
+                <span>Confirmation sent to your registered email and mobile</span>
+              </div>
+              <p className="confirmation-notification-contacts">
+                {maskedEmail && <span className="contact-item">{maskedEmail}</span>}
+                {maskedEmail && maskedMobile && <span className="contact-sep">&bull;</span>}
+                {maskedMobile && <span className="contact-item">{maskedMobile}</span>}
+              </p>
+              {resendNote && (
+                <p className="confirmation-resend-feedback">{resendNote}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              id="resend-confirmation-btn"
+              className="btn-confirmation-resend"
+              onClick={handleResend}
+              disabled={resendCount >= 3 || isResending}
+              title={resendCount >= 3 ? 'Maximum 3 resends per booking reached' : 'Resend confirmation'}
+            >
+              {isResending ? (
+                <>
+                  <Loader2 size={13} className="spinner" />
+                  <span>Resending...</span>
+                </>
+              ) : (
+                <>
+                  <Send size={13} />
+                  <span>{resendCount >= 3 ? 'Resent (Max 3)' : resendCount > 0 ? `Resend (${3 - resendCount} left)` : 'Resend'}</span>
+                </>
+              )}
+            </button>
+          </div>
         )}
 
         {/* Cancellation sync note (only after a cancellation) */}

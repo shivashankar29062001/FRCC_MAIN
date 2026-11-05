@@ -59,11 +59,22 @@
   background: #FEE2E2;
   border: 1.5px solid #FCA5A5;
   color: #991B1B;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .slot-legend-booked svg {
   width: 13px;
   height: 13px;
+}
+
+.slot-legend-car {
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Responsive */

@@ -46,8 +46,15 @@ export default function HallDetail() {
           </p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold text-navy">{inr(hall.pricePerHour)}<span className="text-sm font-normal text-gray-500">/hr</span></p>
-          <p className="text-sm text-gray-500">{inr(hall.pricePerDay)}/day</p>
+          <p className="text-2xl font-bold text-navy">
+            {inr(hall.pricePerPlate || hall.pricePerHour)}
+            <span className="text-sm font-normal text-gray-500">
+              {(hall.pricingUnit === 'per-plate' || hall.pricePerPlate) ? '/plate' : '/hr'}
+            </span>
+          </p>
+          {!(hall.pricingUnit === 'per-plate' || hall.pricePerPlate) && (
+            <p className="text-sm text-gray-500">{inr(hall.pricePerDay)}/day</p>
+          )}
         </div>
       </div>
 

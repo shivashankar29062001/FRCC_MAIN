@@ -119,7 +119,7 @@ export default function VenuePage() {
                       <h3 className="text-lg font-bold text-navy">{h.name}</h3>
                       <span className="bg-gold text-navy text-xs font-semibold rounded px-2 py-0.5">{TYPE_LABEL[h.type]}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">Capacity: up to {h.capacity.toLocaleString('en-IN')} guests • {inr(h.pricePerHour)}/hr • {inr(h.pricePerDay)}/day</p>
+                    <p className="text-sm text-gray-600 mt-1">Capacity: up to {h.capacity.toLocaleString('en-IN')} guests • {(h.pricingUnit === 'per-plate' || h.pricePerPlate) ? `${inr(h.pricePerPlate || h.pricePerHour)}/plate` : `${inr(h.pricePerHour)}/hr • ${inr(h.pricePerDay)}/day`}</p>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {h.amenities.map(a => <span key={a} className="text-xs bg-navy-100 text-navy rounded-full px-2 py-0.5">{a}</span>)}
                     </div>

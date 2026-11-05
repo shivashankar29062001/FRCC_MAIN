@@ -6,6 +6,12 @@ import { Card } from '../../components/ui/feedback.jsx';
 import { Button, Input, Select, LoadingButton } from '../../components/ui/controls.jsx';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { parseDMY } from '../../utils/dates.js';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../utils/mobile.js';
 import { IMAGES } from '../../config/images.js';
 import {
   PLANS_DATA,
@@ -369,7 +375,7 @@ export function MembershipJoinPage() {
   const isStep2Valid = useMemo(() => {
     return (
       Boolean(formData.fullName.trim()) &&
-      /^\d{10}$/.test(formData.mobile.replace(/\D/g, '')) &&
+      isValidIndianMobile(formData.mobile) &&
       EMAIL_REGEX.test(formData.email.trim())
     );
   }, [formData.fullName, formData.mobile, formData.email]);
@@ -384,7 +390,7 @@ export function MembershipJoinPage() {
       Boolean(formData.state.trim()) &&
       /^\d{6}$/.test(formData.pincode.replace(/\D/g, '')) &&
       Boolean(formData.emergencyName.trim()) &&
-      /^\d{10}$/.test(formData.emergencyMobile.replace(/\D/g, ''))
+      isValidIndianMobile(formData.emergencyMobile)
     );
   }, [
     formData.dob,
@@ -405,7 +411,7 @@ export function MembershipJoinPage() {
     if (formData.maritalStatus === 'Married') {
       if (!formData.spouseName.trim()) return false;
       if (formData.spouseDob && validateOptionalDate(formData.spouseDob)) return false;
-      if (formData.spouseMobile && !/^\d{10}$/.test(formData.spouseMobile.replace(/\D/g, ''))) return false;
+      if (formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile)) return false;
     }
 
     // Children checks for Married, Divorced, Widowed
@@ -792,7 +798,7 @@ export function MembershipJoinPage() {
         };
 
         const saved = await saveMembership(record);
-        const assignedCode = saved?.memberCode || saved?.memberId || memberId;
+        const assignedCode = saved?.memberCode || saved?.memberId || confirmedMemberId || '';
 
         console.info('[membership] assigned sequential member code:', assignedCode);
 
@@ -1012,16 +1018,25 @@ export function MembershipJoinPage() {
                     id="reg-mobile"
                     name="mobile"
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    autoComplete="tel-national"
                     maxLength="10"
-                    placeholder="10-digit mobile number"
+                    placeholder={INDIAN_MOBILE_PLACEHOLDER}
                     value={formData.mobile}
                     onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      const val = sanitizeMobileInput(e.target.value);
                       updateForm({ mobile: val });
-                      if (val.length === 10) {
+                      if (isValidIndianMobile(val)) {
                         setFieldErrors((prev) => ({ ...prev, mobile: null }));
                       }
                     }}
+                    onBlur={() => {
+                      if (formData.mobile && !isValidIndianMobile(formData.mobile)) {
+                        setFieldErrors((prev) => ({ ...prev, mobile: INDIAN_MOBILE_MESSAGE }));
+                      }
+                    }}
+                    aria-invalid={Boolean(fieldErrors.mobile)}
                     className="field !border-0 !rounded-none focus:!ring-0 w-full"
                   />
                 </div>
@@ -1198,13 +1213,25 @@ export function MembershipJoinPage() {
                         id="pers-emg-mobile"
                         name="emergencyMobile"
                         type="tel"
+                        inputMode="numeric"
+                        pattern="[6-9][0-9]{9}"
+                        autoComplete="tel-national"
                         maxLength="10"
-                        placeholder="10-digit mobile number"
+                        placeholder={INDIAN_MOBILE_PLACEHOLDER}
                         value={formData.emergencyMobile}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          const val = sanitizeMobileInput(e.target.value);
                           updateForm({ emergencyMobile: val });
+                          if (isValidIndianMobile(val)) {
+                            setFieldErrors((prev) => ({ ...prev, emergencyMobile: null }));
+                          }
                         }}
+                        onBlur={() => {
+                          if (formData.emergencyMobile && !isValidIndianMobile(formData.emergencyMobile)) {
+                            setFieldErrors((prev) => ({ ...prev, emergencyMobile: INDIAN_MOBILE_MESSAGE }));
+                          }
+                        }}
+                        aria-invalid={Boolean(fieldErrors.emergencyMobile)}
                         className="field !border-0 !rounded-none focus:!ring-0 w-full"
                       />
                     </div>
@@ -1342,16 +1369,20 @@ export function MembershipJoinPage() {
                           id="fam-spouse-mobile"
                           name="spouseMobile"
                           type="tel"
+                          inputMode="numeric"
+                          pattern="[6-9][0-9]{9}"
+                          autoComplete="tel-national"
                           maxLength="10"
-                          placeholder="10-digit mobile"
+                          placeholder={INDIAN_MOBILE_PLACEHOLDER}
                           value={formData.spouseMobile}
-                          onChange={(e) => updateForm({ spouseMobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                          onChange={(e) => updateForm({ spouseMobile: sanitizeMobileInput(e.target.value) })}
+                          aria-invalid={Boolean(formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile))}
                           className="field !border-0 !rounded-none focus:!ring-0 w-full"
                         />
                       </div>
-                      {formData.spouseMobile && !/^\d{10}$/.test(formData.spouseMobile) && (
+                      {formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile) && (
                         <p role="alert" className="field-error mt-1">
-                          Mobile must be 10 digits
+                          {INDIAN_MOBILE_MESSAGE}
                         </p>
                       )}
                     </div>

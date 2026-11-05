@@ -1,11 +1,19 @@
 // SMTP email adapter (nodemailer). Credentials are read only from the server environment.
 
-const nodemailer = require('nodemailer');
+let nodemailer = null;
+try {
+  nodemailer = require('nodemailer');
+} catch {
+  nodemailer = null;
+}
 
 let transporter = null;
 let transporterKey = '';
 
 function getTransporter() {
+  if (!nodemailer) {
+    throw new Error('nodemailer is not installed. Please install it in the server directory.');
+  }
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;

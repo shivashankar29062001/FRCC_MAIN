@@ -186,12 +186,7 @@ export function EventsPage() {
                         </span>
                       </div>
 
-                      {/* Sample Badge if applicable */}
-                      {evt.isSample && (
-                        <div className="absolute right-3 top-3 rounded-full bg-slate-900/80 px-2.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase text-slate-200 backdrop-blur border border-white/20">
-                          Sample
-                        </div>
-                      )}
+                      
 
                       {/* Category Chip */}
                       <div className="absolute bottom-3 left-3">

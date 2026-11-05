@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { isValidEmailOrIndianMobile, isPhoneLike, INDIAN_MOBILE_MESSAGE } from '../utils/mobile.js';
 
 export function generateTicketId() {
   const num = Math.floor(1000 + Math.random() * 9000);

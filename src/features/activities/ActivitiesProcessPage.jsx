@@ -11,10 +11,16 @@ import { IMAGES, gameSlot } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
 import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
 import { getSlots, getSlotAvailability } from './availability.service.js';
-import { saveActivityBooking, createActivityBookingRemote } from './bookings.store.js';
+import { saveActivityBooking, createActivityBookingRemote, CHANGED_EVENT } from './bookings.store.js';
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
+import {
+  INDIAN_MOBILE_MESSAGE,
+  INDIAN_MOBILE_PLACEHOLDER,
+  isValidIndianMobile,
+  sanitizeMobileInput,
+} from '../../utils/mobile.js';
 import { MEMBER_DISCOUNT_LABEL, MEMBER_PROMO_NOTE } from '../../config/pricing.js';
 import { MEMBERSHIP_REDIRECT_URL } from '../../config/services.js';
 import {
@@ -30,7 +36,9 @@ import {
   ChevronLeftIcon,
   ArrowRightIcon,
 } from '../../components/ui/icons.jsx';
-import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+
+
+
 
 // ---------------------------------------------------------------------------
 // /book/activities/process — the Activities booking page (redirect target of
@@ -113,13 +121,16 @@ function QrPlaceholder({ seed = 'frcc' }) {
   );
 }
 
-const MOBILE_RE = /^[+\d][\d\s-]{7,14}$/;
-
 const STORAGE_KEY = 'frcc_activities_booking_draft';
 
 function blankDraft(gameId, user) {
   const prefilledMobile = user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
   return {
+
+
+
+
+
     gameId: gameId || '',
     date: '',
     slot: '',
@@ -240,11 +251,29 @@ export function ActivitiesProcessPage() {
     setErrors({});
   };
 
-  // Slots load per game + date from database RPC get_slot_availability
+  // Slots load per game + date from database RPC get_slot_availability / live bookings query
   const slotsQuery = useMockQuery(() => getSlotAvailability(draft.gameId, draft.date), {
     deps: [draft.gameId, draft.date],
     delay: 200,
   });
+  // Always refresh slots when opening the slot picker (step 2)
+  useEffect(() => {
+    if (step === 2 && draft.gameId && draft.date) {
+      slotsQuery.retry();
+    }
+  }, [step, draft.gameId, draft.date]);
+
+  // Immediately refresh slots when an activity booking is confirmed or changed on this device
+  useEffect(() => {
+    const onBookingsChanged = () => {
+      slotsQuery.retry();
+    };
+    window.addEventListener(CHANGED_EVENT, onBookingsChanged);
+    return () => {
+      window.removeEventListener(CHANGED_EVENT, onBookingsChanged);
+    };
+  }, [slotsQuery]);
+
   const slots = slotsQuery.data || [];
   const fullyBooked = !slotsQuery.loading && !slotsQuery.error && slots.length > 0 && slots.every((s) => s.booked);
 
@@ -280,7 +309,7 @@ export function ActivitiesProcessPage() {
       const n = Number(draft.players);
       const nameOk = draft.name.trim().length >= 2;
       const cleanMobile = draft.mobile.replace(/\D/g, '');
-      const mobileOk = cleanMobile.length === 10 || MOBILE_RE.test(draft.mobile.trim());
+      const mobileOk = isValidIndianMobile(draft.mobile);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
         ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)
@@ -298,7 +327,7 @@ export function ActivitiesProcessPage() {
             if (f.max !== undefined && nv > f.max) return false;
           }
           if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) return false;
-          if (f.type === 'tel' && v && !MOBILE_RE.test(String(v).trim())) return false;
+          if (f.type === 'tel' && v && !isValidIndianMobile(v)) return false;
         }
       }
       return true;
@@ -338,8 +367,7 @@ export function ActivitiesProcessPage() {
       const g = gameById(draft.gameId);
       const next = {};
       if (draft.name.trim().length < 2) next.name = 'Enter the booker’s full name.';
-      const cleanMobile = draft.mobile.replace(/\D/g, '');
-      if (cleanMobile.length !== 10 && !MOBILE_RE.test(draft.mobile.trim())) next.mobile = 'Enter a valid 10-digit mobile number.';
+      if (!isValidIndianMobile(draft.mobile)) next.mobile = INDIAN_MOBILE_MESSAGE;
       const n = Number(draft.players);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
@@ -369,8 +397,8 @@ export function ActivitiesProcessPage() {
           if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) {
             next[`x_${f.id}`] = `“${f.label}” is required.`;
           }
-          if (f.type === 'tel' && v && !MOBILE_RE.test(String(v).trim())) {
-            next[`x_${f.id}`] = `“${f.label}” must be a valid mobile number.`;
+          if (f.type === 'tel' && v && !isValidIndianMobile(v)) {
+            next[`x_${f.id}`] = INDIAN_MOBILE_MESSAGE;
           }
         }
       }
@@ -455,13 +483,26 @@ export function ActivitiesProcessPage() {
       } catch (_) {}
 
       setConfirmed(confirmedRecord);
+      slotsQuery.retry();
       setStep(5);
       pushToast(draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
     } catch (err) {
       const msg = err?.message || String(err);
-      if (msg.includes('SLOT_FULL') || msg.includes('no longer available') || msg.includes('ALREADY_BOOKED')) {
-        pushToast('This slot is no longer available', 'error');
-        setErrors({ slot: 'This slot is no longer available', alreadyBooked: 'This slot is no longer available' });
+      const isSlotConflict =
+        msg.includes('SLOT_FULL') ||
+        msg.includes('no longer available') ||
+        msg.includes('ALREADY_BOOKED') ||
+        msg.includes('already booked') ||
+        msg.includes('duplicate') ||
+        msg.includes('23505') ||
+        msg.includes('unique constraint');
+
+      if (isSlotConflict) {
+        pushToast('This slot is no longer available. Please select another slot.', 'error');
+        setErrors({
+          slot: 'This slot is no longer available. Please select another slot.',
+          alreadyBooked: 'This slot is no longer available. Please select another slot.',
+        });
         slotsQuery.retry();
         setStep(2); // Return to Available Slot step
       } else {
@@ -481,6 +522,7 @@ export function ActivitiesProcessPage() {
       'FRCC — Activities Booking Receipt',
       `Booking ID: ${confirmed.bookingId}`,
       `Game: ${confirmed.gameName || g?.name || confirmed.game}`,
+
       `Date: ${prettyDate(confirmed.date)}`,
       `Slot: ${confirmed.slot}`,
       `Players: ${confirmed.players}`,
@@ -531,9 +573,28 @@ export function ActivitiesProcessPage() {
         <Input key={f.id} label={f.label} name={f.id} type="number" min={f.min} max={f.max} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} error={err} />
       );
     }
-    if (f.type === 'tel' || f.type === 'text') {
+    if (f.type === 'tel') {
       return (
-        <Input key={f.id} label={f.label} name={f.id} type={f.type} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
+        <Input
+          key={f.id}
+          label={f.label}
+          name={f.id}
+          type="tel"
+          inputMode="numeric"
+          pattern="[6-9][0-9]{9}"
+          maxLength={10}
+          autoComplete="tel-national"
+          value={value}
+          onChange={(e) => patchExtra(f.id, sanitizeMobileInput(e.target.value))}
+          placeholder={f.placeholder || INDIAN_MOBILE_PLACEHOLDER}
+          hint={f.hint}
+          error={err}
+        />
+      );
+    }
+    if (f.type === 'text') {
+      return (
+        <Input key={f.id} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
       );
     }
     if (f.type === 'checkbox') {
@@ -580,8 +641,8 @@ export function ActivitiesProcessPage() {
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
       guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
-      location: 'Vijayawada Campus · Sports Complex',
-      locationId: 'vja-activities',
+      hideLocation: true,
+
       price: quote.subtotal,
       memberDiscount: quote.discount > 0 ? quote.discount : undefined,
       total: quote.total,
@@ -609,12 +670,10 @@ export function ActivitiesProcessPage() {
             <Card>
               <p className="eyebrow">Step 1 · Select Game</p>
               <h2 className="h-sub mt-1">Which game are you booking?</h2>
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                <span>All facilities and courts are open daily at FRCC.</span>
-                <LocationTrigger locationId="vja-activities" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
-                  Vijayawada Campus · View on map &amp; get directions
-                </LocationTrigger>
-              </div>
+              <p className="mt-1 text-sm text-slate-600">
+                All facilities and courts are open daily at FRCC.
+              </p>
+
               {paramGame && !paramValid && (
                 <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
                   “{paramGame}” isn’t a known game — pick one below to start.
@@ -737,7 +796,19 @@ export function ActivitiesProcessPage() {
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
-                    <Input label="Mobile" name="mobile" type="tel" value={draft.mobile} onChange={(e) => patch({ mobile: e.target.value })} autoComplete="tel" error={errors.mobile} />
+                    <Input
+                      label="Mobile"
+                      name="mobile"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[6-9][0-9]{9}"
+                      maxLength={10}
+                      autoComplete="tel-national"
+                      placeholder={INDIAN_MOBILE_PLACEHOLDER}
+                      value={draft.mobile}
+                      onChange={(e) => patch({ mobile: sanitizeMobileInput(e.target.value) })}
+                      error={errors.mobile}
+                    />
                     {(() => {
                       const selectedSlot = slots.find((s) => s.time === draft.slot);
                       const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
@@ -921,6 +992,7 @@ export function ActivitiesProcessPage() {
                     </div>
 
                     <div className="mx-auto mt-4 max-w-md rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2">
+                      
                       <div className="flex justify-between">
                         <span className="text-slate-500">Date</span>
                         <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>

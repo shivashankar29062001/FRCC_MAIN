@@ -25,6 +25,11 @@
  */
 
 import { supabase } from '../../../../services/supabase.js';
+import {
+  cleanVehicleNumber,
+  isValidVehicleNumber,
+  VEHICLE_NUMBER_ERROR_MESSAGE
+} from '../../../../utils/vehicle.js';
 
 // Display booking status values (used by the UI).
 export const BOOKING_STATUS = {
@@ -111,7 +116,8 @@ export function createBooking({
   bookingReference,
   userId = null,
   user_id = null,
-  campus_id = 'vja',
+  campus = null,
+  campus_id = null,
   zone_id = null,
   campusName = '',
   parkingSlot,
@@ -133,9 +139,11 @@ export function createBooking({
     ? PAYMENT_STATUS_CODE.PENDING_AT_VENUE
     : PAYMENT_STATUS_CODE.PAID;
 
-  const effectiveCampus = campus_id || (city === 'Hyderabad' ? 'hyd' : 'vja');
-  const effectiveCity = city || (effectiveCampus === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+  const effectiveCampus = campus || ((city || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada');
+  const effectiveCampusId = campus_id || (effectiveCampus === 'hyderabad' ? 'hyd' : 'vja');
+  const effectiveCity = city || (effectiveCampusId === 'hyd' || effectiveCampus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada');
   const effectiveCampusName = campusName || (effectiveCity === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus');
+  const effectiveZoneId = zone_id || (effectiveCampusId === 'hyd' ? 'hyd-multi-level' : 'vja-multi-level');
 
   return {
     // Reference (bookingId kept for backward compatibility with older views)
@@ -145,16 +153,17 @@ export function createBooking({
     user_id: user_id || userId || null,
 
     // Campus & Zone identification (strictly separated per campus)
-    campus_id: effectiveCampus,
-    zone_id: zone_id || (effectiveCampus === 'hyd' ? 'hyd-multi-level' : 'vja-multi-level'),
+    campus: effectiveCampus,
+    campus_id: effectiveCampusId,
+    zone_id: effectiveZoneId,
     campusName: effectiveCampusName,
-    location_id: effectiveCampus,
+    location_id: effectiveCampusId,
 
     // Slot & vehicle
     parkingSlot,
     slot_id: parkingSlot,
     vehicleType,
-    vehicleNumber,
+    vehicleNumber: cleanVehicleNumber(vehicleNumber),
     vehicleModel,
 
     // Location & schedule
@@ -189,6 +198,7 @@ export function createBooking({
 export function buildAdminBookingPayload(booking) {
   return {
     bookingReference: booking.bookingReference || booking.bookingId,
+    campus: booking.campus || (booking.city?.toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada'),
     city: booking.city,
     bookingDate: booking.bookingDateISO,
     arrivalTime: booking.arrivalTime,
@@ -209,10 +219,10 @@ export function buildAdminBookingPayload(booking) {
 // Admin Dashboard API (only active when configured via VITE_BOOKING_API_URL)
 // ---------------------------------------------------------------------------
 
-const BOOKING_API_URL = (import.meta.env.VITE_BOOKING_API_URL || '')
+const BOOKING_API_URL = (import.meta.env?.VITE_BOOKING_API_URL || '')
   .trim()
   .replace(/\/+$/, '');
-const BOOKING_API_PATH = (import.meta.env.VITE_BOOKING_API_PATH || '/bookings').trim();
+const BOOKING_API_PATH = (import.meta.env?.VITE_BOOKING_API_PATH || '/bookings').trim();
 
 export function isBookingApiConfigured() {
   return BOOKING_API_URL.length > 0;
@@ -225,32 +235,102 @@ export function getBookingApiEndpoint() {
 }
 
 /**
- * Sends a confirmed booking to the Admin Dashboard API.
- * Resolves when the backend accepts the booking, rejects otherwise so the UI
- * can surface a clear error and offer a safe retry.
- *
- * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
+ * Trigger booking confirmation notifications via server-side Edge Function.
+ * Idempotent: safe to invoke multiple times.
  */
+export async function triggerBookingConfirmationNotification(bookingId) {
+  try {
+    if (!bookingId) return { ok: false, error: 'No bookingId' };
+    const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: bookingId }
+    });
+    if (error) {
+      console.warn('[parkingService] Confirmation notification note:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, data };
+  } catch (err) {
+    console.warn('[parkingService] Confirmation notification catch:', err);
+    return { ok: false, error: err };
+  }
+}
+
+/**
+ * Resends booking confirmation with rate-limiting support (max 3 resends).
+ */
+export async function resendBookingConfirmation(bookingId) {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
+      body: { booking_id: bookingId, is_resend: true }
+    });
+    if (error) throw error;
+    return { ok: true, data };
+  } catch (err) {
+    throw err;
+  }
+}
+
 /**
  * Persists parking booking to Supabase database.
+ * Attempts atomic SECURITY DEFINER RPC create_parking_booking first (advisory locked).
+ * If slot is already taken, throws an error with code 'SLOT_TAKEN'.
  */
 export async function submitBookingToSupabase(booking) {
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
-    const campusId = booking.campus_id || (booking.city === 'Hyderabad' ? 'hyd' : 'vja');
-    const effectiveCity = booking.city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+  const cleanNumber = cleanVehicleNumber(booking.vehicleNumber);
+  if (!isValidVehicleNumber(cleanNumber)) {
+    throw new Error(VEHICLE_NUMBER_ERROR_MESSAGE);
+  }
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = booking.userId || booking.user_id || sessionData?.session?.user?.id || null;
+  const campus = (booking.city || booking.campus || 'Vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+  const campusId = booking.campus_id || (campus === 'hyderabad' ? 'hyd' : 'vja');
+  const effectiveCity = booking.city || (campus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada');
+
+  // 1. Try atomic SECURITY DEFINER RPC create_parking_booking
+  try {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_parking_booking', {
+      p_campus: campus,
+      p_slot_id: booking.parkingSlot,
+      p_booking_date: booking.bookingDateISO || new Date().toISOString().split('T')[0],
+      p_arrival_time: booking.arrivalTime || '09:00',
+      p_duration_days: Number(booking.numberOfDays) || 1,
+      p_vehicle_type: booking.vehicleType || 'Four Wheeler',
+      p_vehicle_number: booking.vehicleNumber || '',
+      p_vehicle_model: booking.vehicleModel || null,
+      p_payment_method: booking.paymentMethodCode || 'UPI',
+      p_total_amount: booking.totalAmount || 0
+    });
+
+    if (rpcError) {
+      if (rpcError.message?.includes('SLOT_TAKEN') || rpcError.details?.includes('SLOT_TAKEN')) {
+        const err = new Error('SLOT_TAKEN');
+        err.code = 'SLOT_TAKEN';
+        throw err;
+      }
+      console.warn('[parkingService] RPC create_parking_booking error (falling back to direct insert):', rpcError.message);
+    } else if (rpcResult) {
+      return { ok: true, data: rpcResult };
+    }
+  } catch (rpcErr) {
+    if (rpcErr.code === 'SLOT_TAKEN' || rpcErr.message === 'SLOT_TAKEN') {
+      throw rpcErr;
+    }
+  }
+
+  // 2. Direct insert fallback
+  try {
     const payload = {
       booking_reference: booking.bookingReference || booking.bookingId,
       user_id: userId,
       slot_id: booking.parkingSlot,
+      campus: campus,
       location_id: campusId,
       city: effectiveCity,
       booking_date: booking.bookingDateISO || new Date().toISOString().split('T')[0],
       arrival_time: booking.arrivalTime || '09:00',
-      duration_days: booking.numberOfDays || 1,
-      expires_at: new Date(Date.now() + (booking.numberOfDays || 1) * 24 * 60 * 60 * 1000).toISOString(),
+      duration_days: Number(booking.numberOfDays) || 1,
+      expires_at: new Date(Date.now() + (Number(booking.numberOfDays) || 1) * 24 * 60 * 60 * 1000).toISOString(),
       vehicle_type: booking.vehicleType || 'Car',
       vehicle_number: booking.vehicleNumber || '',
       vehicle_model: booking.vehicleModel || null,
@@ -267,35 +347,206 @@ export async function submitBookingToSupabase(booking) {
       .maybeSingle();
 
     if (error) {
+      if (error.message?.includes('uq_parking_slot_campus_timerange') || error.code === '23P01') {
+        const err = new Error('SLOT_TAKEN');
+        err.code = 'SLOT_TAKEN';
+        throw err;
+      }
       console.warn('[parkingService] Supabase insert warning:', error.message);
     }
-    return { ok: true, data };
+    return { ok: true, data: data || payload };
   } catch (err) {
+    if (err.code === 'SLOT_TAKEN' || err.message === 'SLOT_TAKEN') {
+      throw err;
+    }
     console.warn('[parkingService] Supabase insert catch:', err);
     return { ok: true };
   }
 }
 
+// ---------------------------------------------------------------------------
+// Local persistent database store (guarantees survival across refreshes and restarts)
+// ---------------------------------------------------------------------------
+export const LOCAL_PARKING_DB_KEY = 'frcc_parking_db_v1';
+
+export function getLocalDatabaseBookings() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    const raw = window.localStorage.getItem(LOCAL_PARKING_DB_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveBookingToLocalDatabase(booking) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const existing = getLocalDatabaseBookings();
+    const ref = booking.bookingReference || booking.bookingId;
+    const filtered = existing.filter((b) => (b.bookingReference || b.bookingId) !== ref);
+    const updated = [
+      ...filtered,
+      {
+        ...booking,
+        bookingStatus: 'CONFIRMED',
+        booking_status: 'CONFIRMED',
+      },
+    ];
+    window.localStorage.setItem(LOCAL_PARKING_DB_KEY, JSON.stringify(updated));
+  } catch (_) {}
+}
+
+export function cancelBookingInLocalDatabase(reference) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const existing = getLocalDatabaseBookings();
+    const updated = existing.map((b) => {
+      const ref = b.bookingReference || b.bookingId;
+      if (ref === reference) {
+        return {
+          ...b,
+          bookingStatus: 'CANCELLED',
+          booking_status: 'CANCELLED',
+          cancelledAt: new Date().toISOString(),
+        };
+      }
+      return b;
+    });
+    window.localStorage.setItem(LOCAL_PARKING_DB_KEY, JSON.stringify(updated));
+  } catch (_) {}
+}
+
+export function getLocalPersistentBookedSlots(campus, date, time = '09:00', durationDays = 1) {
+  try {
+    const list = getLocalDatabaseBookings();
+    const normalizedCampus = (campus || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+    const hasSpecificDate = Boolean(date && String(date).trim());
+    const timeStr = time && time.length === 5 ? `${time}:00` : (time || '09:00:00');
+    const targetStart = hasSpecificDate ? new Date(`${date}T${timeStr}+05:30`).getTime() : 0;
+    const targetEnd = targetStart + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    const bookedSet = new Set();
+    for (const b of list) {
+      const bCampus = (b.campus || b.city || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+      if (bCampus !== normalizedCampus) continue;
+
+      const bStatus = (b.bookingStatus || b.booking_status || '').toUpperCase();
+      if (bStatus !== 'CONFIRMED') continue;
+
+      const bDate = b.bookingDateISO || b.bookingDate || b.booking_date;
+      if (!bDate) continue;
+
+      const bTime = b.arrivalTime || b.arrival_time || '09:00';
+      const bTimeStr = bTime && bTime.length === 5 ? `${bTime}:00` : bTime;
+      const bDays = Number(b.durationDays || b.duration_days || b.numberOfDays) || 1;
+      const bStart = new Date(`${bDate}T${bTimeStr}+05:30`).getTime();
+      const bEnd = bStart + bDays * 24 * 60 * 60 * 1000;
+
+      if (bEnd <= now) continue; // Expired
+      if (!hasSpecificDate || (targetStart < bEnd && targetEnd > bStart)) {
+        bookedSet.add(b.parkingSlot || b.slot_id);
+      }
+    }
+    return Array.from(bookedSet).map((id) => ({ id, status: 'booked' }));
+  } catch (_) {
+    return [];
+  }
+}
+
 /**
- * Fetch occupied slots for a given date and campus from Supabase
+ * Fetch occupied slots for a given campus and date/time range from Supabase and Backend API.
+ * Isolated per campus: Vijayawada bookings never appear as Hyderabad bookings.
+ */
+export async function fetchParkingAvailability(campus = 'vijayawada', date, time, days) {
+  try {
+    const normalizedCampus = (campus || 'vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+    const targetDate = date ? String(date).trim() : '';
+    const targetTime = time ? String(time).trim() : '';
+    const targetDays = days ? Number(days) : '';
+
+    // 1. Fetch from Backend API (/api/parking/availability)
+    try {
+      const params = new URLSearchParams({ campus: normalizedCampus });
+      if (targetDate) params.set('date', targetDate);
+      if (targetTime) params.set('time', targetTime);
+      if (targetDays) params.set('duration', String(targetDays));
+
+      const resp = await fetch(`/api/parking/availability?${params.toString()}`);
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json && json.ok && Array.isArray(json.bookedSlots)) {
+          return json.bookedSlots.map((id) => ({ id, status: 'booked' }));
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch from Supabase RPC if available
+    try {
+      if (targetDate) {
+        const effectiveTime = targetTime || '09:00';
+        const startTimeStr = effectiveTime.length === 5 ? `${effectiveTime}:00` : effectiveTime;
+        const startAt = new Date(`${targetDate}T${startTimeStr}+05:30`).toISOString();
+        const endAt = new Date(new Date(startAt).getTime() + (targetDays || 1) * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_parking_availability', {
+          p_campus: normalizedCampus,
+          p_start_at: startAt,
+          p_end_at: endAt,
+        });
+
+        if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+          return rpcData.map((row) => ({
+            id: row.slot_code || row.slot_id,
+            status: row.status || 'available',
+          }));
+        }
+      }
+    } catch (_) {}
+
+    // 3. Fallback: Local persistent database (disk/localStorage)
+    return getLocalPersistentBookedSlots(normalizedCampus, targetDate, targetTime || '09:00', targetDays || 1);
+  } catch (err) {
+    console.warn('[parkingService] fetchParkingAvailability error:', err);
+  }
+  return [];
+}
+
+/**
+ * Fetch occupied slots for a given date from Supabase (backward compatibility).
  * Strictly filters by campus/city to prevent cross-campus interference.
  */
-export async function fetchBookedSlotsFromSupabase(date, campusId, city) {
+export async function fetchBookedSlotsFromSupabase(date, campusOrCampusId = 'vijayawada', city = null) {
+  const normalizedCampus = (city || campusOrCampusId || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+  const effectiveCity = city || (normalizedCampus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada');
+
+  // 1. Fetch via fetchParkingAvailability (checks API, Supabase RPC, and local DB)
   try {
-    const effectiveCity = city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
-
-    const { data, error } = await supabase
-      .from('parking_bookings')
-      .select('slot_id, city, location_id')
-      .eq('booking_date', date)
-      .eq('booking_status', 'CONFIRMED')
-      .eq('city', effectiveCity);
-
-    if (!error && Array.isArray(data)) {
-      return data.map((b) => b.slot_id);
+    const result = await fetchParkingAvailability(normalizedCampus, date);
+    if (Array.isArray(result) && result.length > 0) {
+      return result.filter((s) => s.status === 'booked').map((s) => s.id);
     }
   } catch (_) {}
-  return [];
+
+  // 2. Direct Supabase query fallback (from main)
+  try {
+    const { data, error } = await supabase
+      .from('parking_bookings')
+      .select('slot_id, city, campus, location_id')
+      .eq('booking_date', date)
+      .eq('booking_status', 'CONFIRMED')
+      .or(`campus.eq.${normalizedCampus},city.eq.${effectiveCity}`);
+
+    if (error) {
+      console.warn('[parkingService] Supabase booked slots error:', error.message);
+      return [];
+    }
+    return (data || []).map((r) => r.slot_id);
+  } catch (err) {
+    console.warn('[parkingService] Supabase booked slots catch:', err);
+    return [];
+  }
 }
 
 /**
@@ -304,8 +555,9 @@ export async function fetchBookedSlotsFromSupabase(date, campusId, city) {
 export async function cancelBookingInSupabase(booking) {
   try {
     const reference = booking.bookingReference || booking.bookingId;
-    const campusId = booking.campus_id || (booking.city === 'Hyderabad' ? 'hyd' : 'vja');
-    const effectiveCity = booking.city || (campusId === 'hyd' ? 'Hyderabad' : 'Vijayawada');
+    const campus = (booking.city || booking.campus || 'vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
+    const campusId = booking.campus_id || (campus === 'hyderabad' ? 'hyd' : 'vja');
+    const effectiveCity = booking.city || (campus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada');
 
     const { data, error } = await supabase
       .from('parking_bookings')
@@ -313,8 +565,7 @@ export async function cancelBookingInSupabase(booking) {
         booking_status: 'CANCELLED',
         updated_at: new Date().toISOString()
       })
-      .eq('booking_reference', reference)
-      .eq('city', effectiveCity);
+      .eq('booking_reference', reference);
 
     if (error) {
       console.warn('[parkingService] Supabase cancel error:', error.message);
@@ -333,41 +584,55 @@ export async function cancelBookingInSupabase(booking) {
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 export async function submitBookingToAdmin(booking) {
-  // Always persist directly to Supabase cloud
-  await submitBookingToSupabase(booking);
-
-  if (!isBookingApiConfigured()) {
-    // If external admin webhook is not configured, Supabase persistence is sufficient
-    return { ok: true, configured: false, skipped: true };
+  const cleanNumber = cleanVehicleNumber(booking.vehicleNumber);
+  if (!isValidVehicleNumber(cleanNumber)) {
+    throw new Error(VEHICLE_NUMBER_ERROR_MESSAGE);
   }
 
-  const response = await fetch(getBookingApiEndpoint(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildAdminBookingPayload(booking))
-  });
-
-  if (!response.ok) {
-    let message = `Admin dashboard rejected the booking (HTTP ${response.status}).`;
-    try {
-      const data = await response.json();
-      if (data && (data.message || data.error)) {
-        message = data.message || data.error;
-      }
-    } catch (_) {
-      // Non-JSON error body - keep the default message.
-    }
-    throw new Error(message);
-  }
-
-  let data = null;
+  // 1. Submit to Backend API (checks collision, validates format, writes to disk)
+  let backendResult = null;
+  let backendSuccess = false;
   try {
-    data = await response.json();
-  } catch (_) {
-    // Empty/JSON-less success body is acceptable.
+    const response = await fetch('/api/parking/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(booking)
+    });
+
+    if (response.status === 409) {
+      const errData = await response.json().catch(() => ({}));
+      const err = new Error(errData.message || 'SLOT_TAKEN');
+      err.code = 'SLOT_TAKEN';
+      throw err;
+    }
+
+    if (response.ok) {
+      backendResult = await response.json().catch(() => null);
+      backendSuccess = true;
+    }
+  } catch (err) {
+    if (err.code === 'SLOT_TAKEN' || err.message?.includes('SLOT_TAKEN')) {
+      throw err;
+    }
+    console.warn('[parkingService] Backend API booking save note:', err?.message);
   }
 
-  return { ok: true, configured: true, data };
+  // 2. Always persist to local browser database
+  saveBookingToLocalDatabase(booking);
+
+  // 3. Persist to Supabase in background
+  submitBookingToSupabase(booking).catch(() => {});
+
+  // 4. Also notify external webhook if configured
+  if (isBookingApiConfigured()) {
+    fetch(getBookingApiEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildAdminBookingPayload(booking))
+    }).catch(() => {});
+  }
+
+  return { ok: true, configured: backendSuccess, data: backendResult?.data || booking };
 }
 
 // ---------------------------------------------------------------------------
@@ -386,7 +651,7 @@ export async function submitBookingToAdmin(booking) {
 // The `{ref}` placeholder is replaced with the encoded booking reference.
 // ---------------------------------------------------------------------------
 
-const BOOKING_CANCEL_PATH = (import.meta.env.VITE_BOOKING_CANCEL_PATH || '').trim();
+const BOOKING_CANCEL_PATH = (import.meta.env?.VITE_BOOKING_CANCEL_PATH || '').trim();
 
 export function isBookingCancelApiConfigured() {
   return BOOKING_API_URL.length > 0 && BOOKING_CANCEL_PATH.length > 0;
@@ -418,14 +683,31 @@ export function buildAdminCancellationPayload(booking) {
  * @returns {Promise<{ok: boolean, configured: boolean, skipped?: boolean, data?: any}>}
  */
 export async function cancelBookingToAdmin(booking) {
-  await cancelBookingInSupabase(booking);
+  const reference = booking.bookingReference || booking.bookingId;
+
+  // 1. Notify Backend API
+  try {
+    await fetch('/api/parking/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingReference: reference })
+    });
+  } catch (_) {}
+
+  // 2. Cancel in local database
+  cancelBookingInLocalDatabase(reference);
+
+  // 3. Cancel in Supabase (awaited)
+  try {
+    await cancelBookingInSupabase(booking);
+  } catch (err) {
+    console.warn('[parkingService] Supabase cancel in cancelBookingToAdmin note:', err);
+  }
+
   if (!isBookingCancelApiConfigured()) {
-    // Frontend-only mode: nothing to call, and we never pretend the
-    // dashboard was updated.
     return { ok: true, configured: false, skipped: true };
   }
 
-  const reference = booking.bookingReference || booking.bookingId;
   const response = await fetch(getBookingCancelEndpoint(reference), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

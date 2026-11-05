@@ -16,6 +16,7 @@ import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, ca
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
+import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE, INDIAN_MOBILE_PLACEHOLDER, sanitizeMobileInput } from '../../utils/mobile.js';
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
@@ -25,13 +26,16 @@ import {
   ChevronLeftIcon,
   ArrowRightIcon,
   PrinterIcon,
+  ClockIcon,
 } from '../../components/ui/icons.jsx';
 import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+import { LocationSelector } from '../../components/booking/LocationSelector.jsx';
+import { STAY_LOCATIONS } from '../../data/bookingLocations.js';
 
 const STORAGE_KEY = 'frcc_stay_booking_draft';
 
 const STEPS = [
-  'Dates',
+  'Location & Dates',
   'Guests',
   'Choose Room',
   'Guest Details',
@@ -126,6 +130,11 @@ export function HotelPage() {
 
     return {
       step: isFreshRoomSelection ? 0 : ((saved?.step !== undefined && saved.step < 5) ? saved.step : 0),
+      cityId: saved?.cityId || 'vja',
+      cityName: saved?.cityName || 'Vijayawada',
+      venueId: saved?.venueId || 'vja-residency',
+      venueName: saved?.venueName || 'FRCC Riverfront',
+      areaName: saved?.areaName || 'Vijayawada Campus',
       areaId: initialArea,
       checkin: searchParams.get('checkin') || saved?.checkin || getTodayISO(),
       checkout: searchParams.get('checkout') || saved?.checkout || getTomorrowISO(),
@@ -142,6 +151,7 @@ export function HotelPage() {
   });
 
   const [paying, setPaying] = useState(false);
+  const [mobileTouched, setMobileTouched] = useState(false);
 
   // When browsing stay landing page, clear any previous stay booking draft or confirmation
   useEffect(() => {
@@ -284,8 +294,22 @@ export function HotelPage() {
     return displayRooms.find((r) => r.id === draft.selectedRoomId) || displayRooms[0] || ALL_ROOMS[0];
   }, [displayRooms, draft.selectedRoomId]);
 
-  // Step 3 Filtered Rooms
+  const itemParam = searchParams.get('item') || searchParams.get('room');
+  const hasPreselectedRoom = Boolean(itemParam || draft.selectedRoomId);
+  const [showAllRooms, setShowAllRooms] = useState(() => !itemParam);
+
+  const effectiveSteps = useMemo(() => {
+    if (itemParam) {
+      return ['Location & Dates', 'Guests', 'Room Details', 'Guest Details', 'Review & Pay', 'Confirmation'];
+    }
+    return STEPS;
+  }, [itemParam]);
+
+  // Step 3 Filtered Rooms - if user already selected a room from the Stay section, only show that room by default
   const filteredStep3Rooms = useMemo(() => {
+    if (hasPreselectedRoom && !showAllRooms && selectedRoom) {
+      return [selectedRoom];
+    }
     if (categoryFilter === 'all') return displayRooms;
     return displayRooms.filter((r) => {
       const cat = (r.category || '').toLowerCase();
@@ -298,7 +322,7 @@ export function HotelPage() {
       }
       return true;
     });
-  }, [displayRooms, categoryFilter]);
+  }, [displayRooms, categoryFilter, hasPreselectedRoom, showAllRooms, selectedRoom]);
 
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -387,18 +411,18 @@ export function HotelPage() {
     return {
       name: selectedRoom?.name || 'Hotel Room',
       image: roomImage(selectedRoom?.id || selectedRoom?.type),
-      detail: `Vijayawada Campus · ${draft.roomsCount} Room${Number(draft.roomsCount) > 1 ? 's' : ''}`,
+      detail: `${draft.areaName || 'Vijayawada Campus'} · ${draft.roomsCount} Room${Number(draft.roomsCount) > 1 ? 's' : ''}`,
       date: draft.checkin && draft.checkout ? `${formatDMY(draft.checkin)} – ${formatDMY(draft.checkout)}` : undefined,
       slot: `${nights} Night${nights > 1 ? 's' : ''}`,
       guests: `${draft.adults} Adults${Number(draft.children) > 0 ? `, ${draft.children} Children` : ''}`,
-      location: 'Vijayawada Campus · Riverfront Hotel',
+      location: draft.venueName && draft.areaName ? `${draft.areaName} — ${draft.venueName}` : (draft.venueName || draft.areaName || 'Vijayawada Campus'),
       locationId: 'vja-hotel',
       price: basePrice,
       memberDiscount: memberDiscount > 0 ? memberDiscount : undefined,
       couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
       total,
     };
-  }, [selectedRoom, draft.roomsCount, draft.checkin, draft.checkout, nights, draft.adults, draft.children, basePrice, memberDiscount, couponDiscount, total]);
+  }, [selectedRoom, draft.roomsCount, draft.checkin, draft.checkout, nights, draft.adults, draft.children, draft.areaName, draft.venueName, basePrice, memberDiscount, couponDiscount, total]);
 
   // Step 1 Validation (Dates)
   const isStep1Valid = useMemo(() => {
@@ -456,11 +480,14 @@ export function HotelPage() {
 
   // Step 4 Validation (Guest details)
   const isStep4Valid = useMemo(() => {
-    const cleanMobile = draft.mobile.replace(/\D/g, '');
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim());
     const validSpecial = (draft.specialRequest || '').length <= 300;
-    return Boolean(draft.name.trim()) && cleanMobile.length === 10 && validEmail && validSpecial;
+    return Boolean(draft.name.trim()) && isValidIndianMobile(draft.mobile) && validEmail && validSpecial;
   }, [draft.name, draft.mobile, draft.email, draft.specialRequest]);
+
+  const mobileError = mobileTouched && !isValidIndianMobile(draft.mobile)
+    ? INDIAN_MOBILE_MESSAGE
+    : '';
 
   // Payment Handler
   async function handlePay() {
@@ -487,19 +514,33 @@ export function HotelPage() {
 
       const isTestBooking = Boolean(appliedCoupon?.is_test || appliedCoupon);
 
+      const isHyd = draft.cityId === 'hyd' || (draft.cityName || '').toLowerCase().includes('hyd') || (draft.areaName || '').toLowerCase().includes('hyd');
+      const resolvedAreaName = draft.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus');
+      const resolvedVenueName = draft.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront');
+      const resolvedCityName = draft.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada');
+      const resolvedCityId = draft.cityId || (isHyd ? 'hyd' : 'vja');
+      const resolvedVenueId = draft.venueId || (isHyd ? 'hyd-residency' : 'vja-residency');
+
+      const locationTag = `[Location: ${resolvedCityId} | ${resolvedCityName} | ${resolvedAreaName} | ${resolvedVenueName}]`;
+      const combinedSpecialRequest = draft.specialRequest
+        ? `${draft.specialRequest.trim()} ${locationTag}`
+        : locationTag;
+
       const bookingPayload = {
         clientRequestId,
         userId: user?.id || null,
         roomTypeId: selectedRoom.id,
         checkIn: draft.checkin,
         checkOut: draft.checkout,
+        checkInTime: '12:00',
+        checkOutTime: '11:00',
         rooms: Number(draft.roomsCount || 1),
         adults: Number(draft.adults || 1),
         children: Number(draft.children || 0),
         guestName: draft.name,
         guestMobile: draft.mobile,
         guestEmail: draft.email,
-        specialRequest: draft.specialRequest || null,
+        specialRequest: combinedSpecialRequest,
         paymentMethod: total === 0 ? 'coupon' : draft.paymentMethod,
         couponCode: appliedCoupon?.code || null,
         couponDiscount,
@@ -540,9 +581,23 @@ export function HotelPage() {
         title: selectedRoom.name,
         roomName: selectedRoom.name,
         roomId: selectedRoom.id,
-        areaName: 'Vijayawada',
+        areaName: resolvedAreaName,
+        venueName: resolvedVenueName,
+        cityName: resolvedCityName,
+        cityId: resolvedCityId,
+        venueId: resolvedVenueId,
+        location: `${resolvedAreaName} · ${resolvedVenueName}`,
+        details: {
+          areaName: resolvedAreaName,
+          venueName: resolvedVenueName,
+          cityName: resolvedCityName,
+          cityId: resolvedCityId,
+          venueId: resolvedVenueId,
+        },
         checkin: draft.checkin,
         checkout: draft.checkout,
+        checkinTime: '12:00 PM',
+        checkoutTime: '11:00 AM',
         date: draft.checkin,
         nights,
         roomsCount: draft.roomsCount,
@@ -576,6 +631,14 @@ export function HotelPage() {
         await addBooking(confirmationRecord);
       }
 
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const storedStays = JSON.parse(window.localStorage.getItem('frcc_stay_bookings') || '[]');
+          const updatedStays = [confirmationRecord, ...storedStays.filter((s) => s.bookingRef !== bookingRef && s.id !== bookingId)];
+          window.localStorage.setItem('frcc_stay_bookings', JSON.stringify(updatedStays.slice(0, 50)));
+        }
+      } catch (_) {}
+
       setConfirmedBooking(confirmationRecord);
       setStep(5);
       pushToast('Room booked successfully! Welcome to FRCC.');
@@ -596,7 +659,7 @@ export function HotelPage() {
     const cleanDigits = String(confirmedBooking.mobile || '').replace(/\D/g, '').slice(-10);
     const targetDigits = cleanDigits ? `91${cleanDigits}` : String(whatsappNumber || '917893616262').replace(/\D/g, '');
 
-    const msg = `*FRCC Stay Reservation*\nBooking ID: ${confirmedBooking.id}\nRoom: ${confirmedBooking.roomName}\nLocation: ${confirmedBooking.areaName}\nCheck-in: ${formatDMY(confirmedBooking.checkin)}\nCheck-out: ${formatDMY(confirmedBooking.checkout)} (${confirmedBooking.nights} night${confirmedBooking.nights > 1 ? 's' : ''})\nGuests: ${confirmedBooking.guests}\nTotal Paid: ${formatInr(confirmedBooking.total)}\n\nShow this confirmation at the front desk.`;
+    const msg = `*FRCC Stay Reservation*\nBooking ID: ${confirmedBooking.id}\nRoom: ${confirmedBooking.roomName}\nLocation: ${confirmedBooking.areaName}\nCheck-in: ${formatDMY(confirmedBooking.checkin)} at 12:00 PM\nCheck-out: ${formatDMY(confirmedBooking.checkout)} at 11:00 AM (${confirmedBooking.nights} night${confirmedBooking.nights > 1 ? 's' : ''})\nGuests: ${confirmedBooking.guests}\nTotal Paid: ${formatInr(confirmedBooking.total)}\n\nShow this confirmation at the front desk.`;
 
     return `https://wa.me/${targetDigits}?text=${encodeURIComponent(msg)}`;
   }, [confirmedBooking]);
@@ -623,9 +686,9 @@ export function HotelPage() {
               <p className="eyebrow">Accommodations</p>
               <h2 className="h-section mt-1">Choose your room</h2>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-                <span>Normal rooms ₹2,500 to ₹4,500 per night</span>
+                <span>Normal rooms starting from ₹2,500 per night</span>
                 <span className="text-slate-300">·</span>
-                <span>Suites ₹4,500 to ₹10,000 per night</span>
+                <span>Suites starting from ₹6,000 per night</span>
               </div>
             </div>
             <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-semibold hover:text-gold-600 inline-flex self-start sm:self-end">
@@ -764,7 +827,7 @@ export function HotelPage() {
     <FlowShell
       service="stay"
       title="Book your stay"
-      steps={STEPS}
+      steps={effectiveSteps}
       currentStep={step}
       onStepClick={(i) => {
         if (i < step && step < 5) setStep(i);
@@ -772,32 +835,49 @@ export function HotelPage() {
       summary={staySummary}
     >
       <div>
-        {/* Step 1: Dates */}
+        {/* Step 1: Location & Dates */}
         {step === 0 && (
           <Card>
-            <p className="eyebrow">Step 1 · Stay Dates</p>
-            <h2 className="h-sub mt-1">Select location and travel dates</h2>
+            <p className="eyebrow">Step 1 · Location &amp; Dates</p>
+            <h2 className="h-sub mt-1">Step 1: Select Location &amp; Dates</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
-              <span>Choose your check-in and check-out dates (minimum 1, maximum 30 nights).</span>
+              <span>Choose your location, venue, and stay dates (minimum 1, maximum 30 nights).</span>
               <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
-                Vijayawada Campus · View on map
+                {draft.areaName || 'Vijayawada Campus'} · View on map
               </LocationTrigger>
             </div>
 
             <div className="mt-6 space-y-6">
-              {/* Area selector — preselected and read-only while only one exists */}
+              {/* Location selector matching Halls pattern */}
               <div>
-                <label className="label">Campus Location</label>
-                <div className="mt-1.5 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-100/90 px-4 py-3 text-sm font-semibold text-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                    <span>Vijayawada Campus</span>
-                  </div>
-                  <span className="text-xs text-slate-500 font-normal">Preselected · Single location</span>
-                </div>
+                <LocationSelector
+                  locations={STAY_LOCATIONS}
+                  cityId={draft.cityId || 'vja'}
+                  venueId={draft.venueId || 'vja-residency'}
+                  cityLabel="Select City"
+                  venueLabel="Select Venue / Campus"
+                  onCityChange={(cid, cityObj, firstVenue) => {
+                    const isHydCity = cid === 'hyd' || (cityObj?.name || '').toLowerCase().includes('hyd');
+                    updateDraft({
+                      cityId: cid,
+                      cityName: cityObj?.name || (isHydCity ? 'Hyderabad' : 'Vijayawada'),
+                      venueId: firstVenue?.id || (isHydCity ? 'hyd-residency' : 'vja-residency'),
+                      venueName: firstVenue?.name || firstVenue?.displayName || (isHydCity ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+                      areaName: firstVenue?.areaName || (isHydCity ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+                    });
+                  }}
+                  onVenueChange={(vid, venueObj) => {
+                    const isHydVenue = vid === 'hyd-residency' || (venueObj?.name || '').toLowerCase().includes('hyd') || draft.cityId === 'hyd';
+                    updateDraft({
+                      venueId: vid,
+                      venueName: venueObj?.name || venueObj?.displayName || (isHydVenue ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+                      areaName: venueObj?.areaName || (isHydVenue ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+                    });
+                  }}
+                />
               </div>
 
-              {/* Dates Grid */}
+              {/* Dates & Times Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <Input
@@ -807,9 +887,12 @@ export function HotelPage() {
                     value={draft.checkin}
                     onChange={(e) => handleCheckinChange(e.target.value)}
                   />
-                  {draft.checkin && (
-                    <p className="text-[11px] text-slate-500 mt-1">Check-in: {formatDMY(draft.checkin)}</p>
-                  )}
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-navy-900 font-medium">
+                    <ClockIcon className="h-4 w-4 shrink-0 text-navy-900" />
+                    <span>
+                      Check-in Time: <strong className="font-bold text-navy-950">12:00 PM</strong>
+                    </span>
+                  </div>
                 </div>
                 <div>
                   <Input
@@ -819,18 +902,13 @@ export function HotelPage() {
                     value={draft.checkout}
                     onChange={(e) => updateDraft({ checkout: e.target.value })}
                   />
-                  {draft.checkout && (
-                    <p className="text-[11px] text-slate-500 mt-1">Check-out: {formatDMY(draft.checkout)}</p>
-                  )}
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-navy-900 font-medium">
+                    <ClockIcon className="h-4 w-4 shrink-0 text-navy-900" />
+                    <span>
+                      Check-out Time: <strong className="font-bold text-navy-950">11:00 AM</strong>
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Duration info & inline error */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 flex items-center justify-between text-sm">
-                <span className="text-slate-600 font-medium">Calculated Stay Duration:</span>
-                <span className="font-bold text-navy-900">
-                  {nights} {nights === 1 ? 'night' : 'nights'}
-                </span>
               </div>
 
               {step1Error && (
@@ -855,7 +933,7 @@ export function HotelPage() {
         {step === 1 && (
           <Card>
             <p className="eyebrow">Step 2 · Guests</p>
-            <h2 className="h-sub mt-1">Party size &amp; room count</h2>
+            <h2 className="h-sub mt-1">Step 2: Party size &amp; room count</h2>
             <p className="mt-1 text-sm text-slate-600">Specify adults, children, and how many rooms you require.</p>
 
             <div className="mt-6 space-y-6 max-w-xl">
@@ -926,7 +1004,7 @@ export function HotelPage() {
                 onClick={() => setStep(2)}
                 className="px-7 py-2.5 inline-flex items-center gap-1.5"
               >
-                Next: Choose Room <ArrowRightIcon className="h-4 w-4" />
+                {hasPreselectedRoom && !showAllRooms ? 'Next: Room Details' : 'Next: Choose Room'} <ArrowRightIcon className="h-4 w-4" />
               </Button>
             </div>
           </Card>
@@ -945,36 +1023,55 @@ export function HotelPage() {
           </Card>
         ) : (
           <Card>
-            <p className="eyebrow">Step 3 · Choose Room</p>
-            <h2 className="h-sub mt-1">Available rooms for your stay</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Showing availability for {formatDMY(draft.checkin)} to {formatDMY(draft.checkout)} ({nights} {nights === 1 ? 'night' : 'nights'}) · {draft.roomsCount} {Number(draft.roomsCount) > 1 ? 'rooms' : 'room'}.
-            </p>
-
-            {/* Category tabs */}
-            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'normal', label: 'Normal rooms' },
-                { id: 'suite', label: 'Suites' },
-              ].map((f) => {
-                const active = categoryFilter === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setCategoryFilter(f.id)}
-                    className={`rounded-xl px-4 py-2 border transition ${
-                      active
-                        ? 'border-navy-900 bg-navy-900 text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p className="eyebrow">
+                  {hasPreselectedRoom && !showAllRooms ? 'Step 3 · Room Details' : 'Step 3 · Choose Room'}
+                </p>
+                <h2 className="h-sub mt-1">
+                  {hasPreselectedRoom && !showAllRooms ? 'Step 3: Your selected room' : 'Step 3: Available rooms for your stay'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Showing availability for {formatDMY(draft.checkin)} to {formatDMY(draft.checkout)} ({nights} {nights === 1 ? 'night' : 'nights'}) · {draft.roomsCount} {Number(draft.roomsCount) > 1 ? 'rooms' : 'room'}.
+                </p>
+              </div>
+              {hasPreselectedRoom && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllRooms((prev) => !prev)}
+                  className="text-xs font-semibold text-navy-900 underline hover:text-gold-600 self-start sm:self-auto cursor-pointer"
+                >
+                  {showAllRooms ? 'Show only selected room' : 'Change room'}
+                </button>
+              )}
             </div>
+
+            {/* Category tabs - only show when browsing all rooms */}
+            {(showAllRooms || !hasPreselectedRoom) && (
+              <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'normal', label: 'Normal rooms' },
+                  { id: 'suite', label: 'Suites' },
+                ].map((f) => {
+                  const active = categoryFilter === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setCategoryFilter(f.id)}
+                      className={`rounded-xl px-4 py-2 border transition ${
+                        active
+                          ? 'border-navy-900 bg-navy-900 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Capacity Warning Banner */}
             {!fitsParty && selectedRoom && (
@@ -993,7 +1090,7 @@ export function HotelPage() {
             {availabilityLoading ? (
               <div className="py-12 text-center text-sm text-slate-500">Checking room availability…</div>
             ) : (
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className={`mt-6 ${hasPreselectedRoom && !showAllRooms ? 'max-w-xl' : 'grid grid-cols-1 gap-4 sm:grid-cols-2'}`}>
                 {filteredStep3Rooms.map((room) => {
                   const isSelected = draft.selectedRoomId === room.id;
                   const availableCount = room.available ?? 1;
@@ -1102,7 +1199,7 @@ export function HotelPage() {
         {step === 3 && (
           <Card>
             <p className="eyebrow">Step 4 · Guest Details</p>
-            <h2 className="h-sub mt-1">Primary guest information</h2>
+            <h2 className="h-sub mt-1">Step 4: Primary guest information</h2>
             <p className="mt-1 text-sm text-slate-600">Provide contact details for booking confirmation and check-in verification.</p>
 
             <div className="mt-6 max-w-xl space-y-5">
@@ -1122,14 +1219,27 @@ export function HotelPage() {
                   </span>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[6-9][0-9]{9}"
+                    autoComplete="tel-national"
                     value={draft.mobile}
-                    onChange={(e) => updateDraft({ mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                    placeholder="9876543210"
+                    onChange={(e) => {
+                      const val = sanitizeMobileInput(e.target.value);
+                      updateDraft({ mobile: val });
+                      if (val.length === 10 || !val) setMobileTouched(true);
+                    }}
+                    onBlur={() => setMobileTouched(true)}
+                    placeholder={INDIAN_MOBILE_PLACEHOLDER}
                     maxLength={10}
+                    aria-invalid={Boolean(mobileError)}
                     className="block w-full rounded-r-xl border-0 py-2.5 px-3.5 text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-0"
                   />
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number</p>
+                {mobileError ? (
+                  <p role="alert" className="field-error mt-1">{mobileError}</p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number</p>
+                )}
               </div>
 
               <Input
@@ -1194,7 +1304,7 @@ export function HotelPage() {
         {step === 4 && (
           <Card>
             <p className="eyebrow">Step 5 · Review &amp; Pay</p>
-            <h2 className="h-sub mt-1">Review reservation and payment</h2>
+            <h2 className="h-sub mt-1">Step 5: Review reservation and payment</h2>
             <p className="mt-1 text-sm text-slate-600">Confirm stay details, review discounts, and complete reservation.</p>
 
             <div className="mt-6 max-w-xl space-y-6">
@@ -1210,7 +1320,7 @@ export function HotelPage() {
                   </div>
                   <div>
                     <span className="text-xs text-slate-500 block">Location</span>
-                    <span className="font-semibold text-navy-900">Vijayawada Campus</span>
+                    <span className="font-semibold text-navy-900">{draft.venueName && draft.areaName ? `${draft.areaName} — ${draft.venueName}` : (draft.venueName || draft.areaName || 'Vijayawada Campus')}</span>
                   </div>
                   <div>
                     <span className="text-xs text-slate-500 block">Stay Dates</span>
@@ -1352,7 +1462,11 @@ export function HotelPage() {
               {/* Cancellation Policy */}
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 space-y-1">
                 <p className="font-semibold text-navy-900">Cancellation Policy</p>
-                <p>{cancellationPolicy}</p>
+                <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                  <li>Free cancellation up to 24 hours before check-in</li>
+                  <li>Late cancellation: 1-night charge</li>
+                  <li>No-show: Non-refundable</li>
+                </ul>
               </div>
 
               {/* Required Terms Checkbox */}
@@ -1519,8 +1633,12 @@ export function HotelPage() {
                   <h4 className="font-display text-base font-bold text-navy-900 truncate">
                     {confirmedBooking.roomName}
                   </h4>
-                  <p className="text-xs text-slate-500 truncate">Vijayawada Campus · Riverfront Hotel</p>
+                  <p className="text-xs text-slate-500 truncate">{confirmedBooking.venueName || confirmedBooking.areaName || 'Vijayawada Campus'}</p>
                 </div>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Location</span>
+                <span className="font-semibold text-navy-900">{confirmedBooking.venueName || confirmedBooking.areaName || 'Vijayawada Campus'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Room</span>
@@ -1549,7 +1667,11 @@ export function HotelPage() {
             {/* Cancellation Policy */}
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 text-left text-xs text-slate-600">
               <span className="font-semibold text-navy-900 block mb-0.5">Cancellation Policy</span>
-              <p>{cancellationPolicy}</p>
+              <ul className="list-disc list-inside space-y-0.5 text-slate-700">
+                <li>Free cancellation up to 24 hours before check-in</li>
+                <li>Late cancellation: 1-night charge</li>
+                <li>No-show: Non-refundable</li>
+              </ul>
             </div>
 
             {/* Action Buttons (no-print) */}

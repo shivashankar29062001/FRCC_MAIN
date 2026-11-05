@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
 // /src/data/parking.js — FRCC Parking Areas & Zones Data
-// Independent Campuses: Vijayawada and Hyderabad
+// Independent Campuses & Locations: Vijayawada and Hyderabad (150 slots each)
 // ---------------------------------------------------------------------------
 
 export const areas = [
-  { id: 'vja', name: 'Vijayawada' },
-  { id: 'hyd', name: 'Hyderabad' },
+  { id: 'vja', name: 'Vijayawada', campus: 'vijayawada' },
+  { id: 'hyd', name: 'Hyderabad', campus: 'hyderabad' },
 ];
 
 export const zones = [
@@ -13,9 +13,11 @@ export const zones = [
   {
     id: 'vja-multi-level',
     areaId: 'vja',
+    locationId: 'vja',
+    campus: 'vijayawada',
     campus_id: 'vja',
+    campusName: 'Vijayawada Campus',
     zone_id: 'vja-multi-level',
-    locationId: 'vja-parking',
     name: 'Multi-Level Parking - Vijayawada',
     subtitle: 'Vijayawada Campus',
     spots: 150,
@@ -38,9 +40,11 @@ export const zones = [
   {
     id: 'hyd-multi-level',
     areaId: 'hyd',
+    locationId: 'hyd',
+    campus: 'hyderabad',
     campus_id: 'hyd',
+    campusName: 'Hyderabad Campus',
     zone_id: 'hyd-multi-level',
-    locationId: 'hyd-parking',
     name: 'Multi-Level Parking - Hyderabad',
     subtitle: 'Hyderabad Campus',
     spots: 150,
@@ -63,11 +67,21 @@ export const zones = [
 export const PARKING_ZONES = zones;
 
 export function getParkingByArea(areaId) {
-  return zones.filter((z) => z.areaId === areaId || z.campus_id === areaId || z.locationId === areaId);
+  return zones.filter(
+    (z) => z.areaId === areaId || z.campus_id === areaId || z.locationId === areaId || z.campus === areaId
+  );
 }
 
 export function getParkingByLocation(locationId) {
-  return zones.filter((z) => z.locationId === locationId || z.areaId === locationId || z.campus_id === locationId);
+  return zones.filter(
+    (z) =>
+      z.locationId === locationId ||
+      z.areaId === locationId ||
+      z.campus_id === locationId ||
+      z.campus === locationId ||
+      (locationId === 'vja-parking' && (z.id === 'vja-multi-level' || z.areaId === 'vja')) ||
+      (locationId === 'hyd-parking' && (z.id === 'hyd-multi-level' || z.areaId === 'hyd'))
+  );
 }
 
 export function getParkingZoneById(id) {

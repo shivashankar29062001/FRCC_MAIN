@@ -1,4 +1,4 @@
-import { Car, Check } from 'lucide-react';
+import { Check, Car } from 'lucide-react';
 import './SlotLegend.css';
 
 export default function SlotLegend() {

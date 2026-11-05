@@ -114,248 +114,201 @@ export function ServiceLanding({ service = 'stay', hero }) {
     if (normService === 'halls') {
       let filtered = hallItems.filter((h) => !selectedArea || h.areaId === selectedArea);
       if (hallFilter !== 'all') {
-        filtered = filtered.filter((h) => h.type === hallFilter);
+        filtered = filtered.filter(
+          (h) => h.roomType === hallFilter || h.name === hallFilter || h.type === hallFilter || h.name.includes(hallFilter)
+        );
       }
       return filtered.map((h) => {
         const typeLabel =
-          h.type === 'ac' ? 'Central AC' : h.type === 'boardroom' ? 'Executive Boardroom' : 'Non AC / Natural Air';
-        const capacityLabel = h.pricingUnit === 'per-person'
-          ? `Capacity: ${h.capacityMin} – ${h.capacityMax?.toLocaleString('en-IN')} guests`
-          : `Seats ${h.capacity} guests`;
+          h.type === 'boardroom' ? 'Executive Boardroom' : h.type === 'ac' ? 'Central AC' : 'Non AC / Natural Air';
+        const capacityLabel = `Capacity: ${h.capacity?.toLocaleString('en-IN')} guests`;
         return {
           id: h.id,
           name: h.name,
-          image: IMAGES[h.id] || IMAGES.hallFunction,
+          image: (h.image ? { src: h.image, alt: h.name, name: h.name } : IMAGES[h.id]) || IMAGES.hallFunction,
           facts: [
             capacityLabel,
             `Type: ${typeLabel}`,
             h.priceNote ? `Dining: ${h.priceNote}` : (h.amenities?.[0] || 'AV Systems & Stage'),
           ],
           priceDisplay: formatInr(h.price || h.prices?.fullDay || 50000),
-          priceUnit: h.pricingUnit === 'per-person' ? ' / person (with food)' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
-          locationId: 'vja-halls',
-          locationName: 'Vijayawada Campus · Convention Block',
+          priceUnit: (h.pricingUnit === 'per-plate' || h.pricingUnit === 'per-person') ? ' / plate' : h.pricingUnit === 'per-hour' ? ' / hour' : ' / day',
+
+
           buttonLabel: 'Book Hall',
-          to: HALL_BOOKING_URL,
+          to: `${HALL_BOOKING_URL}?type=${encodeURIComponent(h.roomType || h.name)}`,
         };
       });
     }
 
     if (normService === 'parking') {
-      return parkingZones.map((z) => ({
-        id: z.id,
-        name: z.name,
-        subtitle: z.subtitle || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
-        image: IMAGES[z.id] || (z.areaId === 'hyd' ? IMAGES['hyd-basement'] || IMAGES.parkingSecurity : IMAGES['vja-multi-level'] || IMAGES.parkingEntry),
-        facts: [
-          `Total parking slots: ${z.spots || 150}`,
-          `Supported vehicles: ${(z.vehicleTypes || ['CAR', 'BIKE']).join(', ')}`,
-        ],
-        priceDisplay: 'Free',
-        priceUnit: '',
-        locationId: z.locationId || (z.areaId === 'hyd' ? 'hyd-parking' : 'vja-parking'),
-        locationName: z.subtitle || (z.areaId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'),
-        buttonLabel: 'Book Parking',
-        to: `/parking/book?campus=${z.areaId}&city=${encodeURIComponent(z.areaId === 'hyd' ? 'Hyderabad' : 'Vijayawada')}`,
-      }));
+      return parkingZones.map((z) => {
+        const campusKey = z.campus || (z.areaId === 'hyd' ? 'hyderabad' : 'vijayawada');
+        const cityName = campusKey === 'hyderabad' ? 'Hyderabad' : 'Vijayawada';
+        const campusId = z.areaId || (campusKey === 'hyderabad' ? 'hyd' : 'vja');
+        const zoneId = z.id;
+        const campusLabel = z.subtitle || z.campusName || (campusId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus');
+
+        return {
+          id: z.id,
+          name: z.name,
+          subtitle: campusLabel,
+          image: IMAGES[z.id] || (campusId === 'hyd' ? IMAGES['hyd-basement'] || IMAGES.parkingSecurity : IMAGES['vja-multi-level'] || IMAGES.parkingEntry),
+          facts: [
+            `Total parking slots: ${z.spots || 150}`,
+            `Supported vehicles: ${(z.vehicleTypes || ['Car', 'Bike']).join(', ')}`,
+          ],
+          priceDisplay: 'Free',
+          priceUnit: '',
+          locationId: z.locationId || (campusId === 'hyd' ? 'hyd-parking' : 'vja-parking'),
+          locationName: campusLabel,
+          buttonLabel: 'Book Parking',
+          to: `/parking/book?campus_id=${campusId}&zone_id=${zoneId}&campus=${campusKey}&city=${encodeURIComponent(cityName)}`,
+        };
+      });
     }
 
     if (normService === 'activities') {
       let filtered = activityGames;
       if (activityFilter !== 'all') {
-        filtered = filtered.filter(
-          (g) => g.category === activityFilter || g.subCategory === activityFilter
-        );
+        filtered = filtered.filter((g) => g.category === activityFilter);
       }
-      return filtered.map((g) => {
-        const priceDisplay = g.priceFrom
-          ? `${formatInr(g.priceFrom)} – ${formatInr(g.priceTo)}`
-          : formatInr(g.pricePerSlot || g.price);
-        const priceUnit = g.pricingUnit === 'per-hour'
-          ? ' / hour'
-          : g.unit === 'month' || g.pricingUnit === 'per-month'
-            ? ' / month'
-            : g.pricingUnit === 'per-session'
-              ? ' / session'
-              : ' / slot';
-        return {
-          id: g.id,
-          name: g.name,
-          subtitle: g.subtitle,
-          image: gameSlot(g.imageKey),
-          facts: [
-            `${g.slotMinutes} min session duration`,
-            `Capacity: Up to ${g.maxPlayers} players`,
-            `Operating hours: ${g.openFrom} – ${g.openTo}`,
-          ],
-          priceDisplay,
-          priceUnit,
-          locationId: 'vja-activities',
-          locationName: 'Vijayawada Campus · Sports Complex',
-          buttonLabel: 'Book game',
-          to: `/book/activities/process?item=${encodeURIComponent(g.id)}&game=${encodeURIComponent(g.id)}`,
-        };
-      });
+      return filtered.map((g) => ({
+        id: g.id,
+        name: g.name,
+        image: g.image || gameSlot(g.name),
+        facts: [
+          `Category: ${g.category.toUpperCase()}`,
+          g.tag || 'Indoor & Outdoor courts',
+          `Pricing: ₹${g.price} / ${g.unit}`,
+        ],
+        priceDisplay: formatInr(g.price),
+        priceUnit: ` / ${g.unit}`,
+        healthCardNote: healthCardDiscountPercent
+          ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
+          : null,
+        locationId: 'vja-sports',
+        locationName: 'Vijayawada Campus · Sports Complex',
+        buttonLabel: 'Book session',
+        to: `/book/activity?item=${encodeURIComponent(g.id)}`,
+      }));
     }
 
     if (normService === 'membership') {
       return membershipPlans.map((p) => ({
         id: p.id,
         name: p.name,
-        image: IMAGES[p.imageSlot] || IMAGES.serviceMembership,
-        facts: p.benefits || [
-          '30% discount on every booking',
-          `Health card: ${healthCardDiscountPercent}% discount at collaborating diagnostic centres`,
-          'Membership ID card and Health card',
+        subtitle: p.subtitle,
+        image: IMAGES[p.id] || IMAGES.heroMembership,
+        facts: [
+          p.duration || 'Lifetime Enrollment',
+          p.badge || 'Executive Access',
+          'Access to Stay, Sports, Dining & Events',
         ],
-        priceDisplay: formatInr(p.price || p.amount),
-        priceUnit: ' (one-time)',
-        healthCardNote: p.healthCardNote,
-        locationId: 'vja-membership',
-        locationName: 'Vijayawada Campus · Member Relations Desk',
-        buttonLabel: 'Join now',
-        to: `/membership/join?item=${encodeURIComponent(p.id)}&plan=${encodeURIComponent(p.id)}`,
+        priceDisplay: formatInr(p.price),
+        priceUnit: ' / lifetime',
+        locationId: 'vja-club',
+        locationName: 'FRCC Main Campus',
+        buttonLabel: 'Apply for membership',
+        to: '/membership/apply',
       }));
     }
 
     return [];
   }, [normService, selectedArea, hallFilter, activityFilter]);
 
-  // Section title & description
-  const sectionMeta = useMemo(() => {
-    switch (normService) {
-      case 'stay':
-        return {
-          eyebrow: 'Accommodations',
-          title: 'Select your room type',
-          desc: 'Relax in well-appointed rooms and suites with complimentary breakfast, pool, and WiFi access.',
-        };
-      case 'halls':
-        return {
-          eyebrow: 'Event Spaces',
-          title: 'Select convention or function hall',
-          desc: 'Host grand weddings, summits, or executive board meetings with full AC and technical support.',
-        };
-      case 'parking':
-        return {
-          eyebrow: 'Campus Access',
-          title: 'Select parking zone',
-          desc: 'Reserve covered or open parking with EV charging and 24/7 attendant security.',
-        };
-      case 'activities':
-        return {
-          eyebrow: 'Sports & Recreation',
-          title: 'Select activity or game',
-          desc: 'Book coached batches, tennis courts, football grounds, indoor games, and pool slots.',
-        };
-      case 'membership':
-        return {
-          eyebrow: 'Membership Tiers',
-          title: 'Choose your lifetime plan',
-          desc: 'One lifetime membership. Member rates across all hotel rooms, halls, parking, and sports.',
-        };
-      default:
-        return { eyebrow: 'Explore', title: 'Available Options', desc: 'Choose your preferred option below.' };
+  // 4. Determine Filter Chips
+  const filterChips = useMemo(() => {
+    if (normService === 'halls') {
+      return [
+        { id: 'all', label: 'All Spaces' },
+        { id: 'Convention Hall', label: 'Convention Hall' },
+        { id: 'Banquet Hall', label: 'Banquet Hall' },
+        { id: 'Board Room', label: 'Board Rooms' },
+      ];
     }
+    if (normService === 'activities') {
+      return [
+        { id: 'all', label: 'All Activities' },
+        { id: 'pool', label: 'Pool & Aquatic' },
+        { id: 'court', label: 'Racket Courts' },
+        { id: 'turf', label: 'Turf & Team' },
+        { id: 'wellness', label: 'Wellness & Gym' },
+      ];
+    }
+    return [];
   }, [normService]);
 
-  // More to explore 3 links
+  // 5. Build dynamic "More to explore" links
   const moreExploreLinks = useMemo(() => {
-    return ALL_EXPLORE_LINKS.filter((item) => item.key !== normService).slice(0, 3);
+    return ALL_EXPLORE_LINKS.filter((link) => link.key !== normService).slice(0, 3);
   }, [normService]);
 
   return (
-    <div className="bg-cream/30 min-h-screen">
-      {/* 1 · Service Hero (always kept at the top) */}
-      {hero || <ServiceHero service={heroService} />}
+    <div className="bg-sand-50 min-h-screen">
+      {/* 1 · Hero */}
+      <ServiceHero service={heroService} overrides={hero} />
 
-      {/* 2 · Main Section */}
-      <section id="content" className="band-white scroll-mt-24" aria-label={sectionMeta.title}>
+      {/* 2 · Main Options Section */}
+      <section className="band-sand" aria-label="Available options">
         <div className="container-x section">
-          {/* Header */}
-          <div className="max-w-2xl">
-            <p className="eyebrow">{sectionMeta.eyebrow}</p>
-            <h1 className="h-section mt-2">{sectionMeta.title}</h1>
-            <p className="mt-3 text-slate-600">{sectionMeta.desc}</p>
+          {/* Section Heading & Subheading */}
+          <div className="text-center max-w-xl mx-auto">
+            <p className="eyebrow">Explore collection</p>
+            <h2 className="h-section mt-2">
+              {normService === 'stay' && 'Rooms & suites'}
+              {normService === 'halls' && 'Celebration spaces'}
+              {normService === 'parking' && 'Designated parking zones'}
+              {normService === 'activities' && 'Sports & recreation'}
+              {normService === 'membership' && 'Membership tiers'}
+            </h2>
+            <p className="mt-3 text-slate-600">
+              {normService === 'stay' && 'Spacious suites and executive rooms with river views and private balconies.'}
+              {normService === 'halls' && 'Centrally air-conditioned convention halls, banquets and boardrooms.'}
+              {normService === 'parking' && 'Secure parking zones across campuses with automated entry and EV support.'}
+              {normService === 'activities' && 'International standard courts, temperature-regulated pool, and open turfs.'}
+              {normService === 'membership' && 'Select your tier to unlock access across sports, stay, and grand events.'}
+            </p>
           </div>
 
-          {/* Area tabs (ONLY if data has more than one area) */}
-          {hasAreas && normService !== 'parking' && (
-            <div className="mt-8 border-b border-slate-200 pb-4">
-              <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block mb-2.5">
-                Select Campus Location
-              </span>
-              <div className="flex flex-wrap items-center gap-2" role="tablist">
-                {serviceAreas.map((area) => {
-                  const isActive = selectedArea === area.id;
-                  return (
-                    <button
-                      key={area.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      onClick={() => setSelectedArea(area.id)}
-                      className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-colors duration-150 ${
-                        isActive
-                          ? 'bg-navy-900 text-white shadow-sm'
-                          : 'bg-white text-slate-700 hover:text-navy-900 hover:bg-slate-50 border border-slate-300'
-                      }`}
-                    >
-                      {area.name}
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Area Switcher Pills (If service has multiple areas) */}
+          {hasAreas && (
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+              {serviceAreas.map((area) => (
+                <button
+                  key={area.id}
+                  type="button"
+                  onClick={() => setSelectedArea(area.id)}
+                  className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors duration-150 ${
+                    selectedArea === area.id
+                      ? 'bg-navy-900 text-white shadow-sm'
+                      : 'bg-white text-slate-700 hover:text-navy-900 border border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {area.name}
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Filter Chips for Halls */}
-          {normService === 'halls' && (
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium mr-1">Type:</span>
-              {[
-                { id: 'all', label: 'All Venues' },
-                { id: 'ac', label: 'AC' },
-                { id: 'non-ac', label: 'Non AC' },
-                { id: 'boardroom', label: 'Board room' },
-              ].map((chip) => {
-                const isActive = hallFilter === chip.id;
+          {/* Filter Chips (Halls or Activities) */}
+          {filterChips.length > 0 && (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+              {filterChips.map((chip) => {
+                const isActive =
+                  normService === 'halls' ? hallFilter === chip.id : activityFilter === chip.id;
                 return (
                   <button
                     key={chip.id}
                     type="button"
-                    onClick={() => setHallFilter(chip.id)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-150 ${
-                      isActive
-                        ? 'bg-gold-500 text-navy-950 shadow-sm'
-                        : 'bg-white text-slate-600 hover:text-navy-900 border border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Filter Chips for Activities */}
-          {normService === 'activities' && (
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500 font-medium mr-1">Category:</span>
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'indoor', label: 'Indoor' },
-                { id: 'outdoor', label: 'Outdoor' },
-                { id: 'water', label: 'Water' },
-                { id: 'fitness', label: 'Fitness' },
-              ].map((chip) => {
-                const isActive = activityFilter === chip.id;
-                return (
-                  <button
-                    key={chip.id}
-                    type="button"
-                    onClick={() => setActivityFilter(chip.id)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors duration-150 ${
+                    onClick={() => {
+                      if (normService === 'halls') {
+                        setHallFilter(chip.id);
+                      } else {
+                        setActivityFilter(chip.id);
+                      }
+                    }}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors duration-150 ${
                       isActive
                         ? 'bg-gold-500 text-navy-950 shadow-sm'
                         : 'bg-white text-slate-600 hover:text-navy-900 border border-slate-200 hover:border-slate-300'
@@ -369,90 +322,123 @@ export function ServiceLanding({ service = 'stay', hero }) {
           )}
 
           {/* 3 · Option Cards Grid */}
-          <div className={cardItems.length === 1 ? "mt-8 flex justify-center" : cardItems.length === 2 ? "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-4xl mx-auto" : "mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"}>
-            {cardItems.map((item) => (
-              <article
-                key={item.id}
-                className={`group flex flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm ${cardItems.length === 1 ? 'w-full max-w-md' : ''}`}
-              >
-                <div className="h-48 overflow-hidden bg-slate-100">
-                  <SmartImage
-                    image={item.image}
-                    aspect="16 / 10"
-                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="flex flex-1 flex-col p-5 sm:p-6">
-                  <h3 className="font-display text-xl font-bold text-navy-900">{item.name}</h3>
-
-                  {item.subtitle && (
-                    <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
-                  )}
-
-                  {item.locationName && (
-                    <div className="mt-1">
-                      {item.googleMapsUrl ? (
-                        <a
-                          href={item.googleMapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
-                        >
-                          {item.locationName}
-                        </a>
-                      ) : (
-                        <LocationTrigger
-                          locationId={item.locationId}
-                          className="text-xs text-slate-500 hover:text-navy-950 font-normal"
-                          showIcon={true}
-                          iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
-                        >
-                          {item.locationName}
-                        </LocationTrigger>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 2 to 3 key facts */}
-                  <ul className="mt-3.5 flex-1 space-y-2 border-t border-slate-100 pt-3 text-xs text-slate-600">
-                    {item.facts.map((fact, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gold-500 shrink-0" />
-                        <span>{fact}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {item.healthCardNote && (
-                    <p className="mt-3 rounded-lg bg-amber-50/80 border border-amber-200/60 p-2.5 text-[11px] text-amber-900 leading-tight">
-                      {item.healthCardNote}
-                    </p>
-                  )}
-
-                  {/* Price */}
-                  <div className="mt-5 flex items-baseline justify-between border-t border-slate-100 pt-3">
-                    <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Rate</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-display text-2xl font-bold text-navy-900">{item.priceDisplay}</span>
-                      {item.priceUnit && <span className="text-xs text-slate-500">{item.priceUnit}</span>}
-                    </div>
+          <div
+            className={
+              cardItems.length === 1
+                ? 'mt-6 flex justify-center'
+                : cardItems.length === 2
+                  ? 'mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 max-w-4xl mx-auto'
+                  : normService === 'halls'
+                    ? 'mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                    : 'mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'
+            }
+          >
+            {cardItems.map((item) => {
+              const isCompact = normService === 'halls';
+              return (
+                <article
+                  key={item.id}
+                  className={`group flex flex-col overflow-hidden rounded-2xl border border-navy-900/10 bg-white transition-colors duration-150 hover:border-gold-500 shadow-sm ${
+                    cardItems.length === 1 ? 'w-full max-w-md' : ''
+                  }`}
+                >
+                  <div className={`${isCompact ? 'h-36 sm:h-40' : 'h-48'} overflow-hidden bg-slate-100`}>
+                    <SmartImage
+                      image={item.image}
+                      aspect={isCompact ? '16 / 9' : '16 / 10'}
+                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
                   </div>
+                  <div className={`flex flex-1 flex-col ${isCompact ? 'p-4 sm:p-5' : 'p-5 sm:p-6'}`}>
+                    <h3 className={`font-display ${isCompact ? 'text-lg' : 'text-xl'} font-bold text-navy-900`}>
+                      {item.name}
+                    </h3>
 
-                  {/* Gold Button */}
-                  <div className="mt-5 pt-1">
-                    <Link
-                      to={item.to}
-                      onClick={(e) => handleActionClick(e, item.to)}
-                      className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm"
+                    {item.subtitle && (
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">{item.subtitle}</p>
+                    )}
+
+                    {item.locationName && (
+                      <div className="mt-1">
+                        {item.googleMapsUrl ? (
+                          <a
+                            href={item.googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                          >
+                            {item.locationName}
+                          </a>
+                        ) : (
+                          <LocationTrigger
+                            locationId={item.locationId}
+                            className="text-xs text-slate-500 hover:text-navy-950 font-normal"
+                            showIcon={true}
+                            iconClassName="mt-0.5 h-3 w-3 shrink-0 text-gold-500"
+                          >
+                            {item.locationName}
+                          </LocationTrigger>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 2 to 3 key facts */}
+                    <ul
+                      className={`${
+                        isCompact ? 'mt-2.5 space-y-1.5 pt-2' : 'mt-3.5 space-y-2 pt-3'
+                      } flex-1 border-t border-slate-100 text-xs text-slate-600`}
                     >
-                      {item.buttonLabel}
-                      <ArrowRightIcon className="h-4 w-4" />
-                    </Link>
+                      {item.facts.map((fact, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-gold-500 shrink-0" />
+                          <span>{fact}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {item.healthCardNote && (
+                      <p className="mt-3 rounded-lg bg-amber-50/80 border border-amber-200/60 p-2.5 text-[11px] text-amber-900 leading-tight">
+                        {item.healthCardNote}
+                      </p>
+                    )}
+
+                    {/* Price */}
+                    <div
+                      className={`${
+                        isCompact ? 'mt-3 pt-2' : 'mt-5 pt-3'
+                      } flex items-baseline justify-between border-t border-slate-100`}
+                    >
+                      <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Rate</span>
+                      <div className="flex items-baseline gap-1">
+                        <span
+                          className={`font-display ${
+                            isCompact ? 'text-xl' : 'text-2xl'
+                          } font-bold text-navy-900`}
+                        >
+                          {item.priceDisplay}
+                        </span>
+                        {item.priceUnit && <span className="text-xs text-slate-500">{item.priceUnit}</span>}
+                      </div>
+                    </div>
+
+                    {/* Gold Button */}
+                    <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
+                      <Link
+                        to={item.to}
+                        onClick={(e) => handleActionClick(e, item.to)}
+                        className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
+                          isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
+                        } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
+                      >
+                        {item.buttonLabel}
+                        <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>

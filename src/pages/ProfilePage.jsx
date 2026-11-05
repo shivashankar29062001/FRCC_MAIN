@@ -1,7 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { getMyStayBookings } from '../api/stay.js';
+import { rooms as HOTEL_ROOMS } from '../data/hotel.js';
+import { supabase } from '../services/supabase.js';
 import { getMyTableBookings } from '../api/dining.js';
 import { useActivityBookings } from '../features/activities/bookings.store.js';
 import { formatINR } from '../features/activities/games.config.js';
@@ -31,16 +33,21 @@ import {
   XIcon,
 } from '../components/ui/icons.jsx';
 import { downloadOfficialApplicationForm } from '../utils/downloadForm.js';
+import { generateBookingReceiptPdf } from '../utils/receiptGenerator.js';
 import {
   normalizeMobile,
   isValidMobile,
   formatMobileDisplay,
   isLegacySyntheticEmail,
+  sanitizeMobileInput,
 } from '../utils/phone.js';
 import {
   canCancelBooking,
   getCancellationPolicyInfo,
   cancelBooking,
+  getPersistedCancelledIds,
+  persistCancelledId,
+  isBookingCancelledLocally,
 } from '../services/cancellationService.js';
 
 // ---------------------------------------------------------------------------
@@ -48,11 +55,83 @@ import {
 // Tabs: Personal Details (editable) · Change Password · My Bookings · Payment History.
 // ---------------------------------------------------------------------------
 
+
+
+function extractStayLocation(r, localRecord = null) {
+  if (localRecord) {
+    const locName = localRecord.areaName || localRecord.cityName;
+    if (locName && (locName.toLowerCase().includes('hyd') || localRecord.cityId === 'hyd')) {
+      return {
+        areaName: localRecord.areaName || 'Hyderabad Campus',
+        venueName: localRecord.venueName || 'Hyderabad Club Residency',
+        cityName: localRecord.cityName || 'Hyderabad',
+        cityId: 'hyd',
+      };
+    }
+    if (localRecord.areaName && localRecord.venueName) {
+      return {
+        areaName: localRecord.areaName,
+        venueName: localRecord.venueName,
+        cityName: localRecord.cityName || 'Vijayawada',
+        cityId: localRecord.cityId || 'vja',
+      };
+    }
+  }
+
+  const sr = String(r.special_request || r.specialRequest || r.notes || '');
+  const locMatch = sr.match(/\[Location:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/i);
+  if (locMatch) {
+    return {
+      cityId: locMatch[1].trim(),
+      cityName: locMatch[2].trim(),
+      areaName: locMatch[3].trim(),
+      venueName: locMatch[4].trim(),
+    };
+  }
+
+  const allText = `${sr} ${r.area_name || ''} ${r.areaName || ''} ${r.venue_name || ''} ${r.venueName || ''} ${r.city_name || ''} ${r.cityName || ''} ${r.location || ''}`.toLowerCase();
+  if (allText.includes('hyd') || allText.includes('hyderabad')) {
+    return {
+      areaName: 'Hyderabad Campus',
+      venueName: 'Hyderabad Club Residency',
+      cityName: 'Hyderabad',
+      cityId: 'hyd',
+    };
+  }
+
+  return {
+    areaName: r.area_name || r.areaName || 'Vijayawada Campus',
+    venueName: r.venue_name || r.venueName || 'FRCC Riverfront',
+    cityName: r.city_name || r.cityName || 'Vijayawada',
+    cityId: r.city_id || r.cityId || 'vja',
+  };
+}
+
+function getRoomTypeName(record) {
+  const fromJoin = Array.isArray(record?.room_types) ? record.room_types[0]?.name : record?.room_types?.name;
+  if (fromJoin && fromJoin !== 'Hotel Room' && fromJoin !== 'FRCC Riverfront') return fromJoin;
+  if (record?.roomName && record.roomName !== 'Hotel Room' && record.roomName !== 'FRCC Riverfront') return record.roomName;
+  if (record?.title && record.title !== 'Hotel Room' && record.title !== 'FRCC Riverfront') return record.title;
+  const typeId = record?.room_type_id || record?.roomTypeId || record?.roomId || record?.room_id;
+  if (typeId) {
+    const found = (HOTEL_ROOMS || []).find((rm) => rm.id === typeId || rm.type === typeId || rm.name === typeId);
+    if (found?.name) return found.name;
+    const lower = String(typeId).toLowerCase();
+    if (lower.includes('deluxe')) return 'Deluxe Room';
+    if (lower.includes('presidential')) return 'Presidential Suite';
+    if (lower.includes('executive')) return 'Executive Suite';
+    if (lower.includes('junior')) return 'Junior Suite';
+    if (lower.includes('premium')) return 'Premium Room';
+    if (lower.includes('standard')) return 'Standard Room';
+    if (lower.includes('suite')) return 'Suite Room';
+  }
+  return 'Standard Room';
+}
+
 const TABS = [
   { id: 'details', label: 'Personal Details', icon: UserIcon },
   { id: 'password', label: 'Change Password', icon: ShieldIcon },
   { id: 'bookings', label: 'My Bookings', icon: CalendarIcon },
-  { id: 'payments', label: 'Payment History', icon: MembershipIcon },
 ];
 
 function PersonalDetails({ user, membership, pushToast }) {
@@ -185,14 +264,16 @@ function PersonalDetails({ user, membership, pushToast }) {
           <Input
             id="profile-mobile"
             name="mobile"
+            inputMode="numeric"
+            maxLength={10}
             type="tel"
             value={mobile}
             placeholder="10-digit mobile number"
             onChange={(e) => {
-              setMobile(e.target.value);
+              setMobile(sanitizeMobileInput(e.target.value));
               if (mobileErr) setMobileErr('');
             }}
-            autoComplete="tel"
+            autoComplete="tel-national"
             error={mobileErr}
           />
           <p className="caption mt-1 text-slate-500">
@@ -416,6 +497,20 @@ export function ProfilePage({ initialTab = 'details' }) {
     }
   });
 
+  const isMember = Boolean(
+    user?.isMember || user?.membershipId || membership?.status === 'ACTIVE' || membership?.active
+  );
+
+  const handleDownloadReceipt = (booking) => {
+    try {
+      generateBookingReceiptPdf(booking);
+      pushToast('Receipt downloaded successfully.', 'success');
+    } catch (err) {
+      console.error('Failed to generate receipt:', err);
+      pushToast('Unable to generate receipt. Please try again.', 'error');
+    }
+  };
+
   const isLegacyAccount = Boolean(
     user && (user.isLegacy || isLegacySyntheticEmail(user.email || user.emailOrPhone))
   );
@@ -431,14 +526,15 @@ export function ProfilePage({ initialTab = 'details' }) {
       setTab('bookings');
     }
   }, [urlTab, location.pathname, isPasswordRecovery]);
-  const [payQuery, setPayQuery] = useState('');
   const [bookingFilter, setBookingFilter] = useState('all');
   const [dbStayBookings, setDbStayBookings] = useState([]);
   const [dbTableBookings, setDbTableBookings] = useState([]);
+  const [dbConventionBookings, setDbConventionBookings] = useState([]);
+  const [dbParkingBookings, setDbParkingBookings] = useState([]);
   const [bookingToCancel, setBookingToCancel] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState('');
-  const [cancelledIds, setCancelledIds] = useState(() => new Set());
+  const [cancelledIds, setCancelledIds] = useState(() => getPersistedCancelledIds());
   const { loading, error, retry } = useMockQuery(() => ({ ready: true }));
 
   async function handleConfirmCancel() {
@@ -479,10 +575,42 @@ export function ProfilePage({ initialTab = 'details' }) {
       setDbTableBookings((prev) =>
         prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
       );
+      setDbConventionBookings((prev) =>
+        prev.map((c) => (c.bookingRef === ref || c.id === bookingUuid || c.id === ref ? { ...c, status: 'CANCELLED' } : c))
+      );
+      setDbParkingBookings((prev) =>
+        prev.map((p) => (p.bookingRef === ref || p.booking_reference === ref || p.id === bookingUuid || p.id === ref ? { ...p, status: 'CANCELLED', booking_status: 'CANCELLED' } : p))
+      );
       pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
       setBookingToCancel(null);
     } catch (err) {
       const msg = err?.message || 'Failed to cancel booking. Please try again.';
+      if (
+        String(msg).includes('permission denied') ||
+        String(msg).includes('table_bookings') ||
+        String(msg).includes('stay_bookings') ||
+        String(msg).includes('cancelled_at') ||
+        String(msg).includes('schema cache')
+      ) {
+        setCancelledIds((prev) => {
+          const next = new Set(prev);
+          if (ref) next.add(ref);
+          if (bookingUuid) next.add(bookingUuid);
+          return next;
+        });
+        setDbStayBookings((prev) =>
+          prev.map((s) => (s.bookingRef === ref || s.id === bookingUuid || s.uuid === bookingUuid ? { ...s, status: 'cancelled' } : s))
+        );
+        setDbTableBookings((prev) =>
+          prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+        );
+        setDbParkingBookings((prev) =>
+          prev.map((p) => (p.bookingRef === ref || p.booking_reference === ref || p.id === bookingUuid || p.id === ref ? { ...p, status: 'CANCELLED', booking_status: 'CANCELLED' } : p))
+        );
+        pushToast(`Booking ${ref || bookingUuid} has been cancelled.`, 'success');
+        setBookingToCancel(null);
+        return;
+      }
       setCancelError(msg);
       pushToast(msg, 'error');
     } finally {
@@ -500,7 +628,19 @@ export function ProfilePage({ initialTab = 'details' }) {
     getMyStayBookings(user.id)
       .then((records) => {
         if (!mounted || !records) return;
+        let localStays = [];
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStays = JSON.parse(window.localStorage.getItem('frcc_stay_bookings') || '[]');
+          }
+        } catch (_) {}
+
         const mapped = records.map((r) => {
+          const matchedLocal = localStays.find(
+            (ls) => (ls.bookingRef && ls.bookingRef === (r.booking_ref || r.bookingRef || r.bookingId || r.id)) ||
+                    (ls.id && (ls.id === (r.booking_ref || r.bookingRef || r.bookingId || r.id) || ls.id === (r.uuid || r.stay_id || r.id)))
+          );
+          const stayLoc = extractStayLocation(r, matchedLocal);
           const uuid = r.uuid || r.stay_id || r.raw_id || r.db_id || r.id;
           const ref = r.booking_ref || r.bookingRef || r.bookingId || r.id;
           return {
@@ -515,9 +655,11 @@ export function ProfilePage({ initialTab = 'details' }) {
             category: 'hotel',
             user_id: r.user_id || user.id,
             userId: r.user_id || user.id,
-            roomName: r.room_types?.name || 'Hotel Room',
-            title: r.room_types?.name || 'Hotel Room',
-            areaName: 'Vijayawada Campus',
+            roomName: getRoomTypeName(r),
+            title: getRoomTypeName(r),
+            areaName: r.area_name || r.areaName || r.location || r.details?.areaName || 'Vijayawada Campus',
+            venueName: r.venue_name || r.venueName || r.details?.venueName || 'FRCC Riverfront',
+            cityName: r.city_name || r.cityName || r.details?.cityName || 'Vijayawada',
             checkin: r.check_in,
             checkout: r.check_out,
             date: r.check_in,
@@ -530,6 +672,13 @@ export function ProfilePage({ initialTab = 'details' }) {
             subtotal: r.subtotal,
             discount: (r.member_discount || 0) + (r.coupon_discount || 0),
             status: r.status,
+            refundPercent: r.refund_percent,
+            refundAmount: r.refund_amount,
+            refundStatus: r.refund_status,
+            retentionAmount: r.retention_amount,
+            price_per_night: r.price_per_night,
+            pricePerNight: r.price_per_night,
+            cancelledAt: r.cancelled_at,
             createdAt: r.created_at,
             is_test: r.is_test,
           };
@@ -543,6 +692,122 @@ export function ProfilePage({ initialTab = 'details' }) {
       mounted = false;
     };
   }, [user?.id]);
+
+  // Load convention hall bookings for user (Supabase + localStorage fallback + real-time reactivity)
+  useEffect(() => {
+    if (!user) {
+      setDbConventionBookings([]);
+      return undefined;
+    }
+    let mounted = true;
+
+    async function fetchConventionBookings() {
+      const currentUid = user.id || user.userId;
+      const userPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (user.email || '').trim().toLowerCase();
+      const merged = [];
+      const seenIds = new Set();
+
+      const addRecord = (r) => {
+        const key = r.id || r.bookingId || r.bookingRef || r.booking_id;
+        if (!key || seenIds.has(key)) return;
+        seenIds.add(key);
+        merged.push({
+          ...r,
+          id: key,
+          bookingId: key,
+          bookingRef: key,
+          category: 'hall',
+          title: r.hall_name || r.hallName || r.title || 'Convention Hall',
+          hallName: r.hall_name || r.hallName || r.title || 'Convention Hall',
+          date: r.date,
+          time: r.time || `${r.start_time || r.startTime || '09:00'} - ${r.end_time || r.endTime || '18:00'}`,
+          startTime: r.start_time || r.startTime || '09:00',
+          endTime: r.end_time || r.endTime || '18:00',
+          guests: r.guests ? (String(r.guests).includes('guest') ? r.guests : `${r.guests} guests`) : '100 guests',
+          guestsNum: Number(r.guestsNum || r.guests) || 100,
+          amount: Number(r.amount || r.total || 0),
+          amountPaid: r.amount_paid != null ? Number(r.amount_paid) : Number(r.amountPaid || r.amount || 0),
+          total: Number(r.amount || r.total || 0),
+          status: r.status || 'CONFIRMED',
+          refundPercent: r.refund_percent ?? r.refundPercent,
+          refundAmount: r.refund_amount ?? r.refundAmount,
+          refundStatus: r.refund_status ?? r.refundStatus,
+          cancelledAt: r.cancelled_at ?? r.cancelledAt,
+          areaName: r.venue_name || r.venueName || 'Hyderabad Club',
+          user_id: r.user_id || currentUid,
+          userId: r.userId || currentUid,
+        });
+      };
+
+      // 1. Supabase convention_bookings
+      if (user.id) {
+        try {
+          const { data, error } = await supabase
+            .from('convention_bookings')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            data.forEach(addRecord);
+          }
+        } catch (err) {
+          console.warn('Unable to load convention bookings from Supabase:', err);
+        }
+      }
+
+      // 2. Local storage
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const localList = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
+          localList.forEach((r) => {
+            const rPhone = (r.phone || r.mobile || '').replace(/\D/g, '').slice(-10);
+            const rEmail = (r.email || '').trim().toLowerCase();
+            const matchesThisUser =
+              (currentUid && (r.user_id === currentUid || r.userId === currentUid)) ||
+              (userPhone && rPhone === userPhone) ||
+              (userEmail && rEmail === userEmail);
+            if (matchesThisUser) {
+              addRecord(r);
+            }
+          });
+        }
+      } catch (_) {}
+
+      // 3. Session confirmation check
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const conf = JSON.parse(window.sessionStorage.getItem('frcc_confirmed') || 'null');
+          if (conf && (conf.hallName || conf.hallId || conf.hall_name || String(conf.id || '').startsWith('FRCC-H-'))) {
+            addRecord(conf);
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setDbConventionBookings(merged);
+      }
+    }
+
+    fetchConventionBookings();
+
+    const reloadListener = () => fetchConventionBookings();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frcc:convention-bookings-changed', reloadListener);
+      window.addEventListener('frcc:booking-created', reloadListener);
+      window.addEventListener('storage', reloadListener);
+    }
+
+    return () => {
+      mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('frcc:convention-bookings-changed', reloadListener);
+        window.removeEventListener('frcc:booking-created', reloadListener);
+        window.removeEventListener('storage', reloadListener);
+      }
+    };
+  }, [user?.id, user?.userId, user?.phone, user?.email]);
 
   // Load dining table bookings for user
   useEffect(() => {
@@ -579,6 +844,159 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
+  // Load parking slot bookings for user (Supabase + localStorage fallback + real-time reactivity)
+  useEffect(() => {
+    if (!user) {
+      setDbParkingBookings([]);
+      return undefined;
+    }
+    let mounted = true;
+
+    async function fetchParkingBookings() {
+      const currentUid = user.id || user.userId;
+      const userPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const userEmail = (user.email || '').trim().toLowerCase();
+      const merged = [];
+      const seenIds = new Set();
+
+      const addRecord = (r) => {
+        const ref = r.booking_reference || r.bookingReference || r.bookingId || r.bookingRef || r.id;
+        if (!ref || seenIds.has(ref)) return;
+        seenIds.add(ref);
+
+        const status = r.booking_status || r.bookingStatus || r.status || 'CONFIRMED';
+        const isCancelled =
+          String(status).toUpperCase() === 'CANCELLED' ||
+          cancelledIds.has(ref) ||
+          isBookingCancelledLocally(ref);
+
+        merged.push({
+          ...r,
+          id: ref,
+          bookingId: ref,
+          bookingRef: ref,
+          booking_reference: ref,
+          bookingReference: ref,
+          category: 'parking',
+          title: `Parking Slot ${r.slot_id || r.parkingSlot || r.slot || ''}`,
+          slot: r.slot_id || r.parkingSlot || r.slot || '',
+          slot_id: r.slot_id || r.parkingSlot || r.slot || '',
+          parkingSlot: r.slot_id || r.parkingSlot || r.slot || '',
+          date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
+          booking_date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
+          time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
+          arrival_time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
+          duration: `${r.duration_days || r.numberOfDays || r.durationDays || 1} Day${(Number(r.duration_days || r.numberOfDays || r.durationDays) || 1) > 1 ? 's' : ''}`,
+          durationDays: Number(r.duration_days || r.numberOfDays || r.durationDays) || 1,
+          vehicleType: r.vehicle_type || r.vehicleType || 'Vehicle',
+          vehicleNumber: r.vehicle_number || r.vehicleNumber || '',
+          vehicleModel: r.vehicle_model || r.vehicleModel || '',
+          amount: 0,
+          total: 0,
+          status: isCancelled ? 'CANCELLED' : status,
+          booking_status: isCancelled ? 'CANCELLED' : status,
+          areaName: (r.campus || r.city || '').toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
+          user_id: r.user_id || r.userId || currentUid,
+          userId: r.userId || currentUid,
+          createdAt: r.created_at || r.createdAt,
+        });
+      };
+
+      // 1. Supabase parking_bookings
+      if (user.id) {
+        try {
+          const { data, error } = await supabase
+            .from('parking_bookings')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            data.forEach(addRecord);
+          }
+        } catch (err) {
+          console.warn('Unable to load parking bookings from Supabase:', err);
+        }
+      }
+
+      // 2. Local storage keys
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const keys = [
+            `frcc_parking_confirmed_bookings_v1.${currentUid}`,
+            'frcc_parking_confirmed_bookings_v1',
+            'frcc_parking_bookings',
+          ];
+          keys.forEach((storageKey) => {
+            const raw = window.localStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                list.forEach((r) => {
+                  const rPhone = (r.phone || r.mobile || r.vehicleNumber || '').replace(/\D/g, '').slice(-10);
+                  const rEmail = (r.email || '').trim().toLowerCase();
+                  const matchesThisUser =
+                    (currentUid && (r.user_id === currentUid || r.userId === currentUid)) ||
+                    (userPhone && rPhone === userPhone) ||
+                    (userEmail && rEmail === userEmail) ||
+                    storageKey.includes(String(currentUid));
+                  if (matchesThisUser || !r.user_id) {
+                    addRecord(r);
+                  }
+                });
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      // 3. Session storage check
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          const keys = [
+            `frcc_parking_confirmed_bookings_v1.${currentUid}`,
+            'frcc_parking_confirmed_bookings_v1',
+          ];
+          keys.forEach((storageKey) => {
+            const raw = window.sessionStorage.getItem(storageKey);
+            if (raw) {
+              const list = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                list.forEach(addRecord);
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setDbParkingBookings(merged);
+      }
+    }
+
+    fetchParkingBookings();
+
+    const reloadListener = () => fetchParkingBookings();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frcc:parking-bookings-changed', reloadListener);
+      window.addEventListener('frcc:booking-cancelled', reloadListener);
+      window.addEventListener('frcc:booking-created', reloadListener);
+      window.addEventListener('storage', reloadListener);
+    }
+
+    return () => {
+      mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('frcc:parking-bookings-changed', reloadListener);
+        window.removeEventListener('frcc:booking-cancelled', reloadListener);
+        window.removeEventListener('frcc:booking-created', reloadListener);
+        window.removeEventListener('storage', reloadListener);
+      }
+    };
+  }, [user?.id, user?.userId, user?.phone, user?.email, cancelledIds]);
+
+
+
   // Merged unique bookings strictly isolated to the authenticated user
   const bookings = useMemo(() => {
     if (!user?.id) return [];
@@ -588,8 +1006,13 @@ export function ProfilePage({ initialTab = 'details' }) {
     const matchesUser = (item) => {
       if (!item) return false;
       const bUid = item.user_id || item.userId;
-      if (bUid === uid) return true;
-      if (userCode && bUid === userCode) return true;
+      if (bUid && (bUid === uid || (userCode && bUid === userCode))) return true;
+      const uPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
+      const bPhone = (item.phone || item.mobile || '').replace(/\D/g, '').slice(-10);
+      if (uPhone && bPhone && uPhone === bPhone) return true;
+      const uEmail = (user.email || '').trim().toLowerCase();
+      const bEmail = (item.email || '').trim().toLowerCase();
+      if (uEmail && bEmail && uEmail === bEmail) return true;
       return false;
     };
 
@@ -597,6 +1020,8 @@ export function ProfilePage({ initialTab = 'details' }) {
     const userActivityBookings = (activityBookings || []).filter(matchesUser);
     const userStayBookings = (dbStayBookings || []).filter(matchesUser);
     const userTableBookings = (dbTableBookings || []).filter(matchesUser);
+    const userConventionBookings = (dbConventionBookings || []).filter(matchesUser);
+    const userParkingBookings = (dbParkingBookings || []).filter(matchesUser);
 
     const bookingsByRef = new Map();
     const idToRef = new Map();
@@ -640,6 +1065,12 @@ export function ProfilePage({ initialTab = 'details' }) {
     userTableBookings.forEach((tbl) => {
       const ref = tbl.bookingRef || tbl.booking_ref || tbl.bookingId || tbl.id;
       const uuid = tbl.uuid || tbl.rawId || tbl.raw_id || tbl.dbId || tbl.db_id || tbl.id;
+      const isCancelled =
+        cancelledIds.has(ref) ||
+        cancelledIds.has(uuid) ||
+        isBookingCancelledLocally(ref) ||
+        isBookingCancelledLocally(uuid) ||
+        (tbl.status && String(tbl.status).toLowerCase() === 'cancelled');
       const normalized = {
         ...tbl,
         bookingRef: ref,
@@ -647,6 +1078,7 @@ export function ProfilePage({ initialTab = 'details' }) {
         id: ref,
         uuid,
         rawId: uuid,
+        status: isCancelled ? 'cancelled' : tbl.status,
       };
       bookingsByRef.set(ref, normalized);
       registerKeys(ref, tbl);
@@ -667,6 +1099,28 @@ export function ProfilePage({ initialTab = 'details' }) {
         };
         bookingsByRef.set(ref, normalized);
         registerKeys(ref, act);
+      }
+    });
+
+    // 3b. Convention hall bookings
+    userConventionBookings.forEach((conv) => {
+      const ref = conv.bookingRef || conv.bookingId || conv.id;
+      if (ref && !bookingsByRef.has(ref)) {
+        bookingsByRef.set(ref, conv);
+        registerKeys(ref, conv);
+      }
+    });
+
+    // 3c. Parking bookings
+    userParkingBookings.forEach((prk) => {
+      const ref = prk.bookingRef || prk.bookingReference || prk.bookingId || prk.id;
+      if (ref && !bookingsByRef.has(ref)) {
+        bookingsByRef.set(ref, {
+          ...prk,
+          amount: 0,
+          total: 0,
+        });
+        registerKeys(ref, prk);
       }
     });
 
@@ -718,9 +1172,57 @@ export function ProfilePage({ initialTab = 'details' }) {
       if (matchedRef && bookingsByRef.has(matchedRef)) {
         const existing = bookingsByRef.get(matchedRef);
         const uuid = existing.uuid || appB.uuid || existing.rawId || appB.rawId || appB.id;
+        const resolvedRoom = isStay
+          ? (getRoomTypeName(appB) !== 'Standard Room' ? getRoomTypeName(appB) : getRoomTypeName(existing))
+          : null;
+
+        const isHydLocation =
+          (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
+          (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
+          (appB.venueName && appB.venueName.toLowerCase().includes('hyd')) ||
+          (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
+          (appB.details?.cityName && appB.details.cityName.toLowerCase().includes('hyd')) ||
+          (appB.details?.areaName && appB.details.areaName.toLowerCase().includes('hyd')) ||
+          (existing.cityName && existing.cityName.toLowerCase().includes('hyd')) ||
+          (existing.areaName && existing.areaName.toLowerCase().includes('hyd')) ||
+          (existing.venueName && existing.venueName.toLowerCase().includes('hyd')) ||
+          (existing.cityId && String(existing.cityId).toLowerCase().includes('hyd'));
+
+        const resolvedLocation = isStay
+          ? (isHydLocation
+              ? {
+                  areaName: 'Hyderabad Campus',
+                  venueName: 'Hyderabad Club Residency',
+                  cityName: 'Hyderabad',
+                  cityId: 'hyd',
+                }
+              : {
+                  areaName:
+                    (appB.areaName && !appB.areaName.includes('Vijayawada') ? appB.areaName : null) ||
+                    (existing.areaName && !existing.areaName.includes('Vijayawada') ? existing.areaName : null) ||
+                    appB.areaName ||
+                    existing.areaName ||
+                    'Vijayawada Campus',
+                  venueName:
+                    (appB.venueName && !appB.venueName.includes('Riverfront') ? appB.venueName : null) ||
+                    (existing.venueName && !existing.venueName.includes('Riverfront') ? existing.venueName : null) ||
+                    appB.venueName ||
+                    existing.venueName ||
+                    'FRCC Riverfront',
+                  cityName:
+                    (appB.cityName && !appB.cityName.includes('Vijayawada') ? appB.cityName : null) ||
+                    (existing.cityName && !existing.cityName.includes('Vijayawada') ? existing.cityName : null) ||
+                    appB.cityName ||
+                    existing.cityName ||
+                    'Vijayawada',
+                })
+          : {};
+
         bookingsByRef.set(matchedRef, {
           ...appB,
           ...existing,
+          ...(resolvedRoom ? { roomName: resolvedRoom, title: resolvedRoom } : {}),
+          ...resolvedLocation,
           bookingRef: matchedRef,
           bookingId: matchedRef,
           id: matchedRef,
@@ -794,13 +1296,52 @@ export function ProfilePage({ initialTab = 'details' }) {
       dedupedList.push(b);
     }
 
-    const unique = dedupedList;
+    const unique = dedupedList.map((item) => {
+      const isItemParking =
+        item.category === 'parking' ||
+        Boolean(item.slot_id) ||
+        Boolean(item.parkingSlot) ||
+        String(item.bookingId || '').includes('PARK') ||
+        String(item.bookingRef || '').includes('PARK');
+
+      if (isItemParking) {
+        return {
+          ...item,
+          amount: 0,
+          total: 0,
+          subtotal: 0,
+          discount: 0,
+        };
+      }
+
+      const amount = Number(item.total !== undefined ? item.total : (item.amount ?? 0));
+      let subtotal = Number(item.subtotal || 0);
+      let discount = Number(item.discount || 0);
+      if ((subtotal <= 0 || subtotal < amount) && amount > 0) {
+        if (item.is_member || item.isMember || isMember) {
+          subtotal = Math.round(amount / 0.7);
+          discount = subtotal - amount;
+        } else {
+          subtotal = amount;
+          discount = 0;
+        }
+      } else if (subtotal > amount && discount <= 0) {
+        discount = subtotal - amount;
+      }
+      return {
+        ...item,
+        amount,
+        total: amount,
+        subtotal,
+        discount,
+      };
+    });
     return unique.sort((a, b) => {
       const timeA = new Date(a.createdAt || a.created_at || a.date || 0).getTime();
       const timeB = new Date(b.createdAt || b.created_at || b.date || 0).getTime();
       return timeB - timeA;
     });
-  }, [user, appBookings, activityBookings, dbStayBookings, dbTableBookings]);
+  }, [user, isMember, appBookings, activityBookings, dbStayBookings, dbTableBookings, dbConventionBookings, dbParkingBookings]);
 
   // Merged unique payments strictly isolated to the authenticated user
   const payments = useMemo(() => {
@@ -856,7 +1397,15 @@ export function ProfilePage({ initialTab = 'details' }) {
             !b.bookingRef?.includes('STAY') &&
             !b.bookingId?.includes('TAB') &&
             !b.bookingRef?.includes('TAB') &&
-            b.category !== 'dining')
+            b.category !== 'dining' &&
+            b.category !== 'hall' &&
+            b.category !== 'parking' &&
+            !b.slot_id &&
+            !b.parkingSlot &&
+            !b.bookingId?.startsWith('FRCC-PARK-') &&
+            !b.bookingRef?.startsWith('FRCC-PARK-') &&
+            !b.bookingId?.startsWith('FRCC-H-') &&
+            !b.bookingRef?.startsWith('FRCC-H-'))
       );
     }
     if (bookingFilter === 'dining') {
@@ -867,16 +1416,29 @@ export function ProfilePage({ initialTab = 'details' }) {
           Boolean(b.bookingRef?.includes('TAB'))
       );
     }
+    if (bookingFilter === 'halls') {
+      return bookings.filter(
+        (b) =>
+          b.category === 'hall' ||
+          b.bookingId?.startsWith('FRCC-H-') ||
+          b.bookingRef?.startsWith('FRCC-H-')
+      );
+    }
+    if (bookingFilter === 'parking') {
+      return bookings.filter(
+        (b) =>
+          b.category === 'parking' ||
+          Boolean(b.slot_id) ||
+          Boolean(b.parkingSlot) ||
+          b.bookingId?.startsWith('FRCC-PARK-') ||
+          b.bookingRef?.startsWith('FRCC-PARK-') ||
+          b.bookingId?.includes('PARK') ||
+          b.bookingRef?.includes('PARK')
+      );
+    }
     return bookings;
   }, [bookings, bookingFilter]);
 
-  const filteredPayments = useMemo(() => {
-    const q = payQuery.trim().toLowerCase();
-    if (!q) return payments;
-    return payments.filter((p) =>
-      [p.id, p.bookingId, p.method].some((v) => String(v || '').toLowerCase().includes(q)),
-    );
-  }, [payments, payQuery]);
 
   const tabs = useMemo(() => {
     return TABS.map((t) => {
@@ -1073,7 +1635,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                     { id: 'all', label: `All Bookings (${bookings.length})` },
                     { id: 'stay', label: `Stays (${bookings.filter((b) => b.category === 'hotel' || b.category === 'stay' || b.checkin || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY')).length})` },
                     { id: 'dining', label: `Dining (${bookings.filter((b) => b.category === 'dining' || b.bookingId?.includes('TAB') || b.bookingRef?.includes('TAB')).length})` },
-                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining')).length})` },
+                    { id: 'activities', label: `Activities (${bookings.filter((b) => b.category === 'activity' || (!b.category && !b.checkin && !b.bookingId?.includes('STAY') && !b.bookingRef?.includes('STAY') && !b.bookingId?.includes('TAB') && !b.bookingRef?.includes('TAB') && b.category !== 'dining' && b.category !== 'hall' && b.category !== 'parking' && !b.slot_id && !b.parkingSlot && !b.bookingId?.startsWith('FRCC-PARK-') && !b.bookingRef?.startsWith('FRCC-PARK-'))).length})` },
+                    { id: 'halls', label: `Halls (${bookings.filter((b) => b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-')).length})` },
+                    { id: 'parking', label: `Parking (${bookings.filter((b) => b.category === 'parking' || Boolean(b.slot_id) || Boolean(b.parkingSlot) || b.bookingId?.startsWith('FRCC-PARK-') || b.bookingRef?.startsWith('FRCC-PARK-') || b.bookingId?.includes('PARK') || b.bookingRef?.includes('PARK')).length})` },
                   ].map((filter) => {
                     const active = (bookingFilter || 'all') === filter.id;
                     return (
@@ -1103,6 +1667,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'No dining reservations yet'
                       : bookingFilter === 'activities'
                       ? 'No activity bookings yet'
+                      : bookingFilter === 'halls'
+                      ? 'No convention hall bookings yet'
+                      : bookingFilter === 'parking'
+                      ? 'No parking reservations yet'
                       : 'No bookings yet'
                   }
                   body={
@@ -1112,7 +1680,11 @@ export function ProfilePage({ initialTab = 'details' }) {
                       ? 'Table reservations booked at FRCC dining outlets will appear here with their status.'
                       : bookingFilter === 'activities'
                       ? 'Sports, courts and recreational bookings will appear here with their status.'
-                      : 'Stays, dining reservations and sports activities booked will appear here with their status.'
+                      : bookingFilter === 'halls'
+                      ? 'Convention halls and banquet spaces reserved will appear here with their status.'
+                      : bookingFilter === 'parking'
+                      ? 'Reserved parking bays and slots will appear here with their status.'
+                      : 'Stays, dining reservations, sports activities and parking booked will appear here with their status.'
                   }
                   icon={CalendarIcon}
                   action={
@@ -1124,9 +1696,17 @@ export function ProfilePage({ initialTab = 'details' }) {
                       <Link to="/dining" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
                         Reserve a table <ArrowRightIcon className="h-4 w-4" />
                       </Link>
+                    ) : bookingFilter === 'halls' ? (
+                      <Link to="/convention/book" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                        Book a hall <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
                     ) : bookingFilter === 'activities' ? (
                       <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
                         Browse activities <ArrowRightIcon className="h-4 w-4" />
+                      </Link>
+                    ) : bookingFilter === 'parking' ? (
+                      <Link to="/book/parking" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                        Book a parking slot <ArrowRightIcon className="h-4 w-4" />
                       </Link>
                     ) : (
                       <div className="flex flex-wrap justify-center gap-3">
@@ -1139,6 +1719,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                         <Link to="/book/activities" className="btn-base px-5 py-2.5 border border-slate-300 bg-white text-navy-900 hover:bg-slate-50">
                           Browse activities
                         </Link>
+                        <Link to="/book/parking" className="btn-base px-5 py-2.5 border border-slate-300 bg-white text-navy-900 hover:bg-slate-50">
+                          Book parking
+                        </Link>
                       </div>
                     )
                   }
@@ -1146,14 +1729,31 @@ export function ProfilePage({ initialTab = 'details' }) {
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
                   {filteredBookings.map((b) => {
-                    const isDining = b.category === 'dining' || Boolean(b.bookingId?.includes('TAB'));
-                    const isStay = !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
+                    const isParking =
+                      b.category === 'parking' ||
+                      Boolean(b.slot_id) ||
+                      Boolean(b.parkingSlot) ||
+                      b.bookingId?.startsWith('FRCC-PARK-') ||
+                      b.bookingRef?.startsWith('FRCC-PARK-') ||
+                      b.bookingId?.includes('PARK') ||
+                      b.bookingRef?.includes('PARK');
+                    const isHall = !isParking && (b.category === 'hall' || b.bookingId?.startsWith('FRCC-H-') || b.bookingRef?.startsWith('FRCC-H-'));
+                    const isDining = !isParking && !isHall && (b.category === 'dining' || Boolean(b.bookingId?.includes('TAB')));
+                    const isStay = !isParking && !isHall && !isDining && (b.category === 'hotel' || b.category === 'stay' || Boolean(b.checkin) || b.bookingId?.includes('STAY') || b.bookingRef?.includes('STAY'));
                     return (
                       <Card key={b.bookingRef || b.bookingId || b.id} className="card-hover">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-1.5 mb-1">
-                              {isDining ? (
+                              {isParking ? (
+                                <span className="inline-block rounded bg-teal-100 text-teal-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                  Parking
+                                </span>
+                              ) : isHall ? (
+                                <span className="inline-block rounded bg-indigo-100 text-indigo-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                                  Hall
+                                </span>
+                              ) : isDining ? (
                                 <span className="inline-block rounded bg-amber-100 text-amber-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
                                   Dining
                                 </span>
@@ -1162,20 +1762,98 @@ export function ProfilePage({ initialTab = 'details' }) {
                                   Stay
                                 </span>
                               ) : null}
-                              {b.is_test && (
-                                <span className="inline-block rounded bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                                  Test
-                                </span>
-                              )}
-                            </div>
-                            <p className="font-semibold text-navy-900">{b.venue_name || b.venueName || b.roomName || b.gameName || b.title || b.game}</p>
+                                                          </div>
+                            <p className="font-semibold text-navy-900">
+                              {isParking
+                                ? (b.title || `Parking Slot ${b.slot_id || b.parkingSlot || b.slot || ''}`)
+                                : isStay
+                                ? (b.roomName || b.title || 'Standard Room')
+                                : isDining
+                                ? (b.venue_name || b.venueName || b.restaurant_name || b.title || 'Dining Table')
+                                : isHall
+                                ? (b.hallName || b.hall_name || b.title || b.venue_name || 'Convention Hall')
+                                : (b.gameName || b.title || b.game || 'Activity')}
+                            </p>
                           </div>
-                          <StatusTag status={cancelledIds.has(b.bookingRef || b.bookingId || b.id) ? 'Cancelled' : b.status} />
+                          {(() => {
+                            const ref = b.bookingRef || b.bookingId || b.id;
+                            const isCancelled = cancelledIds.has(ref) || isBookingCancelledLocally(ref) || (b.status && String(b.status).toLowerCase() === 'cancelled');
+                            return <StatusTag status={isCancelled ? 'Cancelled' : b.status} />;
+                          })()}
                         </div>
                         <p className="mt-2 font-mono text-xs text-slate-500">{b.bookingRef || b.bookingId}</p>
                         <dl className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-sm">
-                          {isDining ? (
+                          {isParking ? (
                             <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Date</dt>
+                                <dd className="font-medium text-navy-900">{formatDMY(b.date || b.booking_date)}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Slot</dt>
+                                <dd className="font-medium text-navy-900">{b.slot_id || b.parkingSlot || b.slot}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Arrival Time</dt>
+                                <dd className="font-medium text-navy-900">{b.time || b.arrival_time}</dd>
+                              </div>
+                              {(b.vehicleNumber || b.details?.vehicleNumber) && (
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">Vehicle</dt>
+                                  <dd className="font-medium text-navy-900">
+                                    {b.vehicleNumber || b.details?.vehicleNumber}
+                                    {(b.vehicleType || b.details?.vehicleType) ? ` (${b.vehicleType || b.details?.vehicleType})` : ''}
+                                  </dd>
+                                </div>
+                              )}
+                              {(b.duration || b.durationDays || b.details?.durationDays) && (
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">Duration</dt>
+                                  <dd className="font-medium text-navy-900">
+                                    {b.duration || `${b.durationDays || b.details?.durationDays} Day${(Number(b.durationDays || b.details?.durationDays) || 1) > 1 ? 's' : ''}`}
+                                  </dd>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Campus</dt>
+                                <dd className="font-medium text-navy-900">{b.areaName || 'Vijayawada Campus'}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Parking Fee</dt>
+                                <dd className="font-bold text-emerald-700">Free</dd>
+                              </div>
+                            </>
+                          ) : isHall ? (
+                            <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Date</dt>
+                                <dd className="font-medium text-navy-900">{formatDMY(b.date)}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Time</dt>
+                                <dd className="font-medium text-navy-900">{b.time || `${b.startTime || ''} - ${b.endTime || ''}`}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Guests</dt>
+                                <dd className="font-medium text-navy-900">{b.guests}</dd>
+                              </div>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Venue</dt>
+                                <dd className="font-medium text-navy-900">{b.areaName || 'FRCC Club'}</dd>
+                              </div>
+                              {b.refundAmount > 0 && (
+                                <div className="flex justify-between gap-3 text-emerald-700">
+                                  <dt>Refund</dt>
+                                  <dd className="font-semibold">{formatINR(b.refundAmount)} ({b.refundStatus === 'PROCESSED' ? 'Processed' : 'Pending'})</dd>
+                                </div>
+                              )}
+                            </>
+                          ) : isDining ? (
+                            <>
+                              <div className="flex justify-between gap-3">
+                                <dt className="text-slate-500">Location</dt>
+                                <dd className="font-medium text-navy-900">{b.location || b.areaName || b.venueLocationName || b.venue_location || b.details?.areaName || 'Vijayawada Campus'}</dd>
+                              </div>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{b.date}</dd>
@@ -1217,8 +1895,10 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                               {(b.areaName || b.details?.area) && (
                                 <div className="flex justify-between gap-3">
-                                  <dt className="text-slate-500">Campus</dt>
-                                  <dd className="font-medium text-navy-900">{b.areaName || b.details?.area}</dd>
+                                  <dt className="text-slate-500">Location</dt>
+                                  <dd className="font-medium text-navy-900">{b.venueName
+                                      ? (b.venueName.includes(b.areaName || '') ? b.venueName : `${b.areaName || 'Vijayawada Campus'} · ${b.venueName}`)
+                                      : (b.areaName || b.details?.area || b.location || 'Vijayawada Campus')}</dd>
                                 </div>
                               )}
                             </>
@@ -1238,48 +1918,96 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                             </>
                           )}
-                          {b.subtotal !== undefined && b.subtotal !== b.amount && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Subtotal</dt>
-                              <dd className="font-medium text-navy-900">{formatINR(b.subtotal)}</dd>
-                            </div>
-                          )}
-                          {b.discount > 0 && (
-                            <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
-                              <dd className="font-medium text-green-700">{formatINR(-b.discount)}</dd>
-                            </div>
-                          )}
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-slate-500">{b.subtotal ? 'Total' : 'Amount'}</dt>
-                            <dd className="font-medium text-navy-900">{formatINR(b.total !== undefined ? b.total : b.amount)}</dd>
-                          </div>
+                          {!isParking && !isDining && (() => {
+                            const rawAmount = Number(b.total !== undefined ? b.total : b.amount) || 0;
+                            let cardSubtotal = Number(b.subtotal || 0);
+                            let cardDiscount = Number(b.discount || 0);
+
+                            if ((cardSubtotal <= 0 || cardSubtotal < rawAmount) && rawAmount > 0) {
+                              if (b.is_member || isMember || cardDiscount > 0) {
+                                cardSubtotal = Math.round(rawAmount / 0.7);
+                                cardDiscount = cardSubtotal - rawAmount;
+                              } else {
+                                cardSubtotal = rawAmount;
+                                cardDiscount = 0;
+                              }
+                            } else if (cardSubtotal > rawAmount && cardDiscount <= 0) {
+                              cardDiscount = cardSubtotal - rawAmount;
+                            }
+
+                            return (
+                              <>
+                                {cardSubtotal > 0 && cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">Subtotal</dt>
+                                    <dd className="font-medium text-navy-900">{formatINR(cardSubtotal)}</dd>
+                                  </div>
+                                )}
+                                {cardDiscount > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <dt className="text-slate-500">{MEMBER_DISCOUNT_LABEL}</dt>
+                                    <dd className="font-medium text-green-700">{formatINR(-cardDiscount)}</dd>
+                                  </div>
+                                )}
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">{cardDiscount > 0 ? 'Total' : 'Amount'}</dt>
+                                  <dd className="font-medium text-navy-900">{formatINR(rawAmount)}</dd>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </dl>
 
-                        {/* Cancel Booking Action (Only for upcoming, cancellable bookings) */}
+                        {/* Booking Card Actions: Download Receipt & Cancel Booking */}
                         {(() => {
                           const ref = b.bookingRef || b.bookingId || b.id;
-                          const effectiveStatus = cancelledIds.has(ref) ? 'Cancelled' : b.status;
+                          const isCancelled =
+                            cancelledIds.has(ref) ||
+                            String(b.status).toLowerCase() === 'cancelled';
+                          const effectiveStatus = isCancelled ? 'Cancelled' : (b.status || 'Confirmed');
                           const effectiveBooking = { ...b, status: effectiveStatus };
-                          const canCancel = canCancelBooking(effectiveBooking) && !cancelledIds.has(ref);
-                          if (!canCancel) return null;
-                          const policy = getCancellationPolicyInfo(effectiveBooking);
+                          const canCancel = canCancelBooking(effectiveBooking) && !isCancelled;
+                          if (isCancelled && !canCancel) return null;
+                          const policy = canCancel ? getCancellationPolicyInfo(effectiveBooking) : null;
 
                           return (
                             <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                               <span className="text-[11px] text-slate-500">
-                                {policy.isWithinCutoff ? '⚠️ Cutoff notice' : 'Eligible for cancellation'}
+                                {canCancel ? (
+                                  policy?.isWithinCutoff
+                                    ? policy.type === 'stay'
+                                      ? '⚠️ Late cancellation (1-night charge)'
+                                      : '⚠️ Cutoff notice'
+                                    : 'Eligible for cancellation'
+                                ) : (
+                                  'FRCC Confirmed Booking'
+                                )}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setCancelError('');
-                                  setBookingToCancel(effectiveBooking);
-                                }}
-                                className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
-                              >
-                                Cancel booking
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {!isCancelled && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadReceipt(effectiveBooking)}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-semibold text-navy-900 hover:border-gold-500 hover:bg-gold-50/60 transition cursor-pointer"
+                                    title="Download PDF Receipt"
+                                  >
+                                    <DownloadIcon className="h-3.5 w-3.5 text-gold-600" />
+                                    Download Receipt
+                                  </button>
+                                )}
+                                {canCancel && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCancelError('');
+                                      setBookingToCancel(effectiveBooking);
+                                    }}
+                                    className="btn-base inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-300 hover:bg-rose-100 transition cursor-pointer"
+                                  >
+                                    Cancel booking
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
@@ -1326,17 +2054,21 @@ export function ProfilePage({ initialTab = 'details' }) {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Service</span>
                           <span className="font-semibold text-navy-900">
-                            {bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || bookingToCancel.title || 'Booking'}
+                            {bookingToCancel.category === 'hotel' || bookingToCancel.category === 'stay' || bookingToCancel.roomName
+                              ? (bookingToCancel.roomName || (bookingToCancel.title !== 'FRCC Riverfront' ? bookingToCancel.title : null) || 'Standard Room')
+                              : (bookingToCancel.title || bookingToCancel.venue_name || bookingToCancel.venueName || bookingToCancel.roomName || bookingToCancel.gameName || 'Booking')}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Date</span>
-                          <span className="font-semibold text-navy-900">{formatDMY(bookingToCancel.checkin || bookingToCancel.date)}</span>
+                          <span className="font-semibold text-navy-900">{formatDMY(bookingToCancel.checkin || bookingToCancel.booking_date || bookingToCancel.date)}</span>
                         </div>
-                        {(bookingToCancel.slot || bookingToCancel.time) && (
+                        {(bookingToCancel.slot || bookingToCancel.parkingSlot || bookingToCancel.slot_id || bookingToCancel.time || bookingToCancel.arrival_time) && (
                           <div className="flex justify-between">
-                            <span className="text-slate-500">Time / Slot</span>
-                            <span className="font-semibold text-navy-900">{bookingToCancel.slot || bookingToCancel.time}</span>
+                            <span className="text-slate-500">{bookingToCancel.parkingSlot || bookingToCancel.slot_id ? 'Slot / Time' : 'Time / Slot'}</span>
+                            <span className="font-semibold text-navy-900">
+                              {[bookingToCancel.slot_id || bookingToCancel.parkingSlot, bookingToCancel.arrival_time || bookingToCancel.time || bookingToCancel.slot].filter(Boolean).join(' • ')}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1351,6 +2083,27 @@ export function ProfilePage({ initialTab = 'details' }) {
                           <p>{policy.policyText}</p>
                           {policy.warningText && (
                             <p className="mt-1 font-semibold text-amber-800">{policy.warningText}</p>
+                          )}
+                          {policy.refundPercent !== undefined && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-200/70 space-y-1 font-medium">
+                              <p>
+                                Time left: <span className="font-bold text-navy-900">
+                                  {policy.hoursUntilStart !== undefined && policy.hoursUntilStart !== null
+                                    ? policy.hoursUntilStart > 0
+                                      ? `${Math.floor(policy.hoursUntilStart)} hours`
+                                      : 'Check-in day (active)'
+                                    : '—'}
+                                </span>
+                              </p>
+                              <p>Refund Percentage: <span className="font-bold text-emerald-700">{policy.refundPercent}%</span></p>
+                              <p>Refund Amount: <span className="font-bold text-emerald-700">₹{Number(policy.refundAmount || 0).toLocaleString('en-IN')}</span></p>
+                              {policy.nonRefundableAmount !== undefined && (
+                                <p>Non-refundable Amount: <span className="font-bold text-slate-700">₹{Number(policy.nonRefundableAmount || 0).toLocaleString('en-IN')}</span></p>
+                              )}
+                              <p className="text-[11px] text-slate-500 pt-1">
+                                Refund Status: <strong>{policy.refundStatusText || (policy.refundAmount > 0 ? 'Refund pending' : 'No refund due')}</strong> &bull; {policy.timingNote || 'Refund will be credited as per your payment method timeline'}.
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}
@@ -1388,61 +2141,16 @@ export function ProfilePage({ initialTab = 'details' }) {
           )}
           {tab === 'payments' && !isPasswordRecovery && (
             <div id="panel-payments" role="tabpanel" aria-labelledby="tab-payments">
-              {payments.length === 0 ? (
-                <EmptyState
-                  title="No payments yet"
-                  body="Payments made on the booking pages will be listed here with their receipt references."
-                  icon={MembershipIcon}
-                  action={
-                    <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
-                      Browse activities <ArrowRightIcon className="h-4 w-4" />
-                    </Link>
-                  }
-                />
-              ) : (
-                <>
-                  <SearchInput
-                    id="pay-search"
-                    name="pay-search"
-                    placeholder="Search payment, booking or method…"
-                    value={payQuery}
-                    onChange={(e) => setPayQuery(e.target.value)}
-                    aria-label="Search payments"
-                  />
-                  {filteredPayments.length === 0 ? (
-                    <div className="mt-4">
-                      <EmptyState title="No matching payments" body="Try a different search term." />
-                    </div>
-                  ) : (
-                    <div className="card mt-4 !p-0 overflow-x-auto">
-                      <table className="w-full min-w-[640px] text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200 bg-navy-50/70 text-left text-xs font-semibold text-slate-500">
-                            <th className="p-3 font-semibold">Payment</th>
-                            <th className="p-3 font-semibold">Booking</th>
-                            <th className="p-3 font-semibold">Method</th>
-                            <th className="p-3 font-semibold">Date</th>
-                            <th className="p-3 text-right font-semibold">Amount</th>
-                            <th className="p-3 font-semibold">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPayments.map((p) => (
-                            <tr key={p.id} className="border-b border-slate-100 transition last:border-0 hover:bg-navy-50/40">
-                              <td className="p-3 font-mono text-xs">{p.id}</td>
-                              <td className="p-3 font-mono text-xs">{p.bookingId}</td>
-                              <td className="p-3 capitalize">{String(p.method).replace(/_/g, ' ')}</td>
-                              <td className="p-3 text-slate-500">{formatDMYTime(p.date)}</td>
-                              <td className="p-3 text-right font-semibold text-navy-900">{formatINR(p.amount)}</td>
-                              <td className="p-3"><StatusTag status={p.status} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </>
-              )}
+              <EmptyState
+                title="No payments yet"
+                body="Payments made on the booking pages will be listed here with their receipt references."
+                icon={MembershipIcon}
+                action={
+                  <Link to="/book/activities" className="btn-base px-5 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+                    Browse activities <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
+                }
+              />
             </div>
           )}
         </div>

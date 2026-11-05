@@ -23,6 +23,10 @@ export const ROUTES = Object.freeze({
   home: '/',
   homeHub: '/home',
   book: '/book',
+  privacyPolicy: '/privacy-policy',
+  cookiePolicy: '/cookie-policy',
+  accessibility: '/accessibility',
+  sitemap: '/sitemap',
 });
 
 export const stay = ROUTES.stay;
@@ -36,5 +40,9 @@ export const gallery = ROUTES.gallery;
 export const leadership = ROUTES.leadership;
 export const applicationForm = ROUTES.applicationForm;
 export const support = ROUTES.support;
+export const privacyPolicy = ROUTES.privacyPolicy;
+export const cookiePolicy = ROUTES.cookiePolicy;
+export const accessibility = ROUTES.accessibility;
+export const sitemap = ROUTES.sitemap;
 
 export default ROUTES;

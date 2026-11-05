@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { isValidIndianMobile } from '../utils/mobile.js';
 
 let paySeqCounter = 5000;
 
@@ -17,6 +18,9 @@ export function generateBookingId(prefix = 'ACT') {
  * Persist any booking (Activities, Stay, Hall, Parking) to Supabase.
  */
 export async function createBooking(bookingRecord, paymentRecord = null) {
+  if (bookingRecord?.mobile && !isValidIndianMobile(bookingRecord.mobile)) {
+    throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
   const { data: sessionData } = await supabase.auth.getSession();
   const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || bookingRecord.user_id || null;
 
@@ -109,28 +113,48 @@ export async function getUserBookings(userId = null) {
     return [];
   }
 
-  return (data || []).map((b) => ({
-    ...b,
-    id: b?.id || b?.booking_id,
-    uuid: b?.id,
-    rawId: b?.id,
-    booking_id: b?.booking_id,
-    bookingId: b?.booking_id,
-    bookingRef: b?.booking_id,
-    booking_ref: b?.booking_id,
-    user_id: b?.user_id || targetUserId,
-    userId: b?.user_id || targetUserId,
-    gameName: b?.title || 'Booking',
-    game: b?.category === 'activity' ? (b?.title || '').toLowerCase().replace(/\s+/g, '-') : (b?.title || 'Booking'),
-    date: b?.date || b?.checkin,
-    slot: b?.slot,
-    players: b?.players,
-    amount: Number(b?.amount || 0),
-    subtotal: Number(b?.subtotal || 0),
-    discount: Number(b?.discount || 0),
-    status: b?.status,
-    createdAt: b?.created_at,
-  }));
+  return (data || []).map((b) => {
+    const amount = Number(b?.amount || 0);
+    let subtotal = Number(b?.subtotal || 0);
+    let discount = Number(b?.discount || 0);
+
+    // If subtotal was 0 in DB or less than amount, recover the true pre-discount price
+    if ((subtotal <= 0 || subtotal < amount) && amount > 0) {
+      if (b?.is_member || discount > 0) {
+        subtotal = Math.round(amount / 0.7);
+        discount = subtotal - amount;
+      } else {
+        subtotal = amount;
+        discount = 0;
+      }
+    } else if (subtotal > amount && discount <= 0) {
+      discount = subtotal - amount;
+    }
+
+    return {
+      ...b,
+      id: b?.id || b?.booking_id,
+      uuid: b?.id,
+      rawId: b?.id,
+      booking_id: b?.booking_id,
+      bookingId: b?.booking_id,
+      bookingRef: b?.booking_id,
+      booking_ref: b?.booking_id,
+      user_id: b?.user_id || targetUserId,
+      userId: b?.user_id || targetUserId,
+      gameName: b?.title || 'Booking',
+      game: b?.category === 'activity' ? (b?.title || '').toLowerCase().replace(/\s+/g, '-') : (b?.title || 'Booking'),
+      date: b?.date || b?.checkin,
+      slot: b?.slot,
+      players: b?.players,
+      amount,
+      total: amount,
+      subtotal,
+      discount,
+      status: b?.status,
+      createdAt: b?.created_at,
+    };
+  });
 }
 
 /**

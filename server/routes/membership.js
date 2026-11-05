@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sendMembershipConfirmation } = require('../services/twilioWhatsApp');
+const { isValidIndianMobile, INDIAN_MOBILE_MESSAGE } = require('../utils/mobile');
 
 /**
  * POST /api/membership/send-whatsapp
@@ -23,6 +24,12 @@ router.post('/send-whatsapp', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Field "mobile" is required to send WhatsApp confirmation',
+      });
+    }
+    if (!isValidIndianMobile(mobile)) {
+      return res.status(400).json({
+        success: false,
+        error: INDIAN_MOBILE_MESSAGE,
       });
     }
 

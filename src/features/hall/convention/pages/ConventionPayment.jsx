@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr, CANCELLATION_POLICY_TEXT } from '../utils/format';
+import { readSession } from '../../../../app/session.js';
 import * as pay from '../services/payment';
 import UpiIdFlow from '../components/payment/UpiIdFlow';
 import UpiAppPicker from '../components/payment/UpiAppPicker';
@@ -89,7 +90,11 @@ export default function ConventionPayment() {
   const hours = booking.startTime && booking.endTime
     ? (Number(booking.endTime.split(':')[0]) * 60 + Number(booking.endTime.split(':')[1]) - Number(booking.startTime.split(':')[0]) * 60 - Number(booking.startTime.split(':')[1])) / 60
     : 0;
-  const hallCharge = hall && hours > 0 ? Math.round(hours * hall.pricePerHour) : 0;
+  const hallCharge = hall
+    ? (hall.pricingUnit === 'per-plate' || hall.pricePerPlate)
+      ? Math.round(Number(booking.guests || 30) * (hall.pricePerPlate || hall.price || 1500))
+      : (hours > 0 ? Math.round(hours * hall.pricePerHour) : 0)
+    : 0;
   const gst = Math.round(hallCharge * 0.18);
   const fee = FEE[selectedMethod] || 0;
   const total = hallCharge + gst + fee;
@@ -109,23 +114,47 @@ export default function ConventionPayment() {
   };
 
   const createBooking = async (extra) => {
+    let currentUser = null;
+    try {
+      currentUser = readSession();
+    } catch (_) {}
+
     const data = await api('/bookings', {
       method: 'POST',
       body: {
-        hallId: booking.hallId, date: booking.date, startTime: booking.startTime, endTime: booking.endTime,
-        guests: Number(booking.guests), eventType: booking.eventType, eventDetails: booking.eventDetails,
-        organizerName: booking.organizerName, phone: booking.phone, email: booking.email,
+        userId: currentUser?.id || currentUser?.userId || null,
+        hallId: booking.hallId,
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        guests: Number(booking.guests),
+        eventType: booking.eventType,
+        eventDetails: booking.eventDetails,
+        organizerName: booking.organizerName || currentUser?.name || 'Organizer',
+        phone: booking.phone || currentUser?.phone || currentUser?.mobile || '',
+        email: booking.email || currentUser?.email || '',
         specialRequests: booking.specialRequests,
-        convenienceFee: fee, paymentMethod: selectedMethod,
+        hallCharge,
+        convenienceFee: fee,
+        amount: total,
+        paymentMethod: selectedMethod,
         paymentStatus: extra.paymentStatus,
-        amountPaid: extra.amountPaid, balanceDue: extra.balanceDue,
-        maskedInstrument: extra.maskedInstrument, upiIdMasked: extra.maskedInstrument,
+        amountPaid: extra.amountPaid,
+        balanceDue: extra.balanceDue,
+        maskedInstrument: extra.maskedInstrument,
+        upiIdMasked: extra.maskedInstrument,
         transactionRef: extra.transactionRef,
-        emiTenure: extra.emiTenure, emiMonthlyAmount: extra.emiMonthlyAmount,
-        gstin: extra.gstin, utrNumber: extra.utrNumber,
+        emiTenure: extra.emiTenure,
+        emiMonthlyAmount: extra.emiMonthlyAmount,
+        gstin: extra.gstin,
+        utrNumber: extra.utrNumber,
         notifyUpdates: booking.notifyUpdates !== false,
-        venueName: hall?.venueName, area: hall?.area, city: hall?.city,
-        hallName: hall?.name, cityName: hall?.cityName, areaName: hall?.areaName,
+        venueName: hall?.venueName,
+        area: hall?.area,
+        city: hall?.city,
+        hallName: hall?.name || booking.hallName || 'Grand Convention Hall',
+        cityName: hall?.cityName,
+        areaName: hall?.areaName,
       },
     });
     return data.booking;
@@ -165,6 +194,10 @@ export default function ConventionPayment() {
       const created = await withTimeout(createBooking(bookingPayload));
       pendingRef.current = null;
       setConfirmed(created);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: created }));
+        window.dispatchEvent(new CustomEvent('frcc:booking-created', { detail: created }));
+      }
       navigate('/convention/confirmation');
     } catch (e) {
       console.error('Payment flow error:', e);
