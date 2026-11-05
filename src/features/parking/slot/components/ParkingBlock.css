@@ -10,7 +10,6 @@
   --slot-available-bg: #FFFFFF;
   --slot-available-border: #D1D5DB;
   --slot-available-text: #0B1833;
-<<<<<<< HEAD
   --slot-available-hover-bg: #F8FAFC;
   --slot-available-hover-border: #94A3B8;
   --slot-selected-bg: #16A34A;
@@ -21,18 +20,6 @@
   --slot-booked-bg: #FEE2E2;
   --slot-booked-border: #F87171;
   --slot-booked-text: #B91C1C;
-=======
-  --slot-available-hover-bg: #F9FAFB;
-  --slot-available-hover-border: #9CA3AF;
-  --slot-selected-bg: #22C55E;
-  --slot-selected-border: #16A34A;
-  --slot-selected-text: #FFFFFF;
-  --slot-selected-hover-bg: #16A34A;
-  --slot-selected-hover-border: #15803D;
-  --slot-booked-bg: #FECACA;
-  --slot-booked-border: #EF4444;
-  --slot-booked-text: #991B1B;
->>>>>>> release/frcc-testing-1
 }
 
 /* Block B - Lavender */
@@ -181,7 +168,6 @@
   line-height: 1;
 }
 
-<<<<<<< HEAD
 /* Checkmark for selected slot */
 .slot-checkmark {
   display: inline-flex;
@@ -196,17 +182,7 @@
   stroke: #FFFFFF;
 }
 
-/* 1. Available slots (Default State):
-   - All parking slots appear in normal white colour by default.
-   - Background: White (#FFFFFF).
-   - Border: Light grey (#D1D5DB).
-   - Text: Dark navy (#0B1833).
-   - No green background or green status indicator.
-   - Available slots remain clickable.
-*/
-=======
 /* Available slots: clean white (#FFFFFF) with subtle grey border (#D1D5DB) */
->>>>>>> release/frcc-testing-1
 .slot-grid-btn.slot-btn-available {
   background: #FFFFFF;
   border: 1.5px solid #D1D5DB;
@@ -225,28 +201,12 @@
   transform: translateY(0) scale(0.98);
 }
 
-<<<<<<< HEAD
-/* 2. Selected slot:
-   - Background: Green (#16A34A).
-   - Border: Dark green (#15803D).
-   - Text: White (#FFFFFF).
-   - Display a white checkmark icon.
-   - Subtle green shadow or highlight.
-   - Clearly distinguishable from all other available slots.
-*/
+/* Selected slot: vivid green (#16A34A) with dark green border (#15803D) and white text */
 .slot-grid-btn.slot-btn-selected {
   background: #16A34A !important;
   border: 1.5px solid #15803D !important;
   color: #FFFFFF !important;
   box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35), 0 0 0 1px #15803D;
-=======
-/* Selected slot: vivid green (#22C55E) with dark green border (#16A34A) and white text */
-.slot-grid-btn.slot-btn-selected {
-  background: var(--slot-selected-bg);
-  border-color: var(--slot-selected-border);
-  color: var(--slot-selected-text);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
->>>>>>> release/frcc-testing-1
 }
 
 .slot-grid-btn.slot-btn-selected:hover:not(:disabled) {
@@ -254,18 +214,13 @@
   border-color: #166534 !important;
   color: #FFFFFF !important;
   transform: translateY(-1px);
-<<<<<<< HEAD
   box-shadow: 0 4px 14px rgba(22, 163, 74, 0.45);
-=======
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
->>>>>>> release/frcc-testing-1
 }
 
 .slot-grid-btn.slot-btn-selected:active:not(:disabled) {
   transform: translateY(0) scale(0.98);
 }
 
-<<<<<<< HEAD
 .slot-grid-btn.slot-btn-selected .slot-label {
   color: #FFFFFF !important;
 }
@@ -274,17 +229,7 @@
   color: #FFFFFF !important;
 }
 
-/* 3. Booked slots:
-   - Maintain the existing booked slot design exactly as it is:
-   - Background: Light red.
-   - Border: Red.
-   - Text: Dark red.
-   - Keep the existing red car icon.
-   - Booked slots are disabled and non-clickable.
-*/
-=======
-/* Booked slot: light red (#FECACA) with darker red border (#EF4444) and dark red text (#991B1B) */
->>>>>>> release/frcc-testing-1
+/* Booked slot: light red (#FEE2E2) with darker red border (#F87171) and dark red text (#B91C1C) */
 .slot-grid-btn.slot-btn-booked {
   background: var(--slot-booked-bg);
   border: 1.5px solid var(--slot-booked-border);
@@ -328,24 +273,15 @@
 
 /* Disabled state */
 .slot-grid-btn:disabled {
-<<<<<<< HEAD
   opacity: 0.85;
-=======
->>>>>>> release/frcc-testing-1
   cursor: not-allowed;
 }
 
 /* Animation for slot selection */
 @keyframes slotSelectPulse {
-<<<<<<< HEAD
   0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
   70% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
   100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
-=======
-  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.45); }
-  70% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
->>>>>>> release/frcc-testing-1
 }
 
 .slot-grid-btn.slot-btn-selected {
