@@ -49,6 +49,16 @@ const ALL_EXPLORE_LINKS = [
   { key: 'membership', to: ROUTES.membership, label: 'Membership', detail: 'Lifetime enrollment and club privileges', image: IMAGES.exploreMoreMembership },
 ];
 
+const ACTIVITY_FILTER_MAP = {
+  pool: (g) => g.group === 'pool' || g.category === 'water' || g.id === 'swimming-pool' || g.id.includes('pool'),
+  court: (g) => g.group === 'court' || ['badminton', 'tennis', 'table-tennis', 'squash'].includes(g.id),
+  turf: (g) => g.group === 'turf' || ['cricket', 'football', 'volleyball', 'basketball', 'golf'].includes(g.id),
+  wellness: (g) =>
+    g.group === 'wellness' ||
+    g.category === 'fitness' ||
+    ['luxury-gym', 'kids-play-area', 'chess', 'carom', 'card-room'].includes(g.id),
+};
+
 export function ServiceLanding({ service = 'stay', hero }) {
   const { user } = useApp();
   const navigate = useNavigate();
@@ -171,27 +181,38 @@ export function ServiceLanding({ service = 'stay', hero }) {
     if (normService === 'activities') {
       let filtered = activityGames;
       if (activityFilter !== 'all') {
-        filtered = filtered.filter((g) => g.category === activityFilter);
+        const matcher = ACTIVITY_FILTER_MAP[activityFilter];
+        if (matcher) {
+          filtered = filtered.filter(matcher);
+        } else {
+          filtered = filtered.filter(
+            (g) => g.category === activityFilter || g.group === activityFilter || g.id === activityFilter
+          );
+        }
       }
-      return filtered.map((g) => ({
-        id: g.id,
-        name: g.name,
-        image: g.image || gameSlot(g.name),
-        facts: [
-          `Category: ${g.category.toUpperCase()}`,
-          g.tag || 'Indoor & Outdoor courts',
-          `Pricing: ₹${g.price} / ${g.unit}`,
-        ],
-        priceDisplay: formatInr(g.price),
-        priceUnit: ` / ${g.unit}`,
-        healthCardNote: healthCardDiscountPercent
-          ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
-          : null,
-        locationId: 'vja-sports',
-        locationName: 'Vijayawada Campus · Sports Complex',
-        buttonLabel: 'Book session',
-        to: `/book/activity?item=${encodeURIComponent(g.id)}`,
-      }));
+      return filtered.map((g) => {
+        const gamePrice = g.price ?? g.pricePerSlot ?? g.priceFrom ?? 1500;
+        const gameUnit = g.unit === 'per-session' ? 'session' : g.unit === 'per-hour' ? 'hour' : (g.unit || 'session');
+        return {
+          id: g.id,
+          name: g.name,
+          image: g.image || gameSlot(g.imageKey || g.id || g.name),
+          facts: [
+            `Category: ${g.category.toUpperCase()}`,
+            g.tag || (g.id === 'luxury-gym' ? 'Cardio, strength, steam & sauna' : 'Indoor & Outdoor courts'),
+            `Pricing: ₹${gamePrice.toLocaleString('en-IN')} / ${gameUnit}`,
+          ],
+          priceDisplay: formatInr(gamePrice),
+          priceUnit: ` / ${gameUnit}`,
+          healthCardNote: healthCardDiscountPercent
+            ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
+            : null,
+          locationId: 'vja-sports',
+          locationName: 'Vijayawada Campus · Sports Complex',
+          buttonLabel: 'Book session',
+          to: `/book/activity?item=${encodeURIComponent(g.id)}`,
+        };
+      });
     }
 
     if (normService === 'membership') {

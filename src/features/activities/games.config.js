@@ -35,7 +35,7 @@ export function gameById(id) {
  * Price quote for a game + selections.
  * - Games: sessions x 1500 ("per session")
  * - Swimming pool: hours x 1000
- * - Luxury Gym: shows "₹2,000 to ₹3,000 per month" and selected tier price (Standard: 2000, Premium: 3000)
+ * - Luxury Gym: shows ₹8,000 per month (Monthly Membership: 8000)
  *
  * @param {object} game config entry
  * @param {{ extras?: object, equipment?: boolean, sessions?: number, hours?: number }} selections
@@ -50,9 +50,8 @@ export function quotePrice(game, selections = {}, isMember = false) {
   let unitLabel = 'per session';
 
   if (game.id === 'luxury-gym') {
-    const selectedTier = extras.tier || 'standard';
-    base = selectedTier === 'premium' ? (game.priceTo || 3000) : (game.priceFrom || 2000);
-    unitLabel = selectedTier === 'premium' ? 'Premium Tier (₹3,000 per month)' : 'Standard Tier (₹2,000 per month)';
+    base = game.price || 8000;
+    unitLabel = 'Monthly Membership (₹8,000 per month)';
   } else if (game.id === 'swimming-pool' || game.pricingUnit === 'per-hour') {
     const hours = Math.max(1, Number(extras.hours || selections.hours || 1));
     base = (game.price || 1000) * hours;

@@ -624,8 +624,7 @@ export function ActivitiesProcessPage() {
   const processSummary = useMemo(() => {
     let detailText = `${GAME_CATEGORIES[game?.category || 'indoor']} · ${game?.slotMinutes || 60} min`;
     if (game?.id === 'luxury-gym') {
-      const tier = draft.extras.tier || 'standard';
-      detailText = tier === 'premium' ? 'Premium Tier (₹3,000 / month)' : 'Standard Tier (₹2,000 / month)';
+      detailText = 'Monthly Membership (₹8,000 / month)';
     } else if (game?.id === 'swimming-pool') {
       const hrs = Number(draft.extras.hours || 1);
       detailText = `${hrs} Hour${hrs > 1 ? 's' : ''} (₹1,000 / hr)`;
@@ -703,7 +702,7 @@ export function ActivitiesProcessPage() {
                         </span>
                         <span className="mt-0.5 block text-xs text-slate-500">
                           {g.id === 'luxury-gym'
-                            ? '₹2,000 to ₹3,000 per month'
+                            ? '₹8,000 per month'
                             : g.id === 'swimming-pool'
                             ? `${formatINR(g.price || 1000)} per hour`
                             : `${GAME_CATEGORIES[g.category]} · ${formatINR(g.price || 1500)} per session`}
@@ -1117,7 +1116,7 @@ export function ActivitiesProcessPage() {
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-navy-900">{g.name}</span>
-                      <span className="block text-xs text-slate-500">from {formatINR(g.pricePerSlot)} · {GAME_CATEGORIES[g.category]}</span>
+                      <span className="block text-xs text-slate-500">{g.id === 'luxury-gym' ? `${formatINR(g.price || 8000)} / month` : `from ${formatINR(g.pricePerSlot)} · ${GAME_CATEGORIES[g.category]}`}</span>
                     </span>
                   </button>
                 ))}

@@ -118,6 +118,8 @@ export const REMOTE = {
   'swimming-pool': 'https://images.unsplash.com/photo-1772519275437-3029ac1d3941?w=1600&q=80&auto=format&fit=crop',
   'kids-play-area': 'https://images.unsplash.com/photo-1763753743781-313e93737d46?w=1600&q=80&auto=format&fit=crop',
   football: 'https://images.unsplash.com/photo-1654462977797-a349656aadcf?w=1600&q=80&auto=format&fit=crop',
+  squash: 'https://images.unsplash.com/photo-1740813402046-08ec3e0ce5d2?w=1600&q=80&auto=format&fit=crop',
+  basketball: 'https://images.unsplash.com/photo-1511903894668-b924c5275076?w=1600&q=80&auto=format&fit=crop',
   facilityPool: 'https://images.unsplash.com/photo-1758448756167-88dc934c58e4?w=2400&q=80&auto=format&fit=crop',
   facilityGym: 'https://images.unsplash.com/photo-1758957646695-ec8bce3df462?w=2400&q=80&auto=format&fit=crop',
   'luxury-gym': 'https://images.unsplash.com/photo-1758957646695-ec8bce3df462?w=2400&q=80&auto=format&fit=crop',
@@ -232,9 +234,8 @@ export const FALLBACK = {
   'hero-hub-3': REMOTE.facilityRestaurant,
   'hero-hub-4': REMOTE.hallStage,
   'hero-hub-5': REMOTE.badminton,
-  // TODO-REPLACE-SQUASH-BASKETBALL-PHOTO
-  squash: REMOTE.badminton,
-  basketball: REMOTE.tennis,
+  squash: REMOTE.squash,
+  basketball: REMOTE.basketball,
   'hero-events': REMOTE.membershipEvents || REMOTE.galleryEvent,
   'hero-contact': REMOTE['hero-contact'],
   'hero-book': REMOTE['hero-book'],
@@ -361,6 +362,16 @@ export const IMAGES = {
   basketball: GAME('basketball', 'Basketball', 'FRCC outdoor floodlit basketball court'),
   'luxury-gym': GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
   facilitygym: GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
+  'tabletennis': GAME('table-tennis', 'Table Tennis', 'FRCC table tennis rally on an indoor blue table'),
+  'Table Tennis': GAME('table-tennis', 'Table Tennis', 'FRCC table tennis rally on an indoor blue table'),
+  'cardroom': GAME('card-room', 'Card Room', 'FRCC classic card room with tables for rummy, poker and teen patti'),
+  'Card Room': GAME('card-room', 'Card Room', 'FRCC classic card room with tables for rummy, poker and teen patti'),
+  'swimmingpool': GAME('swimming-pool', 'Swimming Pool', 'FRCC resort swimming pool with clear water and sun loungers'),
+  'Swimming Pool': GAME('swimming-pool', 'Swimming Pool', 'FRCC resort swimming pool with clear water and sun loungers'),
+  'kidsplayarea': GAME('kids-play-area', 'Kids Play Area', 'FRCC bright, safe indoor children\'s play area with a slide'),
+  'Kids Play Area': GAME('kids-play-area', 'Kids Play Area', 'FRCC bright, safe indoor children\'s play area with a slide'),
+  'luxurygym': GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
+  'Luxury Gym': GAME('luxury-gym', 'Luxury Gym', 'FRCC state-of-the-art luxury gym and fitness floor with cardio and strength equipment'),
 
   // =========================================================================
   // ROOMS — one slot per room type (mega-menu + section pages)
@@ -677,18 +688,80 @@ export function roomSlot(type) {
  * @param {string} id
  */
 export function gameSlot(id) {
-  const key = String(id || '').toLowerCase();
-  if (IMAGES[id]) return IMAGES[id];
-  if (IMAGES[key]) return IMAGES[key];
-  if (key === 'facilitygym' || key === 'luxury-gym' || key === 'luxurygym') {
-    return IMAGES['luxury-gym'] || IMAGES.facilityGym;
+  if (!id) {
+    return {
+      slot: 'unknown-game',
+      name: 'Activity',
+      src: null,
+      srcSet: '',
+      alt: 'Activity',
+      game: true,
+    };
   }
+
+  if (typeof id === 'object' && id.src) return id;
+
+  const raw = typeof id === 'object' ? (id.imageKey || id.id || id.name || '') : String(id);
+  const name = typeof id === 'object' ? (id.name || id.id || '') : raw;
+  const slug = raw
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const noHyphens = slug.replace(/-/g, '');
+
+  if (IMAGES[raw]) return IMAGES[raw];
+  if (IMAGES[slug]) return IMAGES[slug];
+  if (IMAGES[noHyphens]) return IMAGES[noHyphens];
+
+  const GAME_ALIASES = {
+    'luxury-gym': 'luxury-gym',
+    'luxurygym': 'luxury-gym',
+    'gym': 'luxury-gym',
+    'fitness': 'luxury-gym',
+    'facilitygym': 'luxury-gym',
+    'table-tennis': 'table-tennis',
+    'tabletennis': 'table-tennis',
+    'card-room': 'card-room',
+    'cardroom': 'card-room',
+    'swimming-pool': 'swimming-pool',
+    'swimmingpool': 'swimming-pool',
+    'pool': 'swimming-pool',
+    'kids-play-area': 'kids-play-area',
+    'kidsplayarea': 'kids-play-area',
+    'kids-play': 'kids-play-area',
+    'badminton': 'badminton',
+    'tennis': 'tennis',
+    'cricket': 'cricket',
+    'volleyball': 'volleyball',
+    'chess': 'chess',
+    'carom': 'carom',
+    'carrom': 'carom',
+    'golf': 'golf',
+    'football': 'football',
+    'squash': 'squash',
+    'basketball': 'basketball',
+  };
+
+  const targetKey = GAME_ALIASES[slug] || GAME_ALIASES[noHyphens] || slug;
+
+  if (IMAGES[targetKey]) return IMAGES[targetKey];
+
+  const resolvedSrc =
+    localFor(targetKey) ||
+    localFor(slug) ||
+    REMOTE[targetKey] ||
+    REMOTE[slug] ||
+    FALLBACK[targetKey] ||
+    FALLBACK[slug] ||
+    null;
+
   return {
-    slot: key,
-    name: id,
-    src: localFor(key) || REMOTE[key] || FALLBACK[key] || null,
+    slot: targetKey,
+    name: name || targetKey,
+    src: resolvedSrc,
     srcSet: '',
-    alt: id,
+    alt: name || targetKey,
     game: true,
   };
 }

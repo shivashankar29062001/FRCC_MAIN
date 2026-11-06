@@ -7,6 +7,7 @@ export const games = [
     id: 'badminton',
     name: 'Badminton',
     category: 'indoor',
+    group: 'court',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -31,6 +32,7 @@ export const games = [
     id: 'tennis',
     name: 'Tennis',
     category: 'outdoor',
+    group: 'court',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -55,6 +57,7 @@ export const games = [
     id: 'cricket',
     name: 'Cricket',
     category: 'outdoor',
+    group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -86,6 +89,7 @@ export const games = [
     id: 'table-tennis',
     name: 'Table Tennis',
     category: 'indoor',
+    group: 'court',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -110,6 +114,7 @@ export const games = [
     id: 'volleyball',
     name: 'Volleyball',
     category: 'outdoor',
+    group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -135,6 +140,7 @@ export const games = [
     id: 'chess',
     name: 'Chess',
     category: 'indoor',
+    group: 'wellness',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -159,6 +165,7 @@ export const games = [
     id: 'carom',
     name: 'Carom',
     category: 'indoor',
+    group: 'wellness',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -184,6 +191,7 @@ export const games = [
     name: 'Card Room',
     subtitle: 'Rummy · Poker · Teen Patti',
     category: 'indoor',
+    group: 'wellness',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session',
@@ -208,6 +216,7 @@ export const games = [
     id: 'golf',
     name: 'Golf',
     category: 'outdoor',
+    group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -234,6 +243,7 @@ export const games = [
     id: 'swimming-pool',
     name: 'Swimming Pool',
     category: 'water',
+    group: 'pool',
     pricingUnit: 'per-hour', // Client: pricingUnit "per-hour"
     price: 1000, // Client: price 1000
     pricePerSlot: 1000,
@@ -280,6 +290,7 @@ export const games = [
     name: 'Kids Play Area',
     category: 'indoor',
     subCategory: 'kids',
+    group: 'wellness',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -324,6 +335,7 @@ export const games = [
     id: 'football',
     name: 'Football',
     category: 'outdoor',
+    group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
@@ -358,6 +370,7 @@ export const games = [
     id: 'squash',
     name: 'Squash',
     category: 'indoor',
+    group: 'court',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session',
@@ -382,6 +395,7 @@ export const games = [
     id: 'basketball',
     name: 'Basketball',
     category: 'outdoor',
+    group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
     pricingUnit: 'per-session',
@@ -406,22 +420,23 @@ export const games = [
   {
     id: 'luxury-gym',
     name: 'Luxury Gym',
-    category: 'fitness', // Client: category "fitness"
-    priceFrom: 2000, // Client: priceFrom 2000
-    priceTo: 3000, // Client: priceTo 3000
-    pricePerSlot: 2000,
+    category: 'fitness',
+    group: 'wellness',
+    price: 8000,
+    priceFrom: 8000,
+    priceTo: 8000,
+    pricePerSlot: 8000,
     slotMinutes: 60, // SAMPLE
     unit: 'month', // SAMPLE (confirm whether per month or session)
     pricingUnit: 'per-month', // SAMPLE
     tiers: [
-      { id: 'standard', name: 'Standard', price: 2000, description: 'Cardio & strength equipment access' }, // SAMPLE tier
-      { id: 'premium', name: 'Premium', price: 3000, description: 'Full gym, sauna, steam room & trainer consult' }, // SAMPLE tier
+      { id: 'monthly', name: 'Monthly Membership', price: 8000, description: 'Full access to cardio, strength equipment, steam & sauna' },
     ],
     openFrom: '06:00',
     openTo: '22:00',
     maxPlayers: 30,
     imageKey: 'luxury-gym',
-    blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna.',
+    blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna (₹8,000 monthly).',
     level: 'All fitness levels',
     hours: { open: 6, close: 22 },
     playerLabel: 'Members / Guests',
@@ -433,8 +448,7 @@ export const games = [
         type: 'select',
         required: true,
         options: [
-          { value: 'standard', label: 'Standard Tier (₹2,000 per month)', multiplier: 1 },
-          { value: 'premium', label: 'Premium Tier (₹3,000 per month)', multiplier: 1.5 },
+          { value: 'monthly', label: 'Monthly Membership (₹8,000 per month)', multiplier: 1 },
         ],
       },
     ],
