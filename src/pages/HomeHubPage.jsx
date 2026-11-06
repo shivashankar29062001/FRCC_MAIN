@@ -397,19 +397,12 @@ export function HomeHubPage() {
       <section id="facilities" className="band-tint scroll-mt-28" aria-label="Facilities highlights">
         <div className="container-x section">
           <Reveal>
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+            <div className="mb-6">
               <SectionHeading
                 eyebrow="Facilities"
                 title="Corners you'll keep returning to"
                 sub="Campus highlights — the full campus map lives with the front desk."
               />
-              {locationData && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="tag tag-gold flex items-center gap-1.5">
-                    <MapPinIcon className="h-3.5 w-3.5" /> {locationData.name}
-                  </span>
-                </div>
-              )}
             </div>
           </Reveal>
           <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
