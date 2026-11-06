@@ -53,13 +53,15 @@ export function LeadershipPage() {
         {/* Row 1: Featured President Card */}
         {president && (
           <div className="rounded-[16px] border-2 border-transparent hover:border-gold-500 transition-colors duration-150 bg-white overflow-hidden shadow-card grid grid-cols-1 md:grid-cols-[40%_1fr]">
-            <div className="relative aspect-[4/5] md:aspect-auto w-full h-full min-h-[300px] overflow-hidden rounded-[16px]">
+            <div className="relative aspect-[4/5] md:aspect-auto w-full h-full min-h-[320px] md:min-h-[360px] overflow-hidden rounded-[16px]">
               <SmartImage
                 image={{
                   src: president.imageSrc,
                   name: president.role,
                   alt: presidentAlt,
+                  objectPosition: 'center 18%',
                 }}
+                priority
                 fill
                 className="h-full w-full"
               />

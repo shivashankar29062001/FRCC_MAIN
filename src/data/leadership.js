@@ -33,7 +33,7 @@ const allImages = {
   ...imagesLeadership,
 };
 
-import presidentImg from '../assets/leadership/president.webp';
+import presidentImg from '../assets/leadership/president.jpg';
 import vicePresidentImg from '../assets/leadership/vice-president.jpg';
 import secretaryImg from '../assets/leadership/secretary.jpg';
 import jointSecretaryImg from '../assets/leadership/joint-secretary.jpg';

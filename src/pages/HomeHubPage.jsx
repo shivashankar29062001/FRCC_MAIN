@@ -62,7 +62,6 @@ const FACILITY_GRID = [
   { title: 'Infinity Pool', line: 'Heated · 6 AM – 9 PM', image: IMAGES.facilityPool },
   { title: 'Fitness Floor', line: 'Strength & cardio · 5 AM – 11 PM', image: IMAGES.facilityGym },
   { title: 'Restaurant', line: 'Table d’hôte & à la carte', image: IMAGES.facilityRestaurant },
-  { title: 'Gardens', line: 'Lawns, gazebos & decks', image: IMAGES.facilityGarden },
   { title: 'Members Lounge', line: 'Quiet corners · open till midnight', image: IMAGES.galleryLounge },
 ];
 
@@ -119,7 +118,7 @@ export function HomeHubPage() {
   const firstName = firstNameOf(user?.name);
   const greeting = greetingFor(new Date());
   const upcoming = overview.data?.upcoming || [];
-  const latestNotices = (notifications || []).slice(0, 3);
+  const latestNotices = (notifications || []).filter((n) => n.id !== 'n2' && n.title !== 'Weekend gala').slice(0, 3);
 
   // Area cards data (Vijayawada & Hyderabad)
   const AREA_CARDS = [
@@ -469,15 +468,12 @@ export function HomeHubPage() {
       <section id="notices" className="band-white scroll-mt-28" aria-label="Announcements">
         <div className="container-x section">
           <Reveal>
-            <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
               <SectionHeading
                 eyebrow="Announcements"
                 title="Latest notices"
                 sub="Booking updates, events and member notices appear here first."
               />
-              <button type="button" onClick={viewAllNotices} className="text-sm font-semibold text-gold-600 hover:underline">
-                View all
-              </button>
             </div>
           </Reveal>
           {latestNotices.length === 0 ? (

@@ -18,7 +18,6 @@ export function newId(prefix = 'FRCC') {
 
 const seedNotifications = [
   { id: 'n1', title: 'Welcome to FRCC', body: 'Complete your membership to unlock member rates.', date: 'Today' },
-  { id: 'n2', title: 'Weekend gala', body: 'Convention Hall open house this Saturday.', date: 'Yesterday' },
 ];
 
 export const MEMBERSHIP_STORAGE_KEY = 'frcc.membership.v1';
