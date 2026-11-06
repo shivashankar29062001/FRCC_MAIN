@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { name, shortName, tagline, healthCardDiscountPercent } from '../config/site.js';
+import { ROUTES } from '../config/routes.js';
 
 export const SERVICE_HERO_DATA = {
   stay: {
@@ -17,7 +18,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore rooms',
     linkTarget: '#content',
-    to: '/stay#content',
+    to: `${ROUTES.stay}#content`,
     statSuffix: 'on every stay',
   },
   dining: {
@@ -31,7 +32,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore venues',
     linkTarget: '#content',
-    to: '/dining#content',
+    to: `${ROUTES.dining}#content`,
     statSuffix: 'on dining',
   },
   hall: {
@@ -45,7 +46,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore halls',
     linkTarget: '#content',
-    to: '/halls#content',
+    to: `${ROUTES.halls}#content`,
     statSuffix: 'on every event',
   },
   parking: {
@@ -57,9 +58,9 @@ export const SERVICE_HERO_DATA = {
       'Terrace event parking.',
       'Multi-level parking.',
     ],
-    linkText: 'Explore zones',
+    linkText: 'Explore parking',
     linkTarget: '#content',
-    to: '/parking#content',
+    to: `${ROUTES.parking}#content`,
     statSuffix: 'on every slot',
   },
   activities: {
@@ -73,7 +74,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore activities',
     linkTarget: '#content',
-    to: '/activities#content',
+    to: `${ROUTES.activities}#content`,
     statSuffix: 'on every game',
   },
   membership: {
@@ -85,9 +86,9 @@ export const SERVICE_HERO_DATA = {
       'One card across the campus.',
       'ID & Health card on WhatsApp.',
     ],
-    linkText: 'Explore plan',
+    linkText: 'Explore membership',
     linkTarget: '#content',
-    to: '/membership#content',
+    to: `${ROUTES.membership}#content`,
     statSuffix: 'on every booking',
   },
   events: {
@@ -101,7 +102,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore events',
     linkTarget: '#content',
-    to: '/events#content',
+    to: `${ROUTES.events}#content`,
     statSuffix: 'on member passes',
   },
   hub: {
@@ -116,7 +117,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Explore campus',
     linkTarget: '#explore',
-    to: '/home#explore',
+    to: `${ROUTES.homeHub}#explore`,
     statSuffix: 'on every booking',
   },
   support: {
@@ -130,7 +131,7 @@ export const SERVICE_HERO_DATA = {
     ],
     linkText: 'Reach our teams below',
     linkTarget: '#content',
-    to: '/support#content',
+    to: `${ROUTES.support}#content`,
     statSuffix: 'live desk assistance',
   },
 };

@@ -84,6 +84,7 @@ export function readSession() {
       ...emptySession,
       ...parsed,
       email: cleanEmail,
+      pendingEmail: parsed.pendingEmail || null,
       isLegacy,
       hasRealEmail: Boolean(cleanEmail),
       emailOrPhone: cleanContact,

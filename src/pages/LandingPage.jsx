@@ -22,7 +22,7 @@ import { ROUTES } from '../config/routes.js';
 const STAY_FEATURE = {
   to: ROUTES.stay,
   heading: 'Stay',
-  line: '36 rooms across two wings — member rates every night.',
+  line: '6 rooms across two wings — member rates every night.',
   image: IMAGES.staySuite,
 };
 
@@ -236,7 +236,7 @@ export function LandingPage() {
                 onClick={() => { if (import.meta.env.DEV) console.info("[tile]", "Halls and events", HALLS_FEATURE.to); }}
                 className="btn-base bg-navy-900 text-white px-6 py-3 hover:bg-navy-800 inline-flex items-center gap-2"
               >
-                View halls <ArrowRightIcon className="h-4 w-4" />
+                Explore halls <ArrowRightIcon className="h-4 w-4" />
               </Link>
             </div>
           </div>

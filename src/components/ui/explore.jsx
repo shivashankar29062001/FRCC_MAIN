@@ -179,7 +179,7 @@ export function MoreToExplore({ items = [], className }) {
 }
 
 const EXPERIENCE = [
-  { key: 'hotel', label: 'Stay', line: '36 rooms, member rates nightly', imageKey: 'serviceHotel', to: ROUTES.stay },
+  { key: 'hotel', label: 'Stay', line: '6 rooms, member rates nightly', imageKey: 'serviceHotel', to: ROUTES.stay },
   { key: 'hall', label: 'Halls', line: 'Venues for 40 to 600', imageKey: 'serviceHall', to: ROUTES.halls },
   { key: 'parking', label: 'Parking', line: 'Zoned slots by the hour', imageKey: 'serviceParking', to: ROUTES.parking },
   { key: 'activities', label: 'Activities', line: 'Courts, pool and play zones', imageKey: 'serviceActivities', to: ROUTES.activities },

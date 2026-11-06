@@ -184,7 +184,7 @@ export function ServiceHero({ service = 'stay' }) {
     }
 
     // Otherwise navigate directly to the target URL
-    if (data.to && currentPath !== targetPath) {
+    if (data.to) {
       e.preventDefault();
       navigate(data.to);
     }

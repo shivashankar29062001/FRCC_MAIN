@@ -105,7 +105,7 @@ export async function getAvailability(checkIn, checkOut) {
         .filter((b) => b.room_type_id === r.id && b.check_in < checkOut && b.check_out > checkIn && b.status !== 'cancelled')
         .reduce((sum, b) => sum + (b.rooms || 1), 0);
 
-      const available = Math.max(0, (r.roomsTotal || 10) - bookedRooms);
+      const available = Math.max(0, (r.roomsTotal || 1) - bookedRooms);
       return {
         id: r.id,
         area_id: r.areaId || 'vijayawada',

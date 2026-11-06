@@ -52,7 +52,7 @@ const TABS = [
   { id: 'hall', label: 'Hall', icon: HallIcon, button: 'Check availability', busyLabel: 'Checking…', redirectKey: 'hall', showcase: ROUTES.halls, booking: '/book/hall' },
   { id: 'parking', label: 'Parking', icon: ParkingIcon, button: 'Find a slot', busyLabel: 'Finding…', redirectKey: 'parking', showcase: ROUTES.parking, booking: '/parking/book' },
   { id: 'activities', label: 'Activities', icon: GamepadIcon, button: 'Check slots', busyLabel: 'Checking…', redirectKey: 'activities', showcase: ROUTES.activities, booking: '/book/activities/process' },
-  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership, booking: '/membership/join' },
+  { id: 'membership', label: 'Membership', icon: MembershipIcon, button: 'Explore plans', busyLabel: 'Loading…', redirectKey: 'membership', showcase: ROUTES.membership, booking: ROUTES.membership },
 ];
 
 // Game list comes from the activities team's config — the single source of truth.

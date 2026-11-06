@@ -154,7 +154,8 @@ export function AppProvider({ children }) {
       );
 
       const isSynthetic = (val) => Boolean(val && String(val).toLowerCase().endsWith('@frcc.member'));
-      const rawEmail = (profile?.email || supabaseUser.email || '').trim();
+      const pendingEmail = (supabaseUser.new_email || '').trim();
+      const rawEmail = (supabaseUser.email || profile?.email || '').trim();
       const rawPhone = (profile?.phone || supabaseUser.user_metadata?.phone || '').trim();
       const extractedPhone = isSynthetic(rawEmail) ? rawEmail.replace(/@frcc\.member$/i, '') : '';
       const realPhone = rawPhone || extractedPhone;
@@ -167,6 +168,7 @@ export function AppProvider({ children }) {
         userId: profile?.user_id_code || `FRCC-U-${supabaseUser.id.substring(0, 6).toUpperCase()}`,
         name: profile?.name || supabaseUser.user_metadata?.name || (realEmail ? realEmail.split('@')[0] : 'Member'),
         email: realEmail,
+        pendingEmail: pendingEmail || null,
         authEmail: rawEmail, // Kept internally for Supabase auth backend operations
         isLegacy,
         hasRealEmail: Boolean(realEmail),
@@ -184,6 +186,7 @@ export function AppProvider({ children }) {
           prevUser.userId === sessionObj.userId &&
           prevUser.name === sessionObj.name &&
           prevUser.email === sessionObj.email &&
+          prevUser.pendingEmail === sessionObj.pendingEmail &&
           prevUser.emailOrPhone === sessionObj.emailOrPhone &&
           prevUser.phone === sessionObj.phone &&
           prevUser.isMember === sessionObj.isMember &&
@@ -195,6 +198,15 @@ export function AppProvider({ children }) {
         return sessionObj;
       });
       setIsMemberState((prev) => (prev === memberStatus ? prev : memberStatus));
+
+      if (profile && supabaseUser.email && profile.email !== supabaseUser.email && !isSynthetic(supabaseUser.email)) {
+        supabase
+          .from('profiles')
+          .update({ email: supabaseUser.email, updated_at: new Date().toISOString() })
+          .eq('id', supabaseUser.id)
+          .then(() => {})
+          .catch((err) => console.warn('Could not sync profile email:', err));
+      }
 
       if (memberData) {
         setMembership((prev) => {

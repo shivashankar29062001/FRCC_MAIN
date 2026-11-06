@@ -8,35 +8,36 @@ import { IMAGES } from '../config/images.js';
 import { ArrowRightIcon } from '../components/ui/icons.jsx';
 import { TypeWriter } from '../components/TypeWriter.jsx';
 import { MEMBER_DISCOUNT_PERCENT } from '../config/pricing.js';
+import { ROUTES } from '../config/routes.js';
 
 // Five showcase cards for the booking hub
 const CARDS = [
   {
-    to: '/stay',
+    to: ROUTES.stay,
     label: 'Stay',
-    desc: '36 rooms across two wings — member rates from tonight.',
+    desc: '6 rooms across two wings — member rates from tonight.',
     image: IMAGES.serviceHotel,
   },
   {
-    to: '/halls',
+    to: ROUTES.halls,
     label: 'Halls',
     desc: '4 venues seating 40 to 600 — weddings, conferences, celebrations.',
     image: IMAGES.serviceHall,
   },
   {
-    to: '/parking',
+    to: ROUTES.parking,
     label: 'Parking',
     desc: '3 zoned areas — reserve by the hour before you arrive.',
     image: IMAGES.serviceParking,
   },
   {
-    to: '/activities',
+    to: ROUTES.activities,
     label: 'Activities',
     desc: '11 games across courts, grounds, pool and play zones.',
     image: IMAGES.serviceActivities,
   },
   {
-    to: '/membership',
+    to: ROUTES.membership,
     label: 'Membership',
     desc: 'One lifetime fee, member rates across the whole campus.',
     image: IMAGES.serviceMembership,
@@ -71,7 +72,7 @@ export function BookPage() {
               <p className="landing-hero-subline">
                 <TypeWriter
                   phrases={[
-                    '36 rooms across two wings.',
+                    '6 rooms across two wings.',
                     '4 grand celebration halls.',
                     'Zoned parking ready on arrival.',
                     '11 sports & recreational games.',

@@ -137,6 +137,7 @@ const TABS = [
 function PersonalDetails({ user, membership, pushToast }) {
   const { refreshUserData } = useApp();
   const rawEmail = (user?.email || '').trim();
+  const pendingEmail = (user?.pendingEmail || '').trim();
   const isSynthetic = isLegacySyntheticEmail(rawEmail);
   const realEmail = isSynthetic ? '' : rawEmail;
 
@@ -175,14 +176,26 @@ function PersonalDetails({ user, membership, pushToast }) {
       setEmailErr('Please enter a real email address.');
       return;
     }
+    if (cleanEmail === realEmail.toLowerCase()) {
+      setEmailErr('This is already your current active email.');
+      return;
+    }
     setEmailSending(true);
     try {
       const { updateEmail } = await import('../services/authService.js');
-      const { error } = await updateEmail(cleanEmail);
-      if (error) throw error;
-      setEmailStatus(`Confirmation link sent to ${cleanEmail}. Please check your inbox and click the verification link to complete the change.`);
-      pushToast(`Verification link sent to ${cleanEmail}. Check your inbox!`, 'success');
+      const data = await updateEmail(cleanEmail);
+      if (refreshUserData) {
+        await refreshUserData();
+      }
+      if (data?.user?.new_email) {
+        setEmailStatus(`Verification link sent to ${cleanEmail}. Please check your new email to confirm the change. Until confirmed, your active sign-in email remains ${realEmail}.`);
+        pushToast(`Verification link sent to ${cleanEmail}. Check your new email!`, 'success');
+      } else {
+        setEmailStatus(`Email updated to ${cleanEmail}.`);
+        pushToast('Email updated successfully.', 'success');
+      }
       setNewEmail('');
+      setShowEmailForm(false);
     } catch (apiErr) {
       setEmailErr(apiErr?.message || 'Failed to send verification email.');
       pushToast(apiErr?.message || 'Failed to send verification email.', 'error');
@@ -323,6 +336,31 @@ function PersonalDetails({ user, membership, pushToast }) {
             </button>
           </div>
 
+          {/* Pending Email Confirmation Notice */}
+          {pendingEmail && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-amber-800 uppercase tracking-wide text-[10px] bg-amber-200/80 px-1.5 py-0.5 rounded">
+                  Pending Confirmation
+                </span>
+                <div className="space-y-1">
+                  <p>
+                    A verification link was sent to <strong className="font-semibold">{pendingEmail}</strong>. Please check your new inbox and click the link to confirm.
+                  </p>
+                  <p className="text-amber-800 font-medium">
+                    Until confirmed, your active sign-in email remains <strong className="font-semibold">{realEmail}</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {emailStatus && (
+            <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800" role="status">
+              {emailStatus}
+            </div>
+          )}
+
           {/* Email Update / Add Form */}
           {showEmailForm && (
             <div className="mt-4 pt-4 border-t border-slate-200">
@@ -353,11 +391,6 @@ function PersonalDetails({ user, membership, pushToast }) {
                   </LoadingButton>
                 </div>
                 {emailErr && <p className="field-error" role="alert">{emailErr}</p>}
-                {emailStatus && (
-                  <p className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5" role="status">
-                    {emailStatus}
-                  </p>
-                )}
                 <p className="text-[11px] text-slate-500">
                   A confirmation email will be sent to this address. Click the link inside to update your sign-in email.
                 </p>

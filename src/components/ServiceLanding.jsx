@@ -271,7 +271,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       <ServiceHero service={heroService} overrides={hero} />
 
       {/* 2 · Main Options Section */}
-      <section className="band-sand" aria-label="Available options">
+      <section id="content" className="band-sand scroll-mt-24" aria-label="Available options">
         <div className="container-x section">
           {/* Section Heading & Subheading */}
           <div className="text-center max-w-xl mx-auto">

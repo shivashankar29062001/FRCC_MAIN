@@ -50,7 +50,7 @@ export const rooms = [
     sizeSqft: 280, // SAMPLE
     maxGuests: 2, // SAMPLE
     maxOccupancy: 2, // SAMPLE
-    roomsTotal: 10, // SAMPLE (10 for normal)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Free WiFi', 'AC', 'Queen Bed', 'Breakfast Included', 'Room Service'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Comfortable and well-appointed standard room with modern amenities and courtyard view.', // SAMPLE
@@ -68,7 +68,7 @@ export const rooms = [
     sizeSqft: 380, // SAMPLE
     maxGuests: 2, // SAMPLE
     maxOccupancy: 2, // SAMPLE
-    roomsTotal: 10, // SAMPLE (10 for normal)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Free WiFi', 'River View Balcony', 'King Bed', 'AC', 'Breakfast Included', 'Pool Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Spacious deluxe room with private balcony, scenic views, and club pool access.', // SAMPLE
@@ -86,7 +86,7 @@ export const rooms = [
     sizeSqft: 450, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 10, // SAMPLE (10 for normal)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Free WiFi', 'Floor-to-Ceiling Windows', 'King Bed', 'AC', 'Breakfast Included', 'Pool & Gym Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Premium room with floor-to-ceiling windows, luxury bath fittings, and full campus privileges.', // SAMPLE
@@ -106,7 +106,7 @@ export const rooms = [
     sizeSqft: 600, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 4, // SAMPLE (4 for suites)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Free WiFi', 'Living Area', 'King Bed', 'AC', 'Jacuzzi', 'Breakfast Included', 'Club Lounge Access'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Generously proportioned junior suite featuring a separate sitting lounge and riverfront vistas.', // SAMPLE
@@ -124,7 +124,7 @@ export const rooms = [
     sizeSqft: 750, // SAMPLE
     maxGuests: 3, // SAMPLE
     maxOccupancy: 3, // SAMPLE
-    roomsTotal: 4, // SAMPLE (4 for suites)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Free WiFi', 'Separate Living Room', 'Ergonomic Desk', 'Jacuzzi', 'Breakfast Included', 'VIP Concierge'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Executive suite with private meeting lounge, ergonomic work alcove, and bespoke butler service.', // SAMPLE
@@ -142,7 +142,7 @@ export const rooms = [
     sizeSqft: 1100, // SAMPLE
     maxGuests: 4, // SAMPLE
     maxOccupancy: 4, // SAMPLE
-    roomsTotal: 4, // SAMPLE (4 for suites)
+    roomsTotal: 1, // 1 of each room type (6 rooms total)
     amenities: ['Private Terrace', 'Dedicated Butler Service', 'Living & Dining Room', 'Jacuzzi', 'Breakfast Included', 'Valet Parking'], // SAMPLE
     // taxPercent omitted: GST not confirmed by client
     description: 'Palatial royal suite with expansive private terrace, dining room, jacuzzi, and 24-hour butler concierge.', // SAMPLE
