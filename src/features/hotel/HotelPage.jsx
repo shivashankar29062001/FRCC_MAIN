@@ -681,7 +681,7 @@ export function HotelPage() {
         <ServiceHero service="stay" />
 
         <div id="content" className="container-x py-12 sm:py-16 scroll-mt-24">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-slate-200 pb-6">
+          <div className="border-b border-slate-200 pb-6">
             <div>
               <p className="eyebrow">Accommodations</p>
               <h2 className="h-section mt-1">Choose your room</h2>
@@ -691,9 +691,6 @@ export function HotelPage() {
                 <span>Suites starting from ₹6,000 per night</span>
               </div>
             </div>
-            <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-semibold hover:text-gold-600 inline-flex self-start sm:self-end">
-              Vijayawada Campus · View on map
-            </LocationTrigger>
           </div>
 
           {/* Filter Chips */}
@@ -795,7 +792,7 @@ export function HotelPage() {
           {/* Campus Hotel Privileges */}
           <div className="mt-16 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
             <h3 className="font-display text-lg font-bold text-navy-900">FRCC Riverfront Hospitality Privileges</h3>
-            <p className="text-xs text-slate-500 mt-1">Included with every room and suite reservation at Vijayawada campus.</p>
+            <p className="text-xs text-slate-500 mt-1">Included with every room and suite reservation.</p>
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-medium text-slate-700">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="font-bold text-navy-900 block mb-1">Club Swimming Pool</span>
