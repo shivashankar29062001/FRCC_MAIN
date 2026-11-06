@@ -63,7 +63,6 @@ const FACILITY_GRID = [
   { title: 'Fitness Floor', line: 'Strength & cardio · 5 AM – 11 PM', image: IMAGES.facilityGym },
   { title: 'Restaurant', line: 'Table d’hôte & à la carte', image: IMAGES.facilityRestaurant },
   { title: 'Gardens', line: 'Lawns, gazebos & decks', image: IMAGES.facilityGarden },
-  { title: 'Spa Suite', line: 'Massage & sauna · by appointment', image: IMAGES.facilitySpa },
   { title: 'Members Lounge', line: 'Quiet corners · open till midnight', image: IMAGES.galleryLounge },
 ];
 
@@ -403,7 +402,7 @@ export function HomeHubPage() {
               <SectionHeading
                 eyebrow="Facilities"
                 title="Corners you'll keep returning to"
-                sub="Six highlights — the full campus map lives with the front desk."
+                sub="Campus highlights — the full campus map lives with the front desk."
               />
               {locationData && (
                 <div className="flex items-center gap-2 shrink-0">

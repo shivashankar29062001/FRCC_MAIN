@@ -52,7 +52,7 @@ const GALLERY = [
   { label: 'Pool at night', image: IMAGES['gallery-2'] },
   { label: 'Gardens', image: IMAGES['gallery-3'] },
   { label: 'Restaurant', image: IMAGES['gallery-4'] },
-  { label: 'Spa', image: IMAGES['gallery-5'] },
+  { label: 'Lounge', image: IMAGES.galleryLounge },
   { label: 'Gym', image: IMAGES['gallery-6'] },
   { label: 'Event nights', image: IMAGES['gallery-7'] },
   { label: 'Covered parking', image: IMAGES['gallery-8'] },

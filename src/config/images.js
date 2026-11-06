@@ -102,7 +102,8 @@ export const REMOTE = {
   'hero-contact': 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=2400&q=80&auto=format&fit=crop',
   exploreHotel: 'https://images.unsplash.com/photo-1638973140785-3b918e290682?w=2400&q=80&auto=format&fit=crop',
   'gallery-3': 'https://images.unsplash.com/photo-1720934016001-b057ebfd293d?w=2400&q=80&auto=format&fit=crop',
-  facilitySpa: 'https://images.unsplash.com/photo-1730406928950-0047174d5fe3?w=2400&q=80&auto=format&fit=crop',
+  facilityRestaurant: 'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=1600&q=80&auto=format&fit=crop',
+  restaurant: 'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=1600&q=80&auto=format&fit=crop',
   galleryNight: 'https://images.unsplash.com/photo-1766164080257-f3ff48117148?w=2400&q=80&auto=format&fit=crop',
   hallStage: 'https://images.unsplash.com/photo-1771911654088-36080143c3bd?w=2400&q=80&auto=format&fit=crop',
   staySuite: 'https://images.unsplash.com/photo-1630888728969-5e43f55a7a18?w=2400&q=80&auto=format&fit=crop',
@@ -165,7 +166,7 @@ export const REMOTE = {
   'gallery-1': 'https://images.unsplash.com/photo-1771911651523-e050dc4189ea?w=1600&q=80&auto=format&fit=crop',
   'gallery-2': 'https://images.unsplash.com/photo-1671362962572-50cf4edca731?w=1600&q=80&auto=format&fit=crop',
   'gallery-4': 'https://images.unsplash.com/photo-1667388969250-1c7220bf3f37?w=1600&q=80&auto=format&fit=crop',
-  'gallery-5': 'https://images.unsplash.com/photo-1760722974657-f64bce2f9cc5?w=1600&q=80&auto=format&fit=crop',
+  'gallery-5': 'https://images.unsplash.com/photo-1790611180279-fe5a0c942797?w=1600&q=80&auto=format&fit=crop',
   'gallery-6': 'https://images.unsplash.com/photo-1576678927484-cc907957088c?w=1600&q=80&auto=format&fit=crop',
   'gallery-7': 'https://images.unsplash.com/photo-1753966597915-0291759f8d7f?w=1600&q=80&auto=format&fit=crop',
   'gallery-8': 'https://images.unsplash.com/photo-1776262438118-18e2a5613eca?w=1600&q=80&auto=format&fit=crop',
@@ -207,7 +208,7 @@ export const REMOTE = {
   galleryGym: 'https://images.unsplash.com/photo-1683758507025-6e74ad3ca1e5?w=1600&q=80&auto=format&fit=crop',
   galleryEvent: 'https://images.unsplash.com/photo-1784916484663-345ff1536cfd?w=1600&q=80&auto=format&fit=crop',
   gallerySports: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=1600&q=80&auto=format&fit=crop',
-  gallerySpa: 'https://images.unsplash.com/photo-1675149476008-83dbfa2ee917?w=1600&q=80&auto=format&fit=crop',
+  gallerySpa: 'https://images.unsplash.com/photo-1790611180279-fe5a0c942797?w=1600&q=80&auto=format&fit=crop',
   exploreMoreHotel: 'https://images.unsplash.com/photo-1778597578392-cac5ee5113ce?w=1600&q=80&auto=format&fit=crop',
   exploreMoreHall: 'https://images.unsplash.com/photo-1775918427144-51f0bf53f8c4?w=1600&q=80&auto=format&fit=crop',
   exploreMoreParking: 'https://images.unsplash.com/photo-1749269532497-6aa8c01eb880?w=1600&q=80&auto=format&fit=crop',
@@ -232,6 +233,8 @@ export const FALLBACK = {
   'hero-home-5': REMOTE.facilityPool,
   'hero-hub-2': REMOTE.galleryLounge,
   'hero-hub-3': REMOTE.facilityRestaurant,
+  facilityRestaurant: REMOTE.facilityRestaurant || REMOTE['dining-restaurant'],
+  restaurant: REMOTE.restaurant || REMOTE['dining-restaurant'],
   'hero-hub-4': REMOTE.hallStage,
   'hero-hub-5': REMOTE.badminton,
   squash: REMOTE.squash,
@@ -339,8 +342,8 @@ export const IMAGES = {
   facilityPool: S('facilityPool', 'Infinity Pool', 'FRCC resort infinity pool glowing in warm evening light'),
   facilityGym: S('facilityGym', 'Fitness Floor', 'FRCC modern gym with premium strength equipment'),
   facilityRestaurant: S('facilityRestaurant', 'Restaurant', 'FRCC fine-dining restaurant with velvet chairs and marble tables'),
+  restaurant: S('facilityRestaurant', 'Restaurant', 'FRCC fine-dining restaurant with velvet chairs and marble tables'),
   facilityGarden: S('facilityGarden', 'Gardens', 'FRCC landscaped garden lawn with a table and chairs in the shade'),
-  facilitySpa: S('facilitySpa', 'Spa Suite', 'FRCC calm spa room with a massage table, towels and soft candlelight'),
 
   // =========================================================================
   // GAMES — one slot per game id (imageKey in games.config.js)
@@ -454,7 +457,7 @@ export const IMAGES = {
   'gallery-2': S('gallery-2', 'Pool at night', 'FRCC resort pool lit up at night from above'),
   'gallery-3': S('gallery-3', 'Gardens', 'FRCC landscaped garden lawns with a table and chairs in the shade'),
   'gallery-4': S('gallery-4', 'Restaurant', 'FRCC warmly lit restaurant with laid tables and glassware'),
-  'gallery-5': S('gallery-5', 'Spa', 'FRCC spa interior with rolled towels, plants and warm light'),
+  'gallery-5': S('gallery-5', 'Lounge', 'FRCC elegant members lounge with ambient lighting'),
   'gallery-6': S('gallery-6', 'Gym', 'FRCC well-equipped gym floor with rings, kettlebells and balls'),
   'gallery-7': S('gallery-7', 'Event nights', 'FRCC party tables hung with garlands and warm lights'),
   'gallery-8': S('gallery-8', 'Covered parking', 'FRCC covered driveway leading into the car park'),
@@ -522,7 +525,7 @@ export const IMAGES = {
   galleryGym: S('galleryGym', 'Gym', 'FRCC well-equipped gym floor with rings, kettlebells and balls'),
   galleryEvent: S('galleryEvent', 'Event', 'FRCC party tables hung with garlands and warm lights'),
   gallerySports: S('gallerySports', 'Sports', 'FRCC player serving on an outdoor tennis court'),
-  gallerySpa: S('gallerySpa', 'Spa', 'FRCC spa interior with rolled towels, plants and warm light'),
+  gallerySpa: S('galleryLounge', 'Members Lounge', 'FRCC elegant members lounge with ambient lighting'),
 
   // =========================================================================
   // AUTH PAGES (4:5 portrait side-panel)

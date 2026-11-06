@@ -160,7 +160,7 @@ export const HOTELS = [
     imageKey: 'facilityPool',
     rating: 4.8,
     address: 'D.No. 24-29-210A, Durgapuram, Gulabithota Road, Vijayawada, NTR District, Andhra Pradesh – 520003',
-    amenities: ['Free WiFi', 'River View', 'Pool Access', 'Fitness Center', 'Ayurvedic Spa', 'Parking', 'Multi-cuisine Restaurant'],
+    amenities: ['Free WiFi', 'River View', 'Pool Access', 'Fitness Center', 'Parking', 'Multi-cuisine Restaurant'],
     rooms,
   },
 ];
