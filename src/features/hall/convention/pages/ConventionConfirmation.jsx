@@ -4,8 +4,7 @@ import jsPDF from 'jspdf';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr, getBookingRefundPolicy, maskPhone, maskEmail, CANCELLATION_POLICY_TEXT } from '../utils/format';
-import { api } from '../services/api';
-import * as pay from '../services/payment';
+import { cancelHallBooking, getHallBookingById } from '../services/hallBookingService.js';
 import { supabase } from '../../../../services/supabase.js';
 
 export default function ConventionConfirmation() {
@@ -24,14 +23,13 @@ export default function ConventionConfirmation() {
   const [resendCount, setResendCount] = useState(0);
   const [resendMsg, setResendMsg] = useState('');
 
-  // Fallback: if the booking state was lost on refresh, load it by ID from the URL.
+  // Fallback: if the booking state was lost on refresh, load it directly from Supabase.
   useEffect(() => {
     if (confirmed) { setBooking(confirmed); setLoading(false); return; }
     const id = params.get('id');
     if (!id) { setLoading(false); setNotFound(true); return; }
-    api('/bookings/my')
-      .then(d => {
-        const found = d.bookings.find(b => b.id === id);
+    getHallBookingById(id)
+      .then((found) => {
         if (found) { setBooking(found); setConfirmed(found); }
         else setNotFound(true);
       })
@@ -153,30 +151,33 @@ export default function ConventionConfirmation() {
   const doCancel = async () => {
     setCancelling(true); setCancelErr('');
     try {
-      const r = await api(`/bookings/${booking.id}/cancel`, { method: 'POST' });
-      setCancelMsg(r.message);
+      const r = await cancelHallBooking(booking.id);
+      setCancelMsg('Booking cancelled successfully. Your slot is now released.');
       setCancelNotice(true);
-      const updated = {
+      const updated = r.booking ? {
+        ...r.booking,
+        refundStatusText: r.refund?.refundStatusText || (r.refund?.refundAmount > 0 ? 'Refund pending' : 'No refund due'),
+      } : {
         ...booking,
         status: 'CANCELLED',
-        paymentStatus: 'REFUNDED',
-        refundPercent: r.booking?.refundPercent ?? policy.refundPercent,
-        refundAmount: r.booking?.refundAmount ?? policy.refundAmount,
-        refundStatus: r.booking?.refundStatus ?? (policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE'),
-        refundStatusText: r.booking?.refundStatusText ?? (policy.refundAmount > 0 ? 'Refund pending' : 'No refund due'),
+        paymentStatus: r.refund?.refundAmount > 0 ? 'REFUNDED' : booking.paymentStatus,
+        refundPercent: r.refund?.refundPercent ?? policy.refundPercent,
+        refundAmount: r.refund?.refundAmount ?? policy.refundAmount,
+        refundStatus: r.refund?.refundStatus ?? (policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE'),
+        refundStatusText: r.refund?.refundStatusText ?? (policy.refundAmount > 0 ? 'Refund pending' : 'No refund due'),
         balanceDue: 0,
       };
       setBooking(updated);
       setConfirmed(updated);
       setCancelOpen(false);
-      pay.refund(booking.id, updated.refundAmount).catch(e => console.error('Refund call failed:', e.message));
     } catch (e) {
       setCancelErr(e.message || 'Cancellation request failed.');
     } finally { setCancelling(false); }
   };
 
+  const statusUpper = String(booking.status || '').toUpperCase();
   const policy = getBookingRefundPolicy(booking);
-  const eligible = policy.allowed && booking.status === 'CONFIRMED';
+  const eligible = policy.allowed && statusUpper === 'CONFIRMED';
   const started = policy.hoursUntilStart <= 0;
   const nonRefundable = Math.max(0, (Number(booking.amountPaid ?? booking.amount) || 0) - policy.refundAmount);
 
@@ -220,11 +221,13 @@ export default function ConventionConfirmation() {
             </>
           )}
         </dl>
-        {booking.status === 'PENDING_VERIFICATION' && <p className="text-amber-700 text-sm mt-3">⏳ Your booking is pending verification. It will be confirmed once we receive your payment.</p>}
+        {(statusUpper === 'PENDING_VERIFICATION' || booking.paymentStatus === 'PENDING_VERIFICATION') && statusUpper !== 'CANCELLED' && (
+          <p className="text-amber-700 text-sm mt-3">⏳ Your booking is pending verification. It will be confirmed once we receive your payment.</p>
+        )}
         {booking.paymentStatus === 'PARTIAL' && <p className="text-amber-700 text-sm mt-3">Partial payment received — balance of {inr(booking.balanceDue)} is due at the venue.</p>}
         
         {/* Notification details & Resend button */}
-        {booking.status === 'CONFIRMED' && (
+        {statusUpper === 'CONFIRMED' && (
           <div className="mt-4 p-3 bg-stone-50 rounded border border-stone-200">
             <p className="text-xs text-gray-700">
               Confirmation notifications sent via Email, SMS &amp; WhatsApp to <strong>{maskPhone(booking.phone)}</strong> and <strong>{maskEmail(booking.email)}</strong>.

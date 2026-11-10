@@ -30,7 +30,7 @@ const TRAVEL_MODES = [
 ];
 
 export function LocationPanel() {
-  const { isOpen, activeLocation, closeLocation } = useLocationModal();
+  const { isOpen, activeLocation, closeLocation, openLocation } = useLocationModal();
   const { pushToast } = useApp();
 
   const modalRef = useRef(null);
@@ -387,6 +387,37 @@ export function LocationPanel() {
         {/* Right Column: Facility Details & Turn-by-Turn Directions       */}
         {/* ------------------------------------------------------------- */}
         <div className="flex-1 flex flex-col overflow-y-auto p-5 sm:p-7 lg:p-8 max-h-[calc(100vh-260px)] lg:max-h-[92vh]">
+          {/* Available Campuses Switcher: Vijayawada & Hyderabad */}
+          <div className="mb-4">
+            <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+              Available Campuses
+            </span>
+            <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-100 rounded-xl w-fit border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => openLocation(activeLocation?.id?.includes('hotel') ? 'vja-hotel' : 'vja-club')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeLocation?.id === 'vja-club' || activeLocation?.area === 'Vijayawada'
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-navy-900 hover:bg-white/60'
+                }`}
+              >
+                Vijayawada Campus
+              </button>
+              <button
+                type="button"
+                onClick={() => openLocation(activeLocation?.id?.includes('hotel') ? 'hyd-hotel' : 'hyd-office')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  activeLocation?.id === 'hyd-office' || activeLocation?.area === 'Hyderabad'
+                    ? 'bg-navy-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-navy-900 hover:bg-white/60'
+                }`}
+              >
+                Hyderabad Campus
+              </button>
+            </div>
+          </div>
+
           {/* Header Title */}
           <div>
             <div className="flex items-center gap-2">

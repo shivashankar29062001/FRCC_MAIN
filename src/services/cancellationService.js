@@ -366,8 +366,6 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
   }
 
   const refToMatch = bookingRef || bookingId;
-  if (refToMatch) persistCancelledId(refToMatch);
-  if (bookingId) persistCancelledId(bookingId);
 
   // Normalize service type
   let type = String(bookingType || 'auto').toLowerCase();
@@ -380,6 +378,22 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
     else if (hint.startsWith('FRCC-PARK-') || hint.startsWith('FRCC-P-') || hint.includes('PARK')) type = 'parking';
   }
 
+  // Convention halls must cancel authoritatively through hallBookingService (Supabase RPCs only, no Express/local fallback).
+  if (type === 'hall' || type === 'convention') {
+    const { cancelHallBooking } = await import('../features/hall/convention/services/hallBookingService.js');
+    const result = await cancelHallBooking(refToMatch);
+    if (refToMatch) persistCancelledId(refToMatch);
+    if (bookingId) persistCancelledId(bookingId);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'hall' } }));
+      window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: { id: refToMatch, status: 'CANCELLED' } }));
+    }
+    return result;
+  }
+
+  if (refToMatch) persistCancelledId(refToMatch);
+  if (bookingId) persistCancelledId(bookingId);
+
   // 1. Primary: Execute unified cancel_booking RPC or specific service RPC
   try {
     const { data: rpcData, error: rpcErr } = await supabase.rpc('cancel_booking', {
@@ -388,7 +402,7 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
     });
 
     if (!rpcErr && rpcData) {
-      if (type === 'hall' || type === 'stay' || type === 'hotel') {
+      if (type === 'stay' || type === 'hotel') {
         if (rpcData.refund_amount > 0) {
           supabase.functions.invoke('issue-refund', {
             body: { booking_id: refToMatch, service_type: type, refund_amount: rpcData.refund_amount },
@@ -414,73 +428,6 @@ export async function cancelBooking({ bookingType = 'auto', bookingId, bookingRe
     if (msg.includes('INVALID_STATUS') || msg.includes('UNAUTHORIZED') || msg.includes('BOOKING_NOT_FOUND')) {
       throw err;
     }
-  }
-
-  // Hall specific cancellation fallback
-  if (type === 'hall' || type === 'convention') {
-    try {
-      const { data: rpcHall, error: rpcHallErr } = await supabase.rpc('cancel_hall_booking', {
-        p_booking_id: refToMatch,
-      });
-      if (!rpcHallErr && rpcHall) {
-        supabase.functions.invoke('issue-refund', {
-          body: { booking_id: refToMatch, service_type: 'hall', refund_amount: rpcHall.refund_amount },
-        }).catch(() => {});
-        supabase.functions.invoke('send-booking-confirmation', {
-          body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'hall' },
-        }).catch(() => {});
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'hall' } }));
-        }
-        return rpcHall;
-      }
-    } catch (_) {}
-
-    // Direct table update fallback
-    const nowIso = new Date().toISOString();
-    const { calculateHallRefund } = await import('../features/hall/convention/config/halls.config.js');
-    const { data: hallRow } = await supabase.from('convention_bookings').select('*').eq('id', refToMatch).maybeSingle();
-    const refundInfo = calculateHallRefund(hallRow);
-
-    try {
-      await supabase.from('convention_bookings').update({
-        status: 'CANCELLED',
-        cancelled_at: nowIso,
-        refund_percent: refundInfo.refundPercent,
-        refund_amount: refundInfo.refundAmount,
-        refund_status: refundInfo.refundStatus,
-        updated_at: nowIso,
-      }).eq('id', refToMatch);
-    } catch (_) {}
-
-    try {
-      await supabase.from('bookings').update({
-        status: 'CANCELLED',
-        cancelled_at: nowIso,
-        updated_at: nowIso,
-      }).or(`booking_id.eq.${refToMatch},id.eq.${refToMatch}`);
-    } catch (_) {}
-
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const local = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
-        const updated = local.map((item) => (item.id === refToMatch ? { ...item, status: 'CANCELLED', cancelled_at: nowIso } : item));
-        window.localStorage.setItem('frcc_convention_bookings', JSON.stringify(updated));
-      }
-    } catch (_) {}
-
-    supabase.functions.invoke('issue-refund', {
-      body: { booking_id: refToMatch, service_type: 'hall', refund_amount: refundInfo.refundAmount },
-    }).catch(() => {});
-    supabase.functions.invoke('send-booking-confirmation', {
-      body: { booking_id: refToMatch, event_type: 'booking_cancelled', service_type: 'hall' },
-    }).catch(() => {});
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(CANCELLATION_CHANGED_EVENT, { detail: { bookingId: refToMatch, type: 'hall' } }));
-      window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: { id: refToMatch, status: 'CANCELLED' } }));
-    }
-    return { success: true, booking_id: refToMatch, status: 'CANCELLED' };
   }
 
   // Activity fallback

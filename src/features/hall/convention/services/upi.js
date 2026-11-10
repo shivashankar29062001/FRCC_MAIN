@@ -1,8 +1,7 @@
-import { api } from './api';
+import { verifyHallUpi } from './hallBookingService.js';
 
-// Mock-backed UPI VPA verification.
-// TODO: swap this implementation for a real gateway validation API
-// (e.g. Razorpay/Cashfree). The component never changes — only this file.
+// UPI VPA verification for convention hall payments (no Express fallback).
+// TODO-RAZORPAY: swap verifyHallUpi implementation for live Razorpay/Cashfree VPA validation API.
 export async function verifyUPI(upiId) {
-  return api('/payments/verify-upi', { method: 'POST', body: { upiId }, auth: false });
+  return verifyHallUpi(upiId);
 }

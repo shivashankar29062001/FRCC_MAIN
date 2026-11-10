@@ -29,7 +29,7 @@ export function eventStart(date, startTime) {
 export const getBookingRefundPolicy = getRefundPolicy;
 
 export function canCancel(booking, now = new Date()) {
-  return booking?.status === 'CONFIRMED' && getRefundPolicy(booking, now).allowed;
+  return String(booking?.status || '').toUpperCase() === 'CONFIRMED' && getRefundPolicy(booking, now).allowed;
 }
 
 // Masked the same way the server masks recipients, so both agree.

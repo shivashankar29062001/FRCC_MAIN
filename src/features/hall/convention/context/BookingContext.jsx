@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
 
 const BookingContext = createContext(null);
 const EMPTY = {
@@ -8,6 +8,13 @@ const EMPTY = {
   eventType: '', guests: '', eventDetails: '',
   organizerName: '', phone: '', email: '', specialRequests: '',
   notifyUpdates: true,
+  heldBookingId: null,
+  holdExpiresAt: null,
+  serverHallCharge: null,
+  serverGst: null,
+  serverAmount: null,
+  slotError: '',
+  slotErrorCode: '',
 };
 
 export function BookingProvider({ children }) {
@@ -24,10 +31,51 @@ export function BookingProvider({ children }) {
     else sessionStorage.removeItem('frcc_confirmed');
   }, [confirmed]);
 
-  const updateBooking = (patch) => setBookingState(b => ({ ...b, ...patch }));
-  const resetBooking = () => { setBookingState(EMPTY); setConfirmed(null); sessionStorage.removeItem('frcc_booking'); };
+  const updateBooking = useCallback((patch) => {
+    setBookingState((b) => {
+      const next = { ...b, ...patch };
+      const slotChanged = (
+        ('hallId' in patch && patch.hallId !== b.hallId) ||
+        ('date' in patch && patch.date !== b.date) ||
+        ('startTime' in patch && patch.startTime !== b.startTime) ||
+        ('endTime' in patch && patch.endTime !== b.endTime) ||
+        ('guests' in patch && String(patch.guests || '') !== String(b.guests || ''))
+      );
+      if (slotChanged && !('holdExpiresAt' in patch)) {
+        next.holdExpiresAt = null;
+        next.serverHallCharge = null;
+        next.serverGst = null;
+        next.serverAmount = null;
+      }
+      return next;
+    });
+  }, []);
 
-  const value = useMemo(() => ({ booking, updateBooking, resetBooking, confirmed, setConfirmed }), [booking, confirmed]);
+  const clearHold = useCallback(() => {
+    setBookingState((b) => ({
+      ...b,
+      heldBookingId: null,
+      holdExpiresAt: null,
+      serverHallCharge: null,
+      serverGst: null,
+      serverAmount: null,
+    }));
+  }, []);
+
+  const clearSlotError = useCallback(() => {
+    setBookingState((b) => ({ ...b, slotError: '', slotErrorCode: '' }));
+  }, []);
+
+  const resetBooking = useCallback(() => {
+    setBookingState(EMPTY);
+    setConfirmed(null);
+    sessionStorage.removeItem('frcc_booking');
+  }, []);
+
+  const value = useMemo(
+    () => ({ booking, updateBooking, resetBooking, clearHold, clearSlotError, confirmed, setConfirmed }),
+    [booking, updateBooking, resetBooking, clearHold, clearSlotError, confirmed],
+  );
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>;
 }
 

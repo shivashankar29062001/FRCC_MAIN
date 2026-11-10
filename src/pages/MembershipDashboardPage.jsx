@@ -128,7 +128,7 @@ export function MembershipDashboardPage() {
     setPdfError(null);
     setPdfBusy(true);
     try {
-      await downloadOfficialApplicationForm();
+      await downloadOfficialApplicationForm(null, currentMembership);
     } catch (err) {
       console.error('[MembershipDashboardPage] PDF download error:', err);
       setPdfError(err?.message || 'Failed to download application form. Please try again.');

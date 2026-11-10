@@ -4,7 +4,8 @@ import { useApp } from '../app/store/AppContext.jsx';
 import { getMyStayBookings } from '../api/stay.js';
 import { rooms as HOTEL_ROOMS } from '../data/hotel.js';
 import { supabase } from '../services/supabase.js';
-import { getMyTableBookings } from '../api/dining.js';
+import { getMyHallBookings } from '../features/hall/convention/services/hallBookingService.js';
+import { getMyTableBookings, extractDiningLocation } from '../api/dining.js';
 import { useActivityBookings } from '../features/activities/bookings.store.js';
 import { formatINR } from '../features/activities/games.config.js';
 import { MEMBER_DISCOUNT_LABEL } from '../config/pricing.js';
@@ -690,9 +691,10 @@ export function ProfilePage({ initialTab = 'details' }) {
             userId: r.user_id || user.id,
             roomName: getRoomTypeName(r),
             title: getRoomTypeName(r),
-            areaName: r.area_name || r.areaName || r.location || r.details?.areaName || 'Vijayawada Campus',
-            venueName: r.venue_name || r.venueName || r.details?.venueName || 'FRCC Riverfront',
-            cityName: r.city_name || r.cityName || r.details?.cityName || 'Vijayawada',
+            areaName: stayLoc.areaName,
+            venueName: stayLoc.venueName,
+            cityName: stayLoc.cityName,
+            cityId: stayLoc.cityId,
             checkin: r.check_in,
             checkout: r.check_out,
             date: r.check_in,
@@ -726,7 +728,7 @@ export function ProfilePage({ initialTab = 'details' }) {
     };
   }, [user?.id]);
 
-  // Load convention hall bookings for user (Supabase + localStorage fallback + real-time reactivity)
+  // Load convention hall bookings authoritatively from Supabase (no localStorage/Express fallback)
   useEffect(() => {
     if (!user) {
       setDbConventionBookings([]);
@@ -736,90 +738,47 @@ export function ProfilePage({ initialTab = 'details' }) {
 
     async function fetchConventionBookings() {
       const currentUid = user.id || user.userId;
-      const userPhone = (user.phone || user.mobile || '').replace(/\D/g, '').slice(-10);
-      const userEmail = (user.email || '').trim().toLowerCase();
-      const merged = [];
-      const seenIds = new Set();
-
-      const addRecord = (r) => {
-        const key = r.id || r.bookingId || r.bookingRef || r.booking_id;
-        if (!key || seenIds.has(key)) return;
-        seenIds.add(key);
-        merged.push({
-          ...r,
-          id: key,
-          bookingId: key,
-          bookingRef: key,
-          category: 'hall',
-          title: r.hall_name || r.hallName || r.title || 'Convention Hall',
-          hallName: r.hall_name || r.hallName || r.title || 'Convention Hall',
-          date: r.date,
-          time: r.time || `${r.start_time || r.startTime || '09:00'} - ${r.end_time || r.endTime || '18:00'}`,
-          startTime: r.start_time || r.startTime || '09:00',
-          endTime: r.end_time || r.endTime || '18:00',
-          guests: r.guests ? (String(r.guests).includes('guest') ? r.guests : `${r.guests} guests`) : '100 guests',
-          guestsNum: Number(r.guestsNum || r.guests) || 100,
-          amount: Number(r.amount || r.total || 0),
-          amountPaid: r.amount_paid != null ? Number(r.amount_paid) : Number(r.amountPaid || r.amount || 0),
-          total: Number(r.amount || r.total || 0),
-          status: r.status || 'CONFIRMED',
-          refundPercent: r.refund_percent ?? r.refundPercent,
-          refundAmount: r.refund_amount ?? r.refundAmount,
-          refundStatus: r.refund_status ?? r.refundStatus,
-          cancelledAt: r.cancelled_at ?? r.cancelledAt,
-          areaName: r.venue_name || r.venueName || 'Hyderabad Club',
-          user_id: r.user_id || currentUid,
-          userId: r.userId || currentUid,
-        });
-      };
-
-      // 1. Supabase convention_bookings
-      if (user.id) {
-        try {
-          const { data, error } = await supabase
-            .from('convention_bookings')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-          if (!error && Array.isArray(data)) {
-            data.forEach(addRecord);
-          }
-        } catch (err) {
-          console.warn('Unable to load convention bookings from Supabase:', err);
-        }
+      if (!currentUid) {
+        if (mounted) setDbConventionBookings([]);
+        return;
       }
 
-      // 2. Local storage
       try {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const localList = JSON.parse(window.localStorage.getItem('frcc_convention_bookings') || '[]');
-          localList.forEach((r) => {
-            const rPhone = (r.phone || r.mobile || '').replace(/\D/g, '').slice(-10);
-            const rEmail = (r.email || '').trim().toLowerCase();
-            const matchesThisUser =
-              (currentUid && (r.user_id === currentUid || r.userId === currentUid)) ||
-              (userPhone && rPhone === userPhone) ||
-              (userEmail && rEmail === userEmail);
-            if (matchesThisUser) {
-              addRecord(r);
-            }
-          });
+        const list = await getMyHallBookings(currentUid);
+        const mapped = list.map((r) => ({
+          ...r,
+          id: r.id,
+          bookingId: r.id,
+          bookingRef: r.id,
+          category: 'hall',
+          title: r.hallName || 'Convention Hall',
+          hallName: r.hallName || 'Convention Hall',
+          date: r.date,
+          time: `${r.startTime || '09:00'} - ${r.endTime || '18:00'}`,
+          startTime: r.startTime || '09:00',
+          endTime: r.endTime || '18:00',
+          guests: r.guests ? `${r.guests} guests` : '100 guests',
+          guestsNum: Number(r.guests) || 100,
+          amount: Number(r.amount || 0),
+          amountPaid: r.amountPaid != null ? Number(r.amountPaid) : Number(r.amount || 0),
+          total: Number(r.amount || 0),
+          status: r.status || 'CONFIRMED',
+          refundPercent: r.refundPercent,
+          refundAmount: r.refundAmount,
+          refundStatus: r.refundStatus,
+          cancelledAt: r.cancelledAt,
+          areaName: r.venueName || r.areaName || 'Hyderabad Club',
+          user_id: r.userId || currentUid,
+          userId: r.userId || currentUid,
+        }));
+        if (mounted) {
+          setDbConventionBookings(mapped);
         }
-      } catch (_) {}
-
-      // 3. Session confirmation check
-      try {
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-          const conf = JSON.parse(window.sessionStorage.getItem('frcc_confirmed') || 'null');
-          if (conf && (conf.hallName || conf.hallId || conf.hall_name || String(conf.id || '').startsWith('FRCC-H-'))) {
-            addRecord(conf);
-          }
+      } catch (err) {
+        console.warn('Unable to load convention bookings from Supabase:', err);
+        if (mounted) {
+          setDbConventionBookings([]);
         }
-      } catch (_) {}
-
-      if (mounted) {
-        setDbConventionBookings(merged);
       }
     }
 
@@ -829,7 +788,6 @@ export function ProfilePage({ initialTab = 'details' }) {
     if (typeof window !== 'undefined') {
       window.addEventListener('frcc:convention-bookings-changed', reloadListener);
       window.addEventListener('frcc:booking-created', reloadListener);
-      window.addEventListener('storage', reloadListener);
     }
 
     return () => {
@@ -837,25 +795,26 @@ export function ProfilePage({ initialTab = 'details' }) {
       if (typeof window !== 'undefined') {
         window.removeEventListener('frcc:convention-bookings-changed', reloadListener);
         window.removeEventListener('frcc:booking-created', reloadListener);
-        window.removeEventListener('storage', reloadListener);
       }
     };
-  }, [user?.id, user?.userId, user?.phone, user?.email]);
+  }, [user?.id, user?.userId]);
 
   // Load dining table bookings for user
   useEffect(() => {
-    if (!user?.id) {
+    const uid = user?.id || user?.userId;
+    if (!uid) {
       setDbTableBookings([]);
       return undefined;
     }
     let mounted = true;
-    getMyTableBookings(user.id)
+    getMyTableBookings(uid)
       .then((records) => {
         if (!mounted || !records) return;
         setDbTableBookings(
           (records || []).map((r) => {
             const uuid = r.uuid || r.rawId || r.id;
             const ref = r.booking_ref || r.bookingRef || r.bookingId || r.id;
+            const loc = extractDiningLocation(r);
             return {
               ...r,
               id: r.id,
@@ -863,8 +822,13 @@ export function ProfilePage({ initialTab = 'details' }) {
               rawId: uuid,
               bookingRef: ref,
               bookingId: ref,
-              user_id: r.user_id || user.id,
-              userId: r.user_id || user.id,
+              user_id: r.user_id || uid,
+              userId: r.user_id || uid,
+              cityId: loc.cityId,
+              cityName: loc.cityName,
+              areaName: loc.areaName,
+              venueLocationName: loc.venueLocationName,
+              location: loc.location,
             };
           })
         );
@@ -875,7 +839,7 @@ export function ProfilePage({ initialTab = 'details' }) {
     return () => {
       mounted = false;
     };
-  }, [user?.id]);
+  }, [user?.id, user?.userId]);
 
   // Load parking slot bookings for user (Supabase + localStorage fallback + real-time reactivity)
   useEffect(() => {
@@ -1885,7 +1849,7 @@ export function ProfilePage({ initialTab = 'details' }) {
                             <>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Location</dt>
-                                <dd className="font-medium text-navy-900">{b.location || b.areaName || b.venueLocationName || b.venue_location || b.details?.areaName || 'Vijayawada Campus'}</dd>
+                                <dd className="font-medium text-navy-900">{b.location || b.areaName || b.venueLocationName || b.venue_location || b.details?.areaName || extractDiningLocation(b).location}</dd>
                               </div>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>

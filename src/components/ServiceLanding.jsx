@@ -60,10 +60,17 @@ const ACTIVITY_FILTER_MAP = {
 };
 
 export function ServiceLanding({ service = 'stay', hero }) {
-  const { user } = useApp();
+  const { user, isMember, membership, pushToast } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { openAuthPrompt } = useAuthModal();
+
+  const activeMemberCode = membership?.memberCode || membership?.memberId || user?.memberId || user?.memberCode || '';
+  const hasActiveMembership = Boolean(
+    (membership && (membership.memberId || membership.memberCode) && membership.status !== 'Cancelled') ||
+    (user && user.isMember && (!user.isDemo || (membership && (membership.memberId || membership.memberCode)))) ||
+    (isMember && Boolean(activeMemberCode))
+  );
 
   useEffect(() => {
     if (location.state?.authPrompt && location.state?.from && !user) {
@@ -77,6 +84,13 @@ export function ServiceLanding({ service = 'stay', hero }) {
     if (!user) {
       e.preventDefault();
       openAuthPrompt(to);
+      return;
+    }
+    if (normService === 'membership' && hasActiveMembership) {
+      e.preventDefault();
+      pushToast('You already have an active FRCC Membership!', 'info');
+      navigate('/membership/dashboard');
+      return;
     }
   }
 
@@ -230,13 +244,13 @@ export function ServiceLanding({ service = 'stay', hero }) {
         priceUnit: ' / lifetime',
         locationId: 'vja-club',
         locationName: 'FRCC Main Campus',
-        buttonLabel: 'Apply for membership',
-        to: `/membership/join?plan=${encodeURIComponent(p.id)}`,
+        buttonLabel: hasActiveMembership ? 'Active Member · View Dashboard' : 'Apply for membership',
+        to: hasActiveMembership ? '/membership/dashboard' : `/membership/join?plan=${encodeURIComponent(p.id)}`,
       }));
     }
 
     return [];
-  }, [normService, selectedArea, hallFilter, activityFilter]);
+  }, [normService, selectedArea, hallFilter, activityFilter, hasActiveMembership]);
 
   // 4. Determine Filter Chips
   const filterChips = useMemo(() => {
@@ -536,18 +550,20 @@ export function ServiceLanding({ service = 'stay', hero }) {
             <div className="container-x py-14 sm:py-16 text-center">
               <p className="eyebrow-on-dark">{FINAL_STRIP.eyebrow}</p>
               <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mt-2">
-                {FINAL_STRIP.title}
+                {hasActiveMembership ? 'Your Club Privileges are Active' : FINAL_STRIP.title}
               </h2>
               <p className="mt-3 max-w-xl mx-auto text-slate-300 leading-relaxed text-sm sm:text-base">
-                {FINAL_STRIP.description}
+                {hasActiveMembership
+                  ? `You already have an active FRCC Lifetime Membership${activeMemberCode ? ` (#${activeMemberCode})` : ''}. View your digital cards or book facilities with 30% member savings.`
+                  : FINAL_STRIP.description}
               </p>
               <div className="mt-8 flex justify-center">
                 <Link
-                  to={FINAL_STRIP.buttonLink}
-                  onClick={(e) => handleActionClick(e, FINAL_STRIP.buttonLink)}
+                  to={hasActiveMembership ? '/membership/dashboard' : FINAL_STRIP.buttonLink}
+                  onClick={(e) => handleActionClick(e, hasActiveMembership ? '/membership/dashboard' : FINAL_STRIP.buttonLink)}
                   className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-8 py-3.5 text-base font-semibold inline-flex items-center gap-2"
                 >
-                  {FINAL_STRIP.buttonText}
+                  {hasActiveMembership ? 'View Member Dashboard' : FINAL_STRIP.buttonText}
                   <ArrowRightIcon className="h-4 w-4" />
                 </Link>
               </div>

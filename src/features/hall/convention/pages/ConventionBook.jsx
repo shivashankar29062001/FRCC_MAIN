@@ -1,17 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useBooking } from '../context/BookingContext';
 import { api } from '../services/api';
+import {
+  findOverlappingInterval,
+  getHallAvailability,
+} from '../services/hallBookingService.js';
 import Stepper from '../components/Stepper';
 import HallCard from '../components/HallCard';
 import { GUEST_COUNT_CHIPS, HALL_TYPES, COOLING_OPTIONS } from '../config/halls.config.js';
 
 export default function ConventionBook() {
-  const { booking, updateBooking } = useBooking();
+  const { booking, updateBooking, clearSlotError } = useBooking();
   const navigate = useNavigate();
+  const location = useLocation();
   const [halls, setHalls] = useState([]);
   const [citiesData, setCitiesData] = useState([]);
   const [error, setError] = useState('');
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [availError, setAvailError] = useState('');
+  const preselectAppliedRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const roomType = searchParams.get('type') || 'ALL';
   const setRoomType = (val) => {
@@ -160,6 +168,90 @@ export default function ConventionBook() {
     }
   }, [loading, venues, halls, booking.venueId, booking.hallId, updateBooking]);
 
+  // Apply URL query parameters (?item=...&date=...&guests=...&event=...) or route state preselection once catalogs load
+  useEffect(() => {
+    if (loading || preselectAppliedRef.current) return;
+    preselectAppliedRef.current = true;
+
+    const paramHall = location.state?.preselectHall || searchParams.get('hallId') || searchParams.get('item');
+    const paramVenue = location.state?.preselectVenue || searchParams.get('venueId');
+    const paramDate = searchParams.get('date');
+    const paramGuests = searchParams.get('guests');
+    const paramEvent = searchParams.get('event');
+
+    const patch = {};
+    if (paramDate) patch.date = paramDate;
+    if (paramGuests && Number(paramGuests) >= 30) patch.guests = String(paramGuests);
+    if (paramEvent) patch.eventType = paramEvent;
+
+    if (paramHall) {
+      const matchedHall = halls.find((h) => h.id === paramHall);
+      if (matchedHall) {
+        setCityId(matchedHall.cityId);
+        setAreaId(matchedHall.areaId);
+        setVenueId(matchedHall.venueId);
+        Object.assign(patch, {
+          hallId: matchedHall.id,
+          hallName: matchedHall.name,
+          cooling: matchedHall.cooling,
+          capacity: matchedHall.capacity,
+          venueId: matchedHall.venueId,
+          venueName: matchedHall.venueName,
+          cityId: matchedHall.cityId,
+          cityName: matchedHall.cityName,
+          areaId: matchedHall.areaId,
+          areaName: matchedHall.areaName,
+        });
+      }
+    } else if (paramVenue) {
+      const matchedVenue = venues.find((v) => v.id === paramVenue) || halls.find((h) => h.venueId === paramVenue);
+      if (matchedVenue) {
+        setCityId(matchedVenue.cityId);
+        setAreaId(matchedVenue.areaId);
+        setVenueId(matchedVenue.venueId || matchedVenue.id);
+        Object.assign(patch, {
+          cityId: matchedVenue.cityId,
+          cityName: matchedVenue.cityName,
+          areaId: matchedVenue.areaId,
+          areaName: matchedVenue.areaName,
+          venueId: matchedVenue.venueId || matchedVenue.id,
+          venueName: matchedVenue.venueName || matchedVenue.name,
+        });
+      }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      updateBooking(patch);
+    }
+  }, [loading, halls, venues, location.state, searchParams, updateBooking]);
+
+  // Refresh availability on Step 1 whenever a hall and date are both selected (e.g., returned from SLOT_TAKEN or hold expiry)
+  useEffect(() => {
+    let active = true;
+    if (!booking.hallId || !booking.date) {
+      setBookedSlots([]);
+      setAvailError('');
+      return () => { active = false; };
+    }
+    getHallAvailability(booking.hallId, booking.date)
+      .then((list) => {
+        if (!active) return;
+        setBookedSlots(list);
+        setAvailError('');
+      })
+      .catch((err) => {
+        if (!active) return;
+        setBookedSlots([]);
+        setAvailError(err?.message || 'Unable to verify hall availability.');
+      });
+    return () => { active = false; };
+  }, [booking.hallId, booking.date, booking.startTime, booking.endTime, booking.slotError]);
+
+  const overlappingSlot = useMemo(() => {
+    if (!booking.date || !booking.startTime || !booking.endTime) return null;
+    return findOverlappingInterval(bookedSlots, booking.startTime, booking.endTime);
+  }, [bookedSlots, booking.date, booking.startTime, booking.endTime]);
+
   const cityName = useMemo(() => {
     const c = Array.isArray(citiesData) ? citiesData.find(c => c.id === cityId) : null;
     return c ? c.name : '';
@@ -169,6 +261,51 @@ export default function ConventionBook() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Stepper current={0} />
       <h1 className="text-3xl mb-6">Step 1: Select Location & Hall</h1>
+
+      {(booking.slotError || availError) && (
+        <div role="alert" className="bg-red-50 border border-red-300 text-red-800 rounded-lg p-4 mb-6 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold">{booking.slotError || availError}</p>
+              {booking.slotErrorCode === 'ALREADY_BOOKED_BY_YOU' && (
+                <Link to="/my-bookings" className="underline font-semibold text-navy inline-block mt-1">
+                  View My Bookings →
+                </Link>
+              )}
+              {bookedSlots.length > 0 && booking.date && (
+                <p className="text-xs text-red-700 mt-1">
+                  Already booked on {booking.date} for {booking.hallName || booking.hallId}:{' '}
+                  {bookedSlots.map((s) => `${s.startTime}–${s.endTime}`).join(', ')}
+                </p>
+              )}
+            </div>
+            {booking.slotError && (
+              <button
+                type="button"
+                onClick={clearSlotError}
+                className="text-xs border border-red-300 rounded px-2.5 py-1 hover:bg-red-100"
+              >
+                Dismiss
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {overlappingSlot && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-4 mb-6 text-sm">
+          {overlappingSlot.isMine ? (
+            <p className="font-semibold">
+              You already have a booking for this hall at this date and time ({booking.date} {overlappingSlot.startTime}–{overlappingSlot.endTime}).{' '}
+              <Link to="/my-bookings" className="underline text-navy">View My Bookings →</Link>
+            </p>
+          ) : (
+            <p className="font-semibold">
+              This hall is already booked for this date and time. Please choose another time or hall.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Location, filters & sort */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -252,18 +389,21 @@ export default function ConventionBook() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {sortedHalls.map((h, i) => (
           <HallCard key={h.id} hall={h} selected={booking.hallId === h.id} guests={guestsNum} eager={i < 3}
-            onSelect={(hall) => updateBooking({
-            hallId: hall.id,
-            hallName: hall.name,
-            cooling: hall.cooling,
-            capacity: hall.capacity,
-            venueId: hall.venueId,
-            venueName: hall.venueName,
-            cityId: hall.cityId,
-            cityName: hall.cityName,
-            areaId: hall.areaId,
-            areaName: hall.areaName,
-          })} />
+            onSelect={(hall) => {
+              clearSlotError();
+              updateBooking({
+                hallId: hall.id,
+                hallName: hall.name,
+                cooling: hall.cooling,
+                capacity: hall.capacity,
+                venueId: hall.venueId,
+                venueName: hall.venueName,
+                cityId: hall.cityId,
+                cityName: hall.cityName,
+                areaId: hall.areaId,
+                areaName: hall.areaName,
+              });
+            }} />
         ))}
       </div>
 

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import { createHallBooking, getHallAvailability } from '../services/hallBookingService.js';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr } from '../utils/format';
 import { HALL_CANCELLATION_POLICY_TEXT } from '../config/halls.config.js';
 import {
   INDIAN_MOBILE_MESSAGE,
-  INDIAN_MOBILE_PLACEHOLDER,
   isValidIndianMobile,
   sanitizeMobileInput,
 } from '../../../../utils/mobile.js';
@@ -15,16 +15,21 @@ import {
 const EVENT_TYPES = ['Wedding', 'Conference', 'Birthday', 'Corporate', 'Engagement', 'Workshop', 'Social Gathering', 'Other'];
 
 export default function ConventionDetails() {
-  const { booking, updateBooking } = useBooking();
+  const { booking, updateBooking, clearHold, clearSlotError } = useBooking();
   const navigate = useNavigate();
   const [hall, setHall] = useState(null);
   const [error, setError] = useState('');
+  const [holding, setHolding] = useState(false);
 
   useEffect(() => {
+    if (!booking.hallId || !booking.date || !booking.startTime || !booking.endTime) {
+      navigate('/convention/book');
+      return;
+    }
     api('/halls', { auth: false })
       .then(d => setHall(Array.isArray(d?.halls) ? (d.halls.find(h => h.id === booking.hallId) || null) : null))
       .catch(() => {});
-  }, [booking.hallId]);
+  }, [booking.hallId, booking.date, booking.startTime, booking.endTime, navigate]);
 
   const hours = booking.startTime && booking.endTime
     ? (Number(booking.endTime.split(':')[0]) * 60 + Number(booking.endTime.split(':')[1]) - Number(booking.startTime.split(':')[0]) * 60 - Number(booking.startTime.split(':')[1])) / 60
@@ -36,7 +41,8 @@ export default function ConventionDetails() {
     : 0;
   const gst = Math.round(hallCharge * 0.18);
 
-  const next = () => {
+  const next = async () => {
+    if (holding) return;
     if (!booking.eventType) return setError('Please select an event type.');
     if (!booking.guests || Number(booking.guests) < 30) return setError('Enter a guest count of at least 30.');
     if (Number(booking.guests) > 10000) return setError('Guest count cannot exceed 10,000.');
@@ -46,8 +52,64 @@ export default function ConventionDetails() {
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
     if (!isValidIndianMobile(booking.phone)) return setError(INDIAN_MOBILE_MESSAGE);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(booking.email)) return setError('Enter a valid email address.');
+
     setError('');
-    navigate('/convention/payment');
+    clearSlotError();
+    setHolding(true);
+
+    try {
+      // Reserve slot in Supabase with status = 'held' and hold_expires_at = now() + 10 minutes before opening payment.
+      const held = await createHallBooking({
+        hallId: booking.hallId,
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        guests: Number(booking.guests),
+        eventType: booking.eventType,
+        organizerName: booking.organizerName.trim(),
+        phone: booking.phone,
+        email: booking.email.trim(),
+        eventDetails: booking.eventDetails || '',
+        specialRequests: booking.specialRequests || '',
+        venueName: booking.venueName || hall?.venueName || '',
+        cityName: booking.cityName || hall?.cityName || '',
+        areaName: booking.areaName || hall?.areaName || '',
+        cooling: booking.cooling || hall?.cooling || '',
+        heldBookingId: booking.heldBookingId || null,
+      });
+
+      updateBooking({
+        heldBookingId: held.id,
+        holdExpiresAt: held.holdExpiresAt,
+        serverHallCharge: held.hallCharge,
+        serverGst: held.gst,
+        serverAmount: held.amount,
+        slotError: '',
+        slotErrorCode: '',
+      });
+      navigate('/convention/payment');
+    } catch (err) {
+      if (err?.code === 'SLOT_TAKEN' || err?.code === 'ALREADY_BOOKED_BY_YOU') {
+        await getHallAvailability(booking.hallId, booking.date).catch(() => []);
+        clearHold();
+        updateBooking({
+          heldBookingId: null,
+          holdExpiresAt: null,
+          serverHallCharge: null,
+          serverGst: null,
+          serverAmount: null,
+          slotError: err.code === 'SLOT_TAKEN'
+            ? 'This time was just booked by someone else'
+            : 'You already have a booking for this hall at this date and time',
+          slotErrorCode: err.code,
+        });
+        navigate('/convention/book');
+        return;
+      }
+      setError(err?.message || 'Could not hold the hall slot. Please try again.');
+    } finally {
+      setHolding(false);
+    }
   };
 
   const inputClass = "border rounded p-2 w-full";
@@ -104,8 +166,10 @@ export default function ConventionDetails() {
 
           {error && <p className="text-red-600">{error}</p>}
           <div className="flex justify-between">
-            <button onClick={() => navigate('/convention/date')} className="border border-navy text-navy px-6 py-2 rounded">← Back</button>
-            <button onClick={next} className="bg-navy text-gold px-8 py-2 rounded font-semibold">Next →</button>
+            <button type="button" onClick={() => navigate('/convention/date')} className="border border-navy text-navy px-6 py-2 rounded">← Back</button>
+            <button type="button" onClick={next} disabled={holding} className="bg-navy text-gold px-8 py-2 rounded font-semibold disabled:opacity-50">
+              {holding ? 'Holding slot…' : 'Continue to Payment →'}
+            </button>
           </div>
         </div>
       </div>

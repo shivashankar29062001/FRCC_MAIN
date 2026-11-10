@@ -155,9 +155,16 @@ function getSlot(service) {
 }
 
 export function ServiceHero({ service = 'stay' }) {
-  const { user } = useApp();
+  const { user, isMember, membership } = useApp();
   const { openAuthPrompt } = useAuthModal();
   const [headlineDone, setHeadlineDone] = useState(false);
+
+  const activeMemberCode = membership?.memberCode || membership?.memberId || user?.memberId || user?.memberCode || '';
+  const hasActiveMembership = Boolean(
+    (membership && (membership.memberId || membership.memberCode) && membership.status !== 'Cancelled') ||
+    (user && user.isMember && (!user.isDemo || (membership && (membership.memberId || membership.memberCode)))) ||
+    (isMember && Boolean(activeMemberCode))
+  );
   const data = SERVICE_HERO_DATA[service] || SERVICE_HERO_DATA.stay;
   const slot = getSlot(service);
   const isHub = service === 'hub';
@@ -256,25 +263,58 @@ export function ServiceHero({ service = 'stay' }) {
         <div id="booking" className="service-hero-card-wrap scroll-mt-24">
           {service === 'membership' ? (
             <div className="booking-card booking-card--compact">
-              <p className="booking-eyebrow">{HERO_CARD.eyebrow}</p>
-              <h2 className="booking-title font-display">{HERO_CARD.title}</h2>
-              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
-                {HERO_CARD.description}
-              </p>
-              <div className="mt-6">
-                <Link
-                  to={HERO_CARD.buttonLink}
-                  onClick={(e) => {
-                    if (!user) {
-                      e.preventDefault();
-                      openAuthPrompt(HERO_CARD.buttonLink);
-                    }
-                  }}
-                  className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
-                >
-                  {HERO_CARD.buttonText}
-                </Link>
-              </div>
+              {hasActiveMembership ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="booking-eyebrow text-gold-400 font-semibold uppercase tracking-wider">Active Member</p>
+                    <span className="tag tag-gold !text-[10px] !py-0.5 !px-2 font-bold">Enrolled</span>
+                  </div>
+                  <h2 className="booking-title font-display text-white mt-1">Membership Active</h2>
+                  <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    You already have an active FRCC Club Membership
+                    {activeMemberCode ? ` (#${activeMemberCode})` : ''}.
+                    Your 30% savings are unlocked across all club bookings.
+                  </p>
+                  <div className="mt-5 space-y-2.5">
+                    <Link
+                      to="/membership/dashboard"
+                      className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    >
+                      <span>Membership Dashboard</span>
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      to="/book"
+                      className="btn-base border border-white/20 bg-white/10 text-white hover:bg-white/20 w-full justify-center py-2 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Book with Member Rates</span>
+                      <ArrowRightIcon className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="booking-eyebrow">{HERO_CARD.eyebrow}</p>
+                  <h2 className="booking-title font-display">{HERO_CARD.title}</h2>
+                  <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                    {HERO_CARD.description}
+                  </p>
+                  <div className="mt-6">
+                    <Link
+                      to={HERO_CARD.buttonLink}
+                      onClick={(e) => {
+                        if (!user) {
+                          e.preventDefault();
+                          openAuthPrompt(HERO_CARD.buttonLink);
+                        }
+                      }}
+                      className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-3 text-sm font-semibold inline-flex items-center cursor-pointer"
+                    >
+                      {HERO_CARD.buttonText}
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           ) : service === 'dining' ? (
             <DiningHeroCard />

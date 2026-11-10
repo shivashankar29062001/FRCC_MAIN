@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+import {
+  confirmHallBooking,
+  expireHallHold,
+  getHallAvailability,
+} from '../services/hallBookingService.js';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr, CANCELLATION_POLICY_TEXT } from '../utils/format';
-import { readSession } from '../../../../app/session.js';
 import * as pay from '../services/payment';
 import UpiIdFlow from '../components/payment/UpiIdFlow';
 import UpiAppPicker from '../components/payment/UpiAppPicker';
@@ -51,7 +55,7 @@ function findGroup(methodId) {
 }
 
 export default function ConventionPayment() {
-  const { booking, setConfirmed } = useBooking();
+  const { booking, updateBooking, clearHold, clearSlotError, setConfirmed } = useBooking();
   const navigate = useNavigate();
   const [hall, setHall] = useState(null);
   
@@ -66,36 +70,61 @@ export default function ConventionPayment() {
   const [phase, setPhase] = useState('idle'); // idle | processing | failed
   const [error, setError] = useState('');
   const [forceFail, setForceFail] = useState(false);
-  const [hold, setHold] = useState(600);
+  const [hold, setHold] = useState(() => {
+    if (!booking.holdExpiresAt) return 600;
+    return Math.max(0, Math.floor((new Date(booking.holdExpiresAt).getTime() - Date.now()) / 1000));
+  });
   const [expired, setExpired] = useState(false);
   const [otp, setOtp] = useState(null); // {attempts, resendIn}
   const [showTest, setShowTest] = useState(false);
   const pendingRef = useRef(null);
 
   useEffect(() => {
-    if (!booking.hallId) { navigate('/convention/book'); return; }
+    if (!booking.hallId || !booking.date || !booking.startTime || !booking.endTime) {
+      navigate('/convention/book');
+      return;
+    }
+    if (!booking.heldBookingId) {
+      navigate('/convention/details');
+      return;
+    }
     api('/halls', { auth: false })
       .then(d => setHall(Array.isArray(d?.halls) ? (d.halls.find(h => h.id === booking.hallId) || null) : null))
       .catch(() => {});
-  }, [booking.hallId]);
+  }, [booking.hallId, booking.date, booking.startTime, booking.endTime, booking.heldBookingId, navigate]);
 
   useEffect(() => {
-    const t = setInterval(() => setHold(h => {
-      if (h <= 1) { setExpired(true); clearInterval(t); return 0; }
-      return h - 1;
-    }), 1000);
+    if (!booking.holdExpiresAt || !booking.heldBookingId) return undefined;
+
+    const updateRemaining = () => {
+      const remaining = Math.max(0, Math.floor((new Date(booking.holdExpiresAt).getTime() - Date.now()) / 1000));
+      setHold(remaining);
+      if (remaining <= 0) {
+        setExpired(true);
+        expireHallHold(booking.heldBookingId).catch(() => {});
+        return true;
+      }
+      return false;
+    };
+
+    if (updateRemaining()) return undefined;
+
+    const t = setInterval(() => {
+      if (updateRemaining()) clearInterval(t);
+    }, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [booking.holdExpiresAt, booking.heldBookingId]);
 
   const hours = booking.startTime && booking.endTime
     ? (Number(booking.endTime.split(':')[0]) * 60 + Number(booking.endTime.split(':')[1]) - Number(booking.startTime.split(':')[0]) * 60 - Number(booking.startTime.split(':')[1])) / 60
     : 0;
-  const hallCharge = hall
+  const computedHallCharge = hall
     ? (hall.pricingUnit === 'per-plate' || hall.pricePerPlate)
       ? Math.round(Number(booking.guests || 30) * (hall.pricePerPlate || hall.price || 1500))
       : (hours > 0 ? Math.round(hours * hall.pricePerHour) : 0)
     : 0;
-  const gst = Math.round(hallCharge * 0.18);
+  const hallCharge = booking.serverHallCharge != null ? Number(booking.serverHallCharge) : computedHallCharge;
+  const gst = booking.serverGst != null ? Number(booking.serverGst) : Math.round(hallCharge * 0.18);
   const fee = FEE[selectedMethod] || 0;
   const total = hallCharge + gst + fee;
 
@@ -113,86 +142,82 @@ export default function ConventionPayment() {
     setOtp(null);
   };
 
-  const createBooking = async (extra) => {
-    let currentUser = null;
-    try {
-      currentUser = readSession();
-    } catch (_) {}
-
-    const data = await api('/bookings', {
-      method: 'POST',
-      body: {
-        userId: currentUser?.id || currentUser?.userId || null,
-        hallId: booking.hallId,
-        date: booking.date,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        guests: Number(booking.guests),
-        eventType: booking.eventType,
-        eventDetails: booking.eventDetails,
-        organizerName: booking.organizerName || currentUser?.name || 'Organizer',
-        phone: booking.phone || currentUser?.phone || currentUser?.mobile || '',
-        email: booking.email || currentUser?.email || '',
-        specialRequests: booking.specialRequests,
-        hallCharge,
-        convenienceFee: fee,
-        amount: total,
-        paymentMethod: selectedMethod,
-        paymentStatus: extra.paymentStatus,
-        amountPaid: extra.amountPaid,
-        balanceDue: extra.balanceDue,
-        maskedInstrument: extra.maskedInstrument,
-        upiIdMasked: extra.maskedInstrument,
-        transactionRef: extra.transactionRef,
-        emiTenure: extra.emiTenure,
-        emiMonthlyAmount: extra.emiMonthlyAmount,
-        gstin: extra.gstin,
-        utrNumber: extra.utrNumber,
-        notifyUpdates: booking.notifyUpdates !== false,
-        venueName: hall?.venueName,
-        area: hall?.area,
-        city: hall?.city,
-        hallName: hall?.name || booking.hallName || 'Grand Convention Hall',
-        cityName: hall?.cityName,
-        areaName: hall?.areaName,
-      },
-    });
-    return data.booking;
-  };
-
   const withTimeout = (p, ms = 15000) => Promise.race([
     p,
     new Promise((_, rej) => setTimeout(() => rej(new Error('Payment timed out after 15 seconds. Please try again.')), ms)),
   ]);
 
+  const handleReturnOnSlotTaken = async (err) => {
+    await getHallAvailability(booking.hallId, booking.date).catch(() => []);
+    clearHold();
+    updateBooking({
+      heldBookingId: null,
+      holdExpiresAt: null,
+      serverHallCharge: null,
+      serverGst: null,
+      serverAmount: null,
+      slotError: err?.code === 'SLOT_TAKEN'
+        ? 'This time was just booked by someone else'
+        : 'You already have a booking for this hall at this date and time',
+      slotErrorCode: err?.code || 'SLOT_TAKEN',
+    });
+    navigate('/convention/book');
+  };
+
+  const handleExpiredRedirect = () => {
+    expireHallHold(booking.heldBookingId).catch(() => {});
+    clearHold();
+    updateBooking({
+      heldBookingId: null,
+      holdExpiresAt: null,
+      serverHallCharge: null,
+      serverGst: null,
+      serverAmount: null,
+      slotError: 'Your 10-minute slot hold has expired. Please choose your hall, date and time again.',
+      slotErrorCode: 'HOLD_EXPIRED',
+    });
+    navigate('/convention/book');
+  };
+
   const finish = async () => {
     if (phase === 'processing') return;
+    if (!booking.heldBookingId) {
+      navigate('/convention/details');
+      return;
+    }
+    if (booking.holdExpiresAt && Date.now() >= new Date(booking.holdExpiresAt).getTime()) {
+      setExpired(true);
+      expireHallHold(booking.heldBookingId).catch(() => {});
+      return;
+    }
+
     setPhase('processing'); setError('');
     let ref = '';
     try {
       const instant = NO_OTP_INSTANT.includes(selectedMethod);
       ref = 'TXN' + Date.now();
       pay.setForceFailure(forceFail);
-      if (!instant) {
-        const r = await withTimeout(pay.initiatePayment(selectedMethod, activeData));
-        ref = r.ref;
-      } else {
-        ref = await withTimeout(pay.initiatePayment(selectedMethod, activeData).then(r => r.ref));
-      }
+      // TODO-RAZORPAY: Replace simulated initiatePayment with Razorpay Checkout order + signature verification.
+      const paymentResult = await withTimeout(pay.initiatePayment(selectedMethod, activeData));
+      ref = paymentResult.ref;
 
-      const mapStatus = selectedMethod === 'ADVANCE_PAY_AT_VENUE' ? 'PARTIAL' : instant ? 'PENDING_VERIFICATION' : 'PAID';
-      const bookingPayload = {
-        maskedInstrument: activeData.maskedInstrument || '',
-        paymentStatus: mapStatus,
+      const amountPaid = advanceData?.advance != null ? advanceData.advance : instant ? 0 : total;
+      const confirmedResult = await withTimeout(confirmHallBooking({
+        bookingId: booking.heldBookingId,
+        paymentMethod: selectedMethod,
+        amountPaid,
         transactionRef: ref,
-        amountPaid: advanceData?.advance != null ? advanceData.advance : instant ? 0 : total,
-        balanceDue: advanceData?.balanceDue != null ? advanceData.balanceDue : instant ? total : 0,
-        emiTenure: activeData.emiTenure || null, emiMonthlyAmount: activeData.emiMonthlyAmount || null,
-        gstin: activeData.gstin || null, utrNumber: activeData.utrNumber || null,
-      };
+        maskedInstrument: activeData.maskedInstrument || '',
+        emiTenure: activeData.emiTenure || null,
+        emiMonthlyAmount: activeData.emiMonthlyAmount || null,
+        gstin: activeData.gstin || null,
+        utrNumber: activeData.utrNumber || null,
+      }));
 
-      const created = await withTimeout(createBooking(bookingPayload));
+      const created = confirmedResult.booking;
       pendingRef.current = null;
+      clearHold();
+      clearSlotError();
       setConfirmed(created);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: created }));
@@ -201,12 +226,22 @@ export default function ConventionPayment() {
       navigate('/convention/confirmation');
     } catch (e) {
       console.error('Payment flow error:', e);
+      if (e?.code === 'SLOT_TAKEN' || e?.code === 'ALREADY_BOOKED_BY_YOU') {
+        setPhase('idle');
+        await handleReturnOnSlotTaken(e);
+        return;
+      }
+      if (e?.code === 'HOLD_EXPIRED') {
+        setPhase('idle');
+        setExpired(true);
+        return;
+      }
       setPhase('failed');
-      if (ref && !/timed out/i.test(e.message || '')) {
+      if (ref && e?.code !== 'MIGRATION_REQUIRED' && !/timed out|declined|failed/i.test(e?.message || '')) {
         pendingRef.current = { ref, method: selectedMethod, amount: total };
-        setError(`Payment received but booking failed. Your reference is ${ref}. Please contact support to complete the booking or request a refund.`);
+        setError(`Payment received but confirmation failed (${e.message}). Reference: ${ref}. Please contact support.`);
       } else {
-        setError(e.message || 'Something went wrong. Please try again.');
+        setError(e?.message || 'Something went wrong. Please try again.');
       }
     }
   };
@@ -243,7 +278,7 @@ export default function ConventionPayment() {
       case 'EMI_NO_COST': return total >= 10000 ? <EmiPicker amount={total} kind="emi_no_cost" onValid={setForm('EMI_NO_COST')} /> : <p className="text-gray-500">No-Cost EMI is available on totals above ₹10,000.</p>;
       case 'EMI_DEBIT': return <EmiPicker amount={total} kind="emi_debit" onValid={setForm('EMI_DEBIT')} />;
       case 'PAY_LATER': return <PayLaterPicker amount={total} onValid={setForm('PAY_LATER')} />;
-      case 'BANK_TRANSFER': return <BankTransferForm bookingRef={booking.id || 'FRCC'} onValid={setForm('BANK_TRANSFER')} />;
+      case 'BANK_TRANSFER': return <BankTransferForm bookingRef={booking.heldBookingId || booking.id || 'FRCC'} onValid={setForm('BANK_TRANSFER')} />;
       case 'CORPORATE_INVOICE': return <CorporateForm onValid={setForm('CORPORATE_INVOICE')} />;
       case 'ADVANCE_PAY_AT_VENUE': return <AdvanceForm total={total} onValid={setForm('ADVANCE_PAY_AT_VENUE')} />;
       default: return null;
@@ -422,8 +457,8 @@ export default function ConventionPayment() {
         <div className="fixed inset-0 bg-navy-900/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded p-6 max-w-sm text-center">
             <h3 className="text-xl mb-2">Slot hold expired</h3>
-            <p className="text-sm text-gray-600 mb-4">Your 10-minute hold has ended. Please choose your date and slot again.</p>
-            <button onClick={() => navigate('/convention/date')} className="bg-navy text-gold rounded px-6 py-2 font-semibold">Choose a new slot</button>
+            <p className="text-sm text-gray-600 mb-4">Your 10-minute hold has ended and the slot has been released. Please choose your hall, date and slot again.</p>
+            <button type="button" onClick={handleExpiredRedirect} className="bg-navy text-gold rounded px-6 py-2 font-semibold">Return to Step 1</button>
           </div>
         </div>
       )}

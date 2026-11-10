@@ -9,6 +9,66 @@ import { isBookingCancelledLocally } from '../services/cancellationService.js';
 
 const isMock = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_MOCK === 'true';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function isUuid(val) {
+  return typeof val === 'string' && UUID_REGEX.test(val.trim());
+}
+
+/**
+ * Extracts normalized campus/city location metadata from dining booking fields or embedded [Location: ...] notes tag.
+ */
+export function extractDiningLocation(b, localMatch = null) {
+  const notesStr = String(b?.notes || b?.special_request || b?.specialRequest || localMatch?.notes || '');
+  const locMatch = notesStr.match(/\[Location:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/i);
+  if (locMatch) {
+    const cityId = locMatch[1].trim();
+    const cityName = locMatch[2].trim();
+    const areaName = locMatch[3].trim();
+    const venueLocationName = locMatch[4].trim();
+    const isHyd = cityId.toLowerCase().includes('hyd') || cityName.toLowerCase().includes('hyd') || areaName.toLowerCase().includes('hyd');
+    return {
+      cityId: isHyd ? 'hyd' : cityId,
+      cityName: isHyd ? 'Hyderabad' : cityName,
+      areaName: isHyd ? 'Hyderabad Campus' : areaName,
+      venueLocationName,
+      location: venueLocationName && areaName && !venueLocationName.includes(areaName)
+        ? `${areaName} — ${venueLocationName}`
+        : (areaName || venueLocationName),
+    };
+  }
+
+  if (localMatch && (localMatch.location || localMatch.areaName || localMatch.cityName)) {
+    const lText = `${localMatch.cityId || ''} ${localMatch.cityName || ''} ${localMatch.areaName || ''} ${localMatch.location || ''}`.toLowerCase();
+    const isHyd = lText.includes('hyd');
+    return {
+      cityId: localMatch.cityId || (isHyd ? 'hyd' : 'vja'),
+      cityName: localMatch.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+      areaName: localMatch.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+      venueLocationName: localMatch.venueLocationName || (isHyd ? 'Hyderabad Club Dining' : 'FRCC Clubhouse Dining'),
+      location: localMatch.location || localMatch.areaName || (isHyd ? 'Hyderabad Campus — Hyderabad Club Dining' : 'Vijayawada Campus'),
+    };
+  }
+
+  const allText = `${notesStr} ${b?.city_id || b?.cityId || ''} ${b?.city_name || b?.cityName || ''} ${b?.area_name || b?.areaName || ''} ${b?.venue_location_name || b?.venueLocationName || ''} ${b?.location || ''}`.toLowerCase();
+  if (allText.includes('hyd') || allText.includes('hyderabad')) {
+    return {
+      cityId: 'hyd',
+      cityName: 'Hyderabad',
+      areaName: 'Hyderabad Campus',
+      venueLocationName: 'Hyderabad Club Dining',
+      location: 'Hyderabad Campus — Hyderabad Club Dining',
+    };
+  }
+
+  return {
+    cityId: b?.city_id || b?.cityId || 'vja',
+    cityName: b?.city_name || b?.cityName || 'Vijayawada',
+    areaName: b?.area_name || b?.areaName || 'Vijayawada Campus',
+    venueLocationName: b?.venue_location_name || b?.venueLocationName || 'FRCC Clubhouse Dining',
+    location: b?.location || b?.area_name || b?.areaName || 'Vijayawada Campus',
+  };
+}
+
 // In-memory and localStorage persistence for table bookings
 const BASE_STORAGE_KEY = 'frcc_table_bookings_v1';
 
@@ -140,10 +200,10 @@ export async function createTableBooking(payload) {
     sessionUserId = sessionData?.session?.user?.id || null;
   } catch (_) {}
 
-  const currentUserId = payload.userId || payload.user_id || sessionUserId;
+  const currentUserId = sessionUserId || payload.userId || payload.user_id;
 
-  // 1. Mock mode handling
-  if (isMock) {
+  // 1. Mock or demo user (non-UUID) handling
+  if (isMock || (currentUserId && !isUuid(currentUserId))) {
     const stored = getStoredBookings(currentUserId);
     const existing = stored.find((b) => b.client_request_id === clientRequestId);
     if (existing) {
@@ -287,10 +347,26 @@ export async function getMyTableBookings(userId = null) {
     return [];
   }
 
-  if (isMock) {
-    const localList = getStoredBookings(uid);
+  const localList = getStoredBookings(uid);
+
+  if (isMock || !isUuid(uid)) {
     return localList
-      .filter((b) => b.user_id === uid)
+      .filter((b) => !b.user_id || b.user_id === uid || b.userId === uid)
+      .map((b) => {
+        const loc = extractDiningLocation(b);
+        return {
+          ...b,
+          city_id: loc.cityId,
+          cityId: loc.cityId,
+          city_name: loc.cityName,
+          cityName: loc.cityName,
+          venue_location_name: loc.venueLocationName,
+          venueLocationName: loc.venueLocationName,
+          area_name: loc.areaName,
+          areaName: loc.areaName,
+          location: loc.location,
+        };
+      })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }
 
@@ -305,10 +381,23 @@ export async function getMyTableBookings(userId = null) {
     throw error;
   }
 
-  return (data || []).map((b) => {
+  const localByRef = new Map();
+  localList.forEach((l) => {
+    if (l.booking_ref) localByRef.set(String(l.booking_ref), l);
+    if (l.id) localByRef.set(String(l.id), l);
+    if (l.client_request_id) localByRef.set(String(l.client_request_id), l);
+  });
+
+  const remoteMapped = (data || []).map((b) => {
     const venueName = b.dining_venues?.name 
       || LOCAL_VENUES.find((v) => v.id === b.venue_id)?.name 
       || b.venue_id;
+    const localMatch =
+      localByRef.get(String(b.booking_ref)) ||
+      localByRef.get(String(b.id)) ||
+      localByRef.get(String(b.client_request_id)) ||
+      null;
+    const loc = extractDiningLocation(b, localMatch);
 
     return {
       id: b.id,
@@ -324,6 +413,15 @@ export async function getMyTableBookings(userId = null) {
       venue_id: b.venue_id,
       venue_name: venueName,
       venueName,
+      city_id: loc.cityId,
+      cityId: loc.cityId,
+      city_name: loc.cityName,
+      cityName: loc.cityName,
+      venue_location_name: loc.venueLocationName,
+      venueLocationName: loc.venueLocationName,
+      area_name: loc.areaName,
+      areaName: loc.areaName,
+      location: loc.location,
       date: b.date,
       time: b.time_slot,
       slot: b.time_slot,
@@ -340,4 +438,25 @@ export async function getMyTableBookings(userId = null) {
       createdAt: b.created_at,
     };
   });
+
+  const seenRefs = new Set(remoteMapped.map((r) => String(r.booking_ref || r.id)));
+  const extraLocals = localList
+    .filter((l) => !seenRefs.has(String(l.booking_ref || l.id)))
+    .map((b) => {
+      const loc = extractDiningLocation(b);
+      return {
+        ...b,
+        city_id: loc.cityId,
+        cityId: loc.cityId,
+        city_name: loc.cityName,
+        cityName: loc.cityName,
+        venue_location_name: loc.venueLocationName,
+        venueLocationName: loc.venueLocationName,
+        area_name: loc.areaName,
+        areaName: loc.areaName,
+        location: loc.location,
+      };
+    });
+
+  return [...remoteMapped, ...extraLocals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }

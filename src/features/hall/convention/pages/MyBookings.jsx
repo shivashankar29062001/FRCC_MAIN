@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { api } from '../services/api';
+import {
+  cancelHallBooking,
+  getMyHallBookings,
+  markHallBookingPaid,
+} from '../services/hallBookingService.js';
 import { inr, hoursUntilEvent, getBookingRefundPolicy, getRefundMethod, maskPhone, maskEmail } from '../utils/format';
-import * as pay from '../services/payment';
-import { getCurrentUser } from '../services/auth';
 
 const TABS = ['Upcoming', 'Completed', 'Cancelled'];
 
 function classify(b) {
-  if (b.status === 'CANCELLED') return 'Cancelled';
+  const statusUpper = String(b.status || '').toUpperCase();
+  if (statusUpper === 'CANCELLED') return 'Cancelled';
   const over = hoursUntilEvent(b.date, b.endTime) < 0;
   return over ? 'Completed' : 'Upcoming';
 }
@@ -23,13 +26,14 @@ export default function MyBookings() {
   const [cancelling, setCancelling] = useState(false);
   const [cancelNotice, setCancelNotice] = useState(false);
 
-  const user = getCurrentUser();
-
   const load = (silent = false) => {
     if (!silent) setLoading(true);
-    api('/bookings/my')
-      .then(d => setBookings(d.bookings || []))
-      .catch(e => setError(e.message))
+    getMyHallBookings()
+      .then((list) => {
+        setBookings(list);
+        setError('');
+      })
+      .catch((e) => setError(e.message || 'Unable to load bookings.'))
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
@@ -47,12 +51,11 @@ export default function MyBookings() {
     if (!cancelFor) return;
     setCancelling(true);
     try {
-      const r = await api(`/bookings/${cancelFor.id}/cancel`, { method: 'POST' });
-      setMsg(r.message || 'Booking cancelled successfully.');
+      await cancelHallBooking(cancelFor.id);
+      setMsg('Booking cancelled successfully. Your slot is now available.');
       setCancelNotice(true);
       setCancelFor(null);
       load();
-      pay.refund(cancelFor.id, r.booking?.refundAmount ?? 0).catch(e => console.error('Refund call failed:', e.message));
     } catch (e) {
       setError(e.message || 'Failed to cancel booking.');
     } finally {
@@ -116,12 +119,16 @@ export default function MyBookings() {
                     Paid via {(b.paymentMethod || 'UPI_ID').replaceAll('_', ' ')} {b.maskedInstrument ? `• ${b.maskedInstrument}` : ''}
                     {b.balanceDue > 0 ? ` • Due at venue: ${inr(b.balanceDue)}` : ''}
                   </p>
-                  {b.status === 'PENDING_VERIFICATION' && (
+                  {(b.status === 'PENDING_VERIFICATION' || b.paymentStatus === 'PENDING_VERIFICATION') && b.status !== 'CANCELLED' && (
                     <button
                       onClick={async () => {
-                        await api(`/bookings/${b.id}/mark-paid`, { method: 'POST' });
-                        setMsg('Marked as paid (admin mock).');
-                        load();
+                        try {
+                          await markHallBookingPaid(b.id);
+                          setMsg('Marked as paid.');
+                          load();
+                        } catch (e) {
+                          setError(e.message || 'Could not update payment status.');
+                        }
                       }}
                       className="text-xs border border-amber-600 text-amber-700 rounded px-2 py-0.5 mt-1"
                     >

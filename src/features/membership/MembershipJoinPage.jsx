@@ -175,9 +175,16 @@ async function processPassportPhoto(file) {
 }
 
 export function MembershipJoinPage() {
-  const { user, membership, saveMembership, pushToast } = useApp();
+  const { user, isMember, membership, saveMembership, pushToast } = useApp();
   const [searchParams] = useSearchParams();
   const planParam = (searchParams.get('plan') || searchParams.get('item') || '').toLowerCase();
+
+  const activeMemberCode = membership?.memberCode || membership?.memberId || user?.memberId || user?.memberCode || '';
+  const hasActiveMembership = Boolean(
+    (membership && (membership.memberId || membership.memberCode) && membership.status !== 'Cancelled') ||
+    (user && user.isMember && (!user.isDemo || (membership && (membership.memberId || membership.memberCode)))) ||
+    (isMember && Boolean(activeMemberCode))
+  );
 
   // Initialize wizard state from sessionStorage or defaults
   const [wizardState, setWizardState] = useState(() => {
@@ -270,6 +277,15 @@ export function MembershipJoinPage() {
   const [submitError, setSubmitError] = useState('');
   const [paying, setPaying] = useState(false);
   const submittedRef = useRef(false);
+  const [justEnrolled, setJustEnrolled] = useState(false);
+  const notifiedMemberRef = useRef(false);
+
+  useEffect(() => {
+    if (hasActiveMembership && !justEnrolled && !notifiedMemberRef.current) {
+      notifiedMemberRef.current = true;
+      pushToast('You already have an active FRCC Membership!', 'error');
+    }
+  }, [hasActiveMembership, justEnrolled, pushToast]);
 
   // TODO-REMOVE-TEST-COUPON
   const [showCouponInput, setShowCouponInput] = useState(false);
@@ -728,6 +744,11 @@ export function MembershipJoinPage() {
 
   // Step 6 Payment submission
   async function handlePay() {
+    if (hasActiveMembership && !justEnrolled) {
+      setSubmitError('You already have an active membership. You cannot apply for another membership.');
+      pushToast('You already have an active FRCC Membership!', 'error');
+      return;
+    }
     if (finalPrice > 0 && !formData.paymentMethod) {
       setFieldErrors({ paymentMethod: 'Choose a payment method.' });
       return;
@@ -797,6 +818,7 @@ export function MembershipJoinPage() {
           aadhaarMasked,
         };
 
+        setJustEnrolled(true);
         const saved = await saveMembership(record);
         const assignedCode = saved?.memberCode || saved?.memberId || confirmedMemberId || '';
 
@@ -872,6 +894,7 @@ export function MembershipJoinPage() {
         },
       });
     } catch (err) {
+      setJustEnrolled(false);
       console.error('[MembershipJoinPage] Failed to save membership or process payment:', err);
       submittedRef.current = false;
       setPaying(false);
@@ -897,6 +920,85 @@ export function MembershipJoinPage() {
       total: finalPrice,
     };
   }, [selectedPlan, formData.fullName, formData.mobile, formData.maritalStatus, formData.occupationType, planBasePrice, discountAmount, finalPrice, appliedCoupon]);
+
+  if (hasActiveMembership && !justEnrolled) {
+    return (
+      <div className="min-h-[80vh] bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="w-full max-w-xl">
+          <Card className="shadow-lift border-slate-200 text-center p-8 sm:p-10">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gold-50 border border-gold-200 text-gold-600 mb-5 shadow-sm">
+              <CheckCircleIcon className="h-9 w-9 text-gold-600" />
+            </div>
+
+            <span className="tag tag-gold !text-xs font-semibold uppercase tracking-wider">
+              Already Enrolled
+            </span>
+
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-navy-900 mt-3">
+              You already have an active membership
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-600 leading-relaxed max-w-md mx-auto">
+              Our records show that your account is already registered as an active FRCC Club Member. You do not need to apply or pay again.
+            </p>
+
+            {/* Member Details Summary Box */}
+            <div className="mt-6 p-5 rounded-2xl bg-navy-950 text-white text-left space-y-3">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                <span className="text-xs text-slate-400 font-medium">Member ID</span>
+                <span className="font-display text-base font-bold text-gold-400">
+                  #{activeMemberCode || 'FRCC-MEMBER'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                <span className="text-xs text-slate-400 font-medium">Primary Member</span>
+                <span className="text-xs sm:text-sm font-semibold text-white">
+                  {membership?.name || user?.name || 'Member'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                <span className="text-xs text-slate-400 font-medium">Membership Plan</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-200">
+                  {membership?.planName || 'FRCC Lifetime Membership'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-medium">Status</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Active · 30% discount unlocked
+                </span>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/membership/dashboard"
+                className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 px-6 py-3 text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span>Go to Membership Dashboard</span>
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
+              <Link
+                to="/book"
+                className="btn-base border border-slate-300 bg-white text-navy-900 hover:bg-slate-50 px-6 py-3 text-sm font-semibold inline-flex items-center justify-center"
+              >
+                Book with Member Rates
+              </Link>
+            </div>
+
+            <p className="mt-5 text-xs text-slate-500">
+              Need to modify family or registration details?{' '}
+              <Link to="/support#tickets" className="text-navy-900 font-semibold underline hover:text-gold-600">
+                Contact Front Desk Support
+              </Link>
+            </p>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <FlowShell

@@ -133,8 +133,20 @@ export function SupportPage() {
       return;
     }
     setBusy((b) => ({ ...b, ticket: true }));
+    const ticketName = user?.name || contact?.name || 'Guest';
+    const rawEmail = (user?.email || contact?.email || '').trim();
+    const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
+    const ticketEmail = isSynthetic ? '' : rawEmail;
+
     import('../services/supportService.js')
-      .then(({ createTicket }) => createTicket(ticket))
+      .then(({ createTicket }) =>
+        createTicket({
+          ...ticket,
+          name: ticketName,
+          email: ticketEmail,
+          userId: user?.id || user?.userId || null,
+        })
+      )
       .then((created) => {
         setBusy((b) => ({ ...b, ticket: false }));
         pushToast(`Ticket raised: #${created.ticket_id} (${ticket.category})`);
@@ -364,13 +376,23 @@ export function SupportPage() {
                 <h3 className="font-display text-base font-bold text-navy-900">Campus Locations</h3>
                 <p className="mt-1 text-xs text-slate-500">Vijayawada &amp; Hyderabad offices</p>
               </div>
-              <LocationTrigger
-                locationId="vja-club"
-                className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-navy-900 hover:text-gold-600 transition"
-              >
-                <span>View campus map</span>
-                <ArrowRightIcon className="h-3.5 w-3.5" />
-              </LocationTrigger>
+              <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                <LocationTrigger
+                  locationId="vja-club"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-navy-900 hover:text-gold-600 transition"
+                >
+                  <span>Vijayawada map</span>
+                  <ArrowRightIcon className="h-3.5 w-3.5" />
+                </LocationTrigger>
+                <span className="text-slate-300 text-xs" aria-hidden="true">•</span>
+                <LocationTrigger
+                  locationId="hyd-office"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-navy-900 hover:text-gold-600 transition"
+                >
+                  <span>Hyderabad map</span>
+                  <ArrowRightIcon className="h-3.5 w-3.5" />
+                </LocationTrigger>
+              </div>
             </div>
           </div>
         </div>

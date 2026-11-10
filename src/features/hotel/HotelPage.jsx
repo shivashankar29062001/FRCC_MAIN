@@ -86,8 +86,12 @@ export function HotelPage() {
 
   const isBookingFlow = location.pathname.startsWith('/book/') || location.pathname === '/stay/book';
 
-  // Category filter state for rooms
+  // Category & campus filter state for rooms on landing page
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [landingCampus, setLandingCampus] = useState(() => {
+    const c = (searchParams.get('city') || searchParams.get('area') || '').toLowerCase();
+    return c === 'hyd' || c.includes('hyderabad') ? 'hyd' : 'vja';
+  });
 
   // Room types from API/database
   const [roomTypes, setRoomTypes] = useState(() => deduplicateRoomTypes(ALL_ROOMS));
@@ -125,16 +129,23 @@ export function HotelPage() {
       ? ALL_ROOMS.find((r) => r.id === itemParam || r.type === itemParam)
       : null;
 
-    const initialArea = searchParams.get('area') || initialRoom?.areaId || saved?.areaId || HOTEL_AREAS[0]?.id || 'vja';
+    const cityParam = (searchParams.get('city') || searchParams.get('area') || '').toLowerCase();
+    const hasCityParam = Boolean(cityParam);
+    const isHydInit = cityParam === 'hyd' || cityParam.includes('hyderabad');
+
+    const initialArea = searchParams.get('area') || (hasCityParam ? (isHydInit ? 'hyd' : 'vja') : null) || initialRoom?.areaId || saved?.areaId || HOTEL_AREAS[0]?.id || 'vja';
     const isFreshRoomSelection = Boolean(itemParam);
+
+    const initCityId = hasCityParam ? (isHydInit ? 'hyd' : 'vja') : (saved?.cityId || 'vja');
+    const initIsHyd = initCityId === 'hyd';
 
     return {
       step: isFreshRoomSelection ? 0 : ((saved?.step !== undefined && saved.step < 5) ? saved.step : 0),
-      cityId: saved?.cityId || 'vja',
-      cityName: saved?.cityName || 'Vijayawada',
-      venueId: saved?.venueId || 'vja-residency',
-      venueName: saved?.venueName || 'FRCC Riverfront',
-      areaName: saved?.areaName || 'Vijayawada Campus',
+      cityId: initCityId,
+      cityName: hasCityParam ? (initIsHyd ? 'Hyderabad' : 'Vijayawada') : (saved?.cityName || (initIsHyd ? 'Hyderabad' : 'Vijayawada')),
+      venueId: hasCityParam ? (initIsHyd ? 'hyd-residency' : 'vja-residency') : (saved?.venueId || (initIsHyd ? 'hyd-residency' : 'vja-residency')),
+      venueName: hasCityParam ? (initIsHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront') : (saved?.venueName || (initIsHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront')),
+      areaName: hasCityParam ? (initIsHyd ? 'Hyderabad Campus' : 'Vijayawada Campus') : (saved?.areaName || (initIsHyd ? 'Hyderabad Campus' : 'Vijayawada Campus')),
       areaId: initialArea,
       checkin: searchParams.get('checkin') || saved?.checkin || getTodayISO(),
       checkout: searchParams.get('checkout') || saved?.checkout || getTomorrowISO(),
@@ -222,6 +233,7 @@ export function HotelPage() {
     const checkoutParam = searchParams.get('checkout');
     const adultsParam = searchParams.get('adults');
     const roomsParam = searchParams.get('rooms');
+    const cityParam = (searchParams.get('city') || searchParams.get('area') || '').toLowerCase();
 
     const patch = {};
     if (checkinParam) patch.checkin = checkinParam;
@@ -230,6 +242,15 @@ export function HotelPage() {
     if (roomsParam) patch.roomsCount = roomsParam;
     if (itemParam) {
       patch.selectedRoomId = itemParam;
+    }
+    if (cityParam) {
+      const isHyd = cityParam === 'hyd' || cityParam.includes('hyderabad');
+      patch.cityId = isHyd ? 'hyd' : 'vja';
+      patch.cityName = isHyd ? 'Hyderabad' : 'Vijayawada';
+      patch.venueId = isHyd ? 'hyd-residency' : 'vja-residency';
+      patch.venueName = isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront';
+      patch.areaName = isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus';
+      patch.areaId = isHyd ? 'hyd' : 'vja';
     }
     if (Object.keys(patch).length > 0) {
       updateDraft(patch);
@@ -416,7 +437,7 @@ export function HotelPage() {
       slot: `${nights} Night${nights > 1 ? 's' : ''}`,
       guests: `${draft.adults} Adults${Number(draft.children) > 0 ? `, ${draft.children} Children` : ''}`,
       location: draft.venueName && draft.areaName ? `${draft.areaName} — ${draft.venueName}` : (draft.venueName || draft.areaName || 'Vijayawada Campus'),
-      locationId: 'vja-hotel',
+      locationId: draft.cityId === 'hyd' ? 'hyd-hotel' : 'vja-hotel',
       price: basePrice,
       memberDiscount: memberDiscount > 0 ? memberDiscount : undefined,
       couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
@@ -681,7 +702,7 @@ export function HotelPage() {
         <ServiceHero service="stay" />
 
         <div id="content" className="container-x py-12 sm:py-16 scroll-mt-24">
-          <div className="border-b border-slate-200 pb-6">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b border-slate-200 pb-6">
             <div>
               <p className="eyebrow">Accommodations</p>
               <h2 className="h-section mt-1">Choose your room</h2>
@@ -690,6 +711,41 @@ export function HotelPage() {
                 <span className="text-slate-300">·</span>
                 <span>Suites starting from ₹6,000 per night</span>
               </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              {/* Campus Selector: Vijayawada & Hyderabad */}
+              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/80 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setLandingCampus('vja')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    landingCampus === 'vja'
+                      ? 'bg-navy-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-navy-900'
+                  }`}
+                >
+                  Vijayawada Campus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLandingCampus('hyd')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    landingCampus === 'hyd'
+                      ? 'bg-navy-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-navy-900'
+                  }`}
+                >
+                  Hyderabad Campus
+                </button>
+              </div>
+
+              <LocationTrigger
+                locationId={landingCampus === 'hyd' ? 'hyd-hotel' : 'vja-hotel'}
+                className="text-xs text-navy-900 font-semibold hover:text-gold-600 inline-flex items-center"
+              >
+                {landingCampus === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus'} · View on map
+              </LocationTrigger>
             </div>
           </div>
 
@@ -777,8 +833,8 @@ export function HotelPage() {
                       <span className="text-xs text-slate-500 ml-1">/ night</span>
                     </div>
                     <Link
-                      to={`/book/hotel?item=${encodeURIComponent(room.id)}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`}
-                      onClick={(e) => handleSelectRoom(e, `/book/hotel?item=${encodeURIComponent(room.id)}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`)}
+                      to={`/book/hotel?item=${encodeURIComponent(room.id)}&city=${landingCampus}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`}
+                      onClick={(e) => handleSelectRoom(e, `/book/hotel?item=${encodeURIComponent(room.id)}&city=${landingCampus}&checkin=${defaultCheckin}&checkout=${defaultCheckout}`)}
                       className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 font-semibold px-4 py-2 text-xs rounded-xl transition shadow-sm inline-flex items-center justify-center"
                     >
                       Select room
@@ -791,8 +847,10 @@ export function HotelPage() {
 
           {/* Campus Hotel Privileges */}
           <div className="mt-16 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
-            <h3 className="font-display text-lg font-bold text-navy-900">FRCC Riverfront Hospitality Privileges</h3>
-            <p className="text-xs text-slate-500 mt-1">Included with every room and suite reservation.</p>
+            <h3 className="font-display text-lg font-bold text-navy-900">
+              {landingCampus === 'hyd' ? 'Hyderabad Club Residency Hospitality Privileges' : 'FRCC Riverfront Hospitality Privileges'}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Included with every room and suite reservation at Vijayawada &amp; Hyderabad campuses.</p>
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-medium text-slate-700">
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="font-bold text-navy-900 block mb-1">Club Swimming Pool</span>
@@ -839,7 +897,10 @@ export function HotelPage() {
             <h2 className="h-sub mt-1">Step 1: Select Location &amp; Dates</h2>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
               <span>Choose your location, venue, and stay dates (minimum 1, maximum 30 nights).</span>
-              <LocationTrigger locationId="vja-hotel" className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex">
+              <LocationTrigger
+                locationId={draft.cityId === 'hyd' ? 'hyd-hotel' : 'vja-hotel'}
+                className="text-xs text-navy-900 font-medium hover:text-gold-600 inline-flex"
+              >
                 {draft.areaName || 'Vijayawada Campus'} · View on map
               </LocationTrigger>
             </div>

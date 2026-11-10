@@ -129,6 +129,14 @@ export async function saveUserMembership(membershipData) {
   if (membershipData.mobile && !isValidIndianMobile(membershipData.mobile)) {
     throw new Error('Please enter a valid 10-digit Indian mobile number.');
   }
+
+  // Prevent duplicate active membership enrollment for the same user
+  if (currentUserId) {
+    const existing = await getUserMembership(currentUserId);
+    if (existing && (existing.memberId || existing.memberCode) && existing.status !== 'Cancelled') {
+      throw new Error(`You already have an active FRCC membership (#${existing.memberCode || existing.memberId}).`);
+    }
+  }
   const payload = {
     user_id: currentUserId,
     name: membershipData.name || 'Member',
