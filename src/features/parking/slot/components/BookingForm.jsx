@@ -172,9 +172,19 @@ export default function BookingForm({
 
       {/* STEP 2: SELECT SLOT */}
       <div id="step-select-slot" className="mt-8">
-        <div className="campus-slot-banner mb-3 flex items-center justify-between">
-          <div className="text-sm font-semibold text-navy-900">
-            Select Parking Slot — {campusLabel} (150 Total Slots)
+        <div className="campus-slot-banner mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold text-navy-900">
+              Select Parking Slot — {campusLabel}{' '}
+              {formData.date
+                ? `(${formatDisplayDate(formData.date)}${formData.time ? ` · ${formatDisplayTime(formData.time)}` : ''})`
+                : '(150 Total Slots)'}
+            </div>
+            {!formData.date && (
+              <p className="text-xs text-amber-700 mt-0.5 font-medium">
+                Select your Booking Date, Booking Time, and No. of Days in Schedule below to view live slot availability.
+              </p>
+            )}
           </div>
           {selectedSlot && (
             <div className="text-xs font-semibold px-2.5 py-1 rounded bg-gold-500/20 text-navy-900 border border-gold-500/40">
@@ -380,6 +390,12 @@ export default function BookingForm({
                 </div>
               </div>
             </div>
+
+            {errors.payment && (
+              <p className="field-error-text mt-3 block" role="alert">
+                {errors.payment}
+              </p>
+            )}
 
             <button
               type="button"

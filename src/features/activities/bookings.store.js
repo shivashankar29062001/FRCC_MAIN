@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase.js';
 import { getUserBookings, getUserPayments } from '../../services/bookingsService.js';
 import { readSession } from '../../app/session.js';
-import { gameById, quotePrice } from './games.config.js';
+import { gameById, quotePrice, isGroupActivity, resolveActivityLocation, matchesActivityBooking } from './games.config.js';
 
 export const CHANGED_EVENT = 'frcc:activity-bookings-changed';
 export const LOCAL_ACTIVITY_BOOKINGS_KEY = 'frcc_active_activity_bookings';
@@ -86,6 +86,12 @@ async function fallbackCreateActivityBooking({
   mobile = null,
   email = null,
   paymentMethod = 'upi',
+  cityId = null,
+  cityName = null,
+  areaName = null,
+  venueLocationId = null,
+  venueLocationName = null,
+  location = null,
   details = {},
 }) {
   let currentUserId = null;
@@ -106,6 +112,15 @@ async function fallbackCreateActivityBooking({
 
   const game = gameById(gameId);
   const gameTitle = game?.name || details?.gameName || gameId;
+  const loc = resolveActivityLocation({
+    cityId,
+    cityName,
+    areaName,
+    venueLocationId,
+    venueLocationName,
+    location,
+    details,
+  });
 
   // Check member status
   let isMember = Boolean(sessionProfile?.isMember);
@@ -123,33 +138,43 @@ async function fallbackCreateActivityBooking({
   }
 
   const quote = quotePrice(game, { extras: details, equipment: details?.equipment }, isMember);
-  const subtotal = Number(quote?.subtotal || game?.price || 1500);
-  const discount = Number(quote?.discount || 0);
-  const amount = Number(quote?.total ?? (subtotal - discount));
+  const isGameFree = Boolean(game?.isFree || (game?.price ?? game?.pricePerSlot) === 0);
+  const subtotal = isGameFree ? 0 : Number(quote?.subtotal ?? game?.price ?? 1500);
+  const discount = isGameFree ? 0 : Number(quote?.discount ?? 0);
+  const amount = isGameFree ? 0 : Number(quote?.total ?? (subtotal - discount));
 
   const year = new Date().getFullYear();
   const random6 = String(Math.floor(100000 + Math.random() * 900000));
   const bookingRef = `FRCC-ACT-${year}-${random6}`;
-  const status = paymentMethod === 'pay_at_venue' ? 'Pending' : 'Confirmed';
+  const status = !isGameFree && paymentMethod === 'pay_at_venue' ? 'Pending' : 'Confirmed';
+
+  const enrichedDetails = {
+    ...(details || {}),
+    gameId,
+    isFree: isGameFree,
+    cityId: loc.cityId,
+    cityName: loc.cityName,
+    areaName: loc.areaName,
+    venueLocationId: loc.venueLocationId,
+    venueLocationName: loc.venueLocationName,
+    location: loc.location,
+    ...(currentUserId && !validDbUserId ? { memberUserId: currentUserId } : {}),
+  };
 
   const bookingPayload = {
     booking_id: bookingRef,
     user_id: validDbUserId,
-    game_id: gameId,
     category: 'activity',
     title: gameTitle,
     date: String(date),
     slot: String(slot),
+    area_name: loc.areaName,
     players: Number(players || 1),
-
-    details: {
-      ...(details || {}),
-      ...(currentUserId && !validDbUserId ? { memberUserId: currentUserId } : {}),
-    },
+    details: enrichedDetails,
     subtotal,
     discount,
     amount,
-    payment_method: paymentMethod || 'upi',
+    payment_method: isGameFree ? 'free' : (paymentMethod || 'upi'),
     is_member: Boolean(isMember),
     status,
     user_name: userName || sessionProfile?.name || sessionUser?.user_metadata?.name || null,
@@ -157,33 +182,35 @@ async function fallbackCreateActivityBooking({
     email: email || sessionUser?.email || null,
   };
 
-  // 1. Pre-check if slot is already occupied by an active booking in local cache or DB
+  // 1. Pre-check if slot is already occupied for this game and campus location
   const localList = getLocalActiveActivityBookings();
   const localConflict = localList.find(
     (b) =>
-      (b.game_id === gameId || b.gameId === gameId || b.game === gameId) &&
       String(b.date) === String(date) &&
       (String(b.slot).trim() === String(slot).trim() || String(b.slot).startsWith(String(slot).trim())) &&
-      (!b.status || !['cancelled', 'Cancelled'].includes(b.status)),
+      (!b.status || !['cancelled', 'Cancelled'].includes(b.status)) &&
+      matchesActivityBooking(b, gameId, gameTitle, loc),
   );
-  if (localConflict && game?.category !== 'water' && game?.id !== 'swimming-pool') {
+  if (localConflict && !isGroupActivity(gameId)) {
     throw new Error('This slot is no longer available');
   }
 
   try {
     const { data: existingSlots } = await supabase
       .from('bookings')
-      .select('id, booking_id, slot, status')
+      .select('id, booking_id, slot, status, title, area_name, details')
       .eq('category', 'activity')
       .eq('date', String(date))
       .in('status', ['Confirmed', 'Pending', 'confirmed', 'pending'])
-      .limit(20);
+      .limit(50);
 
     if (existingSlots && existingSlots.length > 0) {
       const dbMatch = existingSlots.find(
-        (b) => String(b.slot).trim() === String(slot).trim() || String(b.slot).startsWith(String(slot).trim()),
+        (b) =>
+          (String(b.slot).trim() === String(slot).trim() || String(b.slot).startsWith(String(slot).trim())) &&
+          matchesActivityBooking(b, gameId, gameTitle, loc),
       );
-      if (dbMatch && game?.category !== 'water' && game?.id !== 'swimming-pool') {
+      if (dbMatch && !isGroupActivity(gameId)) {
         throw new Error('This slot is no longer available');
       }
     }
@@ -218,6 +245,8 @@ async function fallbackCreateActivityBooking({
         title: gameTitle,
         date: String(date),
         slot: String(slot),
+        area_name: loc.areaName,
+        details: enrichedDetails,
         players: Number(players || 1),
         subtotal,
         discount,
@@ -271,6 +300,15 @@ async function fallbackCreateActivityBooking({
     game: gameId,
     title: gameTitle,
     gameName: gameTitle,
+    city_id: loc.cityId,
+    cityId: loc.cityId,
+    city_name: loc.cityName,
+    cityName: loc.cityName,
+    area_name: loc.areaName,
+    areaName: loc.areaName,
+    venueLocationId: loc.venueLocationId,
+    venueLocationName: loc.venueLocationName,
+    location: loc.location,
     amount,
     subtotal,
     discount,
@@ -299,8 +337,34 @@ export async function createActivityBookingRemote({
   mobile = null,
   email = null,
   paymentMethod = 'upi',
+  cityId = null,
+  cityName = null,
+  areaName = null,
+  venueLocationId = null,
+  venueLocationName = null,
+  location = null,
   details = {},
 }) {
+  const loc = resolveActivityLocation({
+    cityId,
+    cityName,
+    areaName,
+    venueLocationId,
+    venueLocationName,
+    location,
+    details,
+  });
+  const enrichedDetails = {
+    ...(details || {}),
+    gameId,
+    cityId: loc.cityId,
+    cityName: loc.cityName,
+    areaName: loc.areaName,
+    venueLocationId: loc.venueLocationId,
+    venueLocationName: loc.venueLocationName,
+    location: loc.location,
+  };
+
   let rpcError = null;
   try {
     const { data, error } = await supabase.rpc('create_activity_booking', {
@@ -312,15 +376,27 @@ export async function createActivityBookingRemote({
       p_mobile: mobile || null,
       p_email: email || null,
       p_payment_method: paymentMethod || 'upi',
-      p_details: details || {},
+      p_details: enrichedDetails,
     });
 
     if (!error && data) {
-      saveLocalActiveActivityBooking(data);
+      const rpcResult = {
+        ...data,
+        city_id: data.city_id || loc.cityId,
+        cityId: data.cityId || loc.cityId,
+        city_name: data.city_name || loc.cityName,
+        cityName: data.cityName || loc.cityName,
+        area_name: data.area_name || loc.areaName,
+        areaName: data.areaName || loc.areaName,
+        venueLocationId: loc.venueLocationId,
+        venueLocationName: loc.venueLocationName,
+        location: data.location || loc.location,
+      };
+      saveLocalActiveActivityBooking(rpcResult);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(CHANGED_EVENT));
       }
-      return data;
+      return rpcResult;
     }
     rpcError = error;
   } catch (err) {
@@ -354,7 +430,13 @@ export async function createActivityBookingRemote({
     mobile,
     email,
     paymentMethod,
-    details,
+    cityId: loc.cityId,
+    cityName: loc.cityName,
+    areaName: loc.areaName,
+    venueLocationId: loc.venueLocationId,
+    venueLocationName: loc.venueLocationName,
+    location: loc.location,
+    details: enrichedDetails,
   });
 }
 

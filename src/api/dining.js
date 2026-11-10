@@ -18,6 +18,26 @@ function isUuid(val) {
  * Extracts normalized campus/city location metadata from dining booking fields or embedded [Location: ...] notes tag.
  */
 export function extractDiningLocation(b, localMatch = null) {
+  const explicitCity = String(b?.city_id || b?.cityId || '').trim().toLowerCase();
+  const explicitCityName = String(b?.city_name || b?.cityName || '').trim();
+  const explicitArea = String(b?.area_name || b?.areaName || '').trim();
+  const explicitVenueLoc = String(b?.venue_location_name || b?.venueLocationName || '').trim();
+  const explicitLoc = String(b?.location || '').trim();
+
+  if (explicitCity || explicitArea || explicitLoc) {
+    const combined = `${explicitCity} ${explicitCityName} ${explicitArea} ${explicitVenueLoc} ${explicitLoc}`.toLowerCase();
+    const isHyd = combined.includes('hyd');
+    const areaName = explicitArea || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus');
+    const venueLocationName = explicitVenueLoc || (isHyd ? 'Hyderabad Club Dining' : 'FRCC Clubhouse Dining');
+    return {
+      cityId: isHyd ? 'hyd' : (explicitCity || 'vja'),
+      cityName: explicitCityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+      areaName,
+      venueLocationName,
+      location: explicitLoc || (venueLocationName && areaName && !venueLocationName.includes(areaName) ? `${areaName} — ${venueLocationName}` : areaName),
+    };
+  }
+
   const notesStr = String(b?.notes || b?.special_request || b?.specialRequest || localMatch?.notes || '');
   const locMatch = notesStr.match(/\[Location:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/i);
   if (locMatch) {
@@ -67,6 +87,65 @@ export function extractDiningLocation(b, localMatch = null) {
     venueLocationName: b?.venue_location_name || b?.venueLocationName || 'FRCC Clubhouse Dining',
     location: b?.location || b?.area_name || b?.areaName || 'Vijayawada Campus',
   };
+}
+
+export function stripDiningLocationTag(notesStr) {
+  return String(notesStr || '')
+    .replace(/\s*\[Location:[^\]]+\]\s*/gi, ' ')
+    .trim();
+}
+
+export function normalizeDiningDateISO(rawDate) {
+  const s = String(rawDate || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+  if (m) {
+    return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  return '';
+}
+
+function getISTNow() {
+  const now = new Date();
+  const dateISO = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const parts = now
+    .toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false, hour: '2-digit', minute: '2-digit' })
+    .split(':')
+    .map(Number);
+  const minutes = (Number(parts[0]) || 0) * 60 + (Number(parts[1]) || 0);
+  return { dateISO, minutes };
+}
+
+export function parseSlotMinutes(timeStr) {
+  const raw = String(timeStr || '').trim().toUpperCase();
+  const ampm = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/.exec(raw);
+  if (ampm) {
+    let h = Number(ampm[1]);
+    const m = Number(ampm[2]);
+    const period = ampm[3];
+    if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h < 12) h += 12;
+    return h * 60 + m;
+  }
+  const hhmm = /^(\d{1,2}):(\d{2})$/.exec(raw);
+  if (hhmm) {
+    return Number(hhmm[1]) * 60 + Number(hhmm[2]);
+  }
+  return NaN;
+}
+
+/**
+ * Returns true if the given dining reservation date & time slot has already passed in Asia/Kolkata.
+ */
+export function isDiningSlotPast(dateInput, timeStr) {
+  const iso = normalizeDiningDateISO(dateInput);
+  if (!iso) return true;
+  const { dateISO: todayIST, minutes: nowMins } = getISTNow();
+  if (iso < todayIST) return true;
+  if (iso > todayIST) return false;
+  const slotMins = parseSlotMinutes(timeStr);
+  if (Number.isNaN(slotMins)) return false;
+  return slotMins <= nowMins;
 }
 
 // In-memory and localStorage persistence for table bookings
@@ -145,33 +224,59 @@ const VENUE_SLOTS = {
 
 /**
  * Get available table slots for a venue and date with remaining seats.
+ * Queries Supabase get_available_table_slots RPC when online and always disables
+ * past time slots on today's Asia/Kolkata date across all dining venues.
  * @param {string} venueId
  * @param {string} date - DD/MM/YYYY or YYYY-MM-DD
  */
 export async function getTableSlots(venueId, date) {
   const times = VENUE_SLOTS[venueId] || VENUE_SLOTS.restaurant;
-  const stored = getStoredBookings();
+  const isoDate = normalizeDiningDateISO(date);
 
-  // Pseudo-random baseline seats per slot seeded by date and time
+  if (!isMock && isoDate) {
+    try {
+      const { data, error } = await supabase.rpc('get_available_table_slots', {
+        p_venue_id: venueId,
+        p_date: isoDate,
+      });
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map((row, idx) => {
+          const time = row.time_slot;
+          const past = isDiningSlotPast(isoDate, time);
+          const seatsLeft = past ? 0 : Number(row.seats_left ?? 0);
+          return {
+            id: `${venueId}-${idx}`,
+            time,
+            seatsLeft,
+            isPast: past,
+            available: !past && Boolean(row.available) && seatsLeft > 0,
+          };
+        });
+      }
+    } catch {
+      /* fallback to baseline local slots */
+    }
+  }
+
+  const stored = getStoredBookings();
   const dateStr = String(date || '').replace(/\D/g, '');
   const dateNum = Number(dateStr) || 123;
 
   return times.map((time, idx) => {
-    // Capacity baseline between 8 and 20 seats
+    const past = isoDate ? isDiningSlotPast(isoDate, time) : false;
     const baseline = 8 + ((dateNum + idx * 7) % 13);
-
-    // Count already booked guests for this venue, date, and slot
     const booked = stored
-      .filter((b) => b.venue_id === venueId && b.date === date && b.time === time)
+      .filter((b) => b.venue_id === venueId && (b.date === date || b.date === isoDate) && b.time === time)
       .reduce((sum, b) => sum + (Number(b.guests) || 0), 0);
 
-    const seatsLeft = Math.max(0, baseline - booked);
+    const seatsLeft = past ? 0 : Math.max(0, baseline - booked);
 
     return {
       id: `${venueId}-${idx}`,
       time,
       seatsLeft,
-      available: seatsLeft > 0,
+      isPast: past,
+      available: !past && seatsLeft > 0,
     };
   });
 }
@@ -187,11 +292,17 @@ export async function createTableBooking(payload) {
   const clientRequestId = payload.clientRequestId || payload.client_request_id
     || `tbl_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-  // Convert DD/MM/YYYY into YYYY-MM-DD for database DATE column if needed
-  let bookingDate = payload.date;
-  if (bookingDate && /^\d{2}\/\d{2}\/\d{4}$/.test(bookingDate)) {
-    const [dd, mm, yyyy] = bookingDate.split('/');
-    bookingDate = `${yyyy}-${mm}-${dd}`;
+  const bookingDate = normalizeDiningDateISO(payload.date);
+  const slotTime = payload.time || payload.slot;
+  if (!bookingDate) {
+    throw new Error('Please select a valid reservation date.');
+  }
+  const { dateISO: todayIST } = getISTNow();
+  if (bookingDate < todayIST) {
+    throw new Error('Reservation date cannot be in the past.');
+  }
+  if (isDiningSlotPast(bookingDate, slotTime)) {
+    throw new Error('Selected time slot has already passed. Please choose an upcoming time slot.');
   }
 
   let sessionUserId = null;
@@ -245,7 +356,7 @@ export async function createTableBooking(payload) {
       guest_mobile: payload.mobile || payload.guestMobile || payload.guest_mobile || '',
       guest_email: payload.email || payload.guestEmail || payload.guest_email || '',
       notes: payload.notes || payload.specialRequest || '',
-      status: 'confirmed',
+      status: 'CONFIRMED',
       is_free: true,
       total: 0,
       qrValue: `FRCC:TABLE:${bookingRef}`,
@@ -264,7 +375,7 @@ export async function createTableBooking(payload) {
     p_client_request_id: clientRequestId,
     p_venue_id: payload.venueId || payload.venue_id,
     p_date: bookingDate,
-    p_time: payload.time || payload.slot,
+    p_time: slotTime,
     p_guests: Number(payload.guests || 2),
     p_name: payload.name || payload.guestName || payload.guest_name || '',
     p_mobile: payload.mobile || payload.guestMobile || payload.guest_mobile || '',
@@ -272,6 +383,11 @@ export async function createTableBooking(payload) {
     p_notes: payload.notes || payload.specialRequest || null,
     p_age_confirmed: Boolean(payload.ageConfirmed || payload.age_confirmed),
     p_user_id: currentUserId || null,
+    p_city_id: payload.cityId || null,
+    p_city_name: payload.cityName || null,
+    p_area_name: payload.areaName || null,
+    p_venue_location_name: payload.venueLocationName || null,
+    p_location: payload.location || null,
   };
 
   const { data, error } = await supabase.rpc('create_table_booking', rpcParams);
@@ -287,6 +403,7 @@ export async function createTableBooking(payload) {
 
   const venue = LOCAL_VENUES.find((v) => v.id === data.venue_id) || { name: data.venue_id };
   const effectiveUserId = data.user_id || currentUserId;
+  const loc = extractDiningLocation(data, payload);
 
   const formattedBooking = {
     id: data.id,
@@ -303,15 +420,15 @@ export async function createTableBooking(payload) {
     venue_id: data.venue_id,
     venue_name: venue.name,
     venueName: venue.name,
-    city_id: payload.cityId || data.city_id || 'vja',
-    cityId: payload.cityId || data.city_id || 'vja',
-    city_name: payload.cityName || data.city_name || 'Vijayawada',
-    cityName: payload.cityName || data.city_name || 'Vijayawada',
-    venue_location_name: payload.venueLocationName || data.venue_location_name || 'FRCC Clubhouse Dining',
-    venueLocationName: payload.venueLocationName || data.venue_location_name || 'FRCC Clubhouse Dining',
-    area_name: payload.areaName || data.area_name || 'Vijayawada Campus',
-    areaName: payload.areaName || data.area_name || 'Vijayawada Campus',
-    location: payload.location || payload.areaName || data.area_name || 'Vijayawada Campus',
+    city_id: loc.cityId,
+    cityId: loc.cityId,
+    city_name: loc.cityName,
+    cityName: loc.cityName,
+    venue_location_name: loc.venueLocationName,
+    venueLocationName: loc.venueLocationName,
+    area_name: loc.areaName,
+    areaName: loc.areaName,
+    location: loc.location,
     date: data.date,
     time: data.time_slot,
     slot: data.time_slot,
@@ -320,7 +437,7 @@ export async function createTableBooking(payload) {
     guest_mobile: data.guest_mobile,
     guest_email: data.guest_email,
     notes: data.notes,
-    status: data.status || 'confirmed',
+    status: String(data.status || 'CONFIRMED').toUpperCase(),
     is_free: true,
     total: 0,
     qrValue: `FRCC:TABLE:${data.booking_ref}`,
@@ -332,6 +449,11 @@ export async function createTableBooking(payload) {
   const stored = getStoredBookings(effectiveUserId);
   stored.push(formattedBooking);
   saveStoredBookings(stored, effectiveUserId);
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('frcc:table-bookings-changed', { detail: formattedBooking }));
+    window.dispatchEvent(new CustomEvent('frcc:booking-created', { detail: formattedBooking }));
+  }
 
   return formattedBooking;
 }
@@ -430,7 +552,9 @@ export async function getMyTableBookings(userId = null) {
       guest_mobile: b.guest_mobile,
       guest_email: b.guest_email,
       notes: b.notes,
-      status: (isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.id)) ? 'cancelled' : (b.status || 'confirmed'),
+      status: (isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.id))
+        ? 'CANCELLED'
+        : String(b.status || 'CONFIRMED').toUpperCase(),
       is_free: true,
       total: 0,
       qrValue: `FRCC:TABLE:${b.booking_ref}`,

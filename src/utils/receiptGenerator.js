@@ -110,7 +110,16 @@ export function generateBookingReceiptPdf(booking) {
   } else if (isParking) {
     rows.push(['Parking Date', formatDMY(booking.date || booking.booking_date)]);
     rows.push(['Slot Number', String(booking.slot_id || booking.parkingSlot || booking.slot || '—')]);
-    rows.push(['Arrival Time', String(booking.time || booking.arrival_time || '09:00')]);
+    const parkingArrival = String(
+      booking.arrival_time ||
+        booking.arrivalTime ||
+        booking.time ||
+        booking.bookingTime ||
+        booking.details?.arrivalTime ||
+        booking.details?.bookingTime ||
+        '09:00'
+    ).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+    rows.push(['Arrival Time', parkingArrival]);
     if (booking.vehicleNumber) {
       rows.push(['Vehicle', `${booking.vehicleNumber}${booking.vehicleType ? ` (${booking.vehicleType})` : ''}`]);
     }
@@ -121,7 +130,10 @@ export function generateBookingReceiptPdf(booking) {
     rows.push(['Parking Fee', 'Complimentary (Free)']);
   } else {
     // Activity
-
+    const actLoc = booking.location || booking.details?.location || booking.areaName || booking.area_name || booking.details?.areaName;
+    if (actLoc) {
+      rows.push(['Campus Location', String(actLoc)]);
+    }
     rows.push(['Activity Date', formatDMY(booking.date)]);
     rows.push(['Time Slot', String(booking.slot || '—')]);
     rows.push(['Players / Participants', String(booking.players || 1)]);
@@ -139,8 +151,16 @@ export function generateBookingReceiptPdf(booking) {
   if (discount > 0) {
     rows.push(['Member Privilege Discount (30%)', `-${formatINR(discount)}`]);
   }
-  rows.push(['Total Amount Paid', (isDining || isParking) ? 'Free (₹0)' : formatINR(totalAmount)]);
-  rows.push(['Payment Method', String(booking.payment_method || booking.paymentMethod || ((isDining || isParking) ? 'Complimentary Pass' : 'Online (UPI/Card)'))]);
+  const isFreeTotal = isDining || isParking || totalAmount === 0 || booking.payment_method === 'free' || booking.details?.isFree;
+  rows.push(['Total Amount Paid', isFreeTotal ? 'Free (₹0)' : formatINR(totalAmount)]);
+  rows.push([
+    'Payment Method',
+    String(
+      booking.payment_method === 'free' || (booking.details?.isFree && totalAmount === 0)
+        ? 'Complimentary Pass (Free)'
+        : booking.payment_method || booking.paymentMethod || (isFreeTotal ? 'Complimentary Pass' : 'Online (UPI/Card)')
+    ),
+  ]);
   rows.push(['Booking Status', String(booking.status || 'Confirmed')]);
 
   // 4 · Render Card-like Table

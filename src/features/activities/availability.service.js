@@ -4,7 +4,7 @@
 // with direct live bookings query fallback and client cache so availability always reflects actual DB records.
 // ---------------------------------------------------------------------------
 
-import { gameById } from './games.config.js';
+import { gameById, isGroupActivity as isGroupGame, matchesActivityBooking } from './games.config.js';
 import { supabase } from '../../services/supabase.js';
 import { getLocalActiveActivityBookings } from './bookings.store.js';
 
@@ -41,54 +41,52 @@ export function slotRange(gameId, startHHMM) {
  * @param {string} dateISO 'YYYY-MM-DD'
  * @returns {Promise<Array<{ time: string, range: string, capacity: number, bookedCount: number, remaining: number, status: string, booked: boolean }>>}
  */
-export async function getSlotAvailability(gameId, dateISO) {
+export async function getSlotAvailability(gameId, dateISO, locationInfo = null) {
   if (!gameId || !dateISO) return [];
 
   const game = gameById(gameId);
   const gameTitle = game?.name || gameId;
   const baseSlots = getSlots(gameId, dateISO);
-  const isGroupActivity = gameId === 'swimming-pool' || gameId === 'kids-play-area' || gameId === 'luxury-gym';
+  const isGroupActivity = isGroupGame(gameId);
 
   const activeBookings = [];
 
-  // 1. Try authoritative database RPC
+  // 1. Try authoritative database RPC when no campus-specific filter is needed
   let rpcSucceeded = false;
-  try {
-    const { data, error } = await supabase.rpc('get_slot_availability', {
-      p_game_id: gameId,
-      p_date: dateISO,
-    });
-
-    if (!error && Array.isArray(data) && data.length > 0) {
-      rpcSucceeded = true;
-      data.forEach((s) => {
-        const count = Number(s.booked_count ?? 0);
-        if (count > 0) {
-          activeBookings.push({ slot: s.slot, players: count, booking_id: `rpc_${s.slot}` });
-        }
+  if (!locationInfo) {
+    try {
+      const { data, error } = await supabase.rpc('get_slot_availability', {
+        p_game_id: gameId,
+        p_date: dateISO,
       });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        rpcSucceeded = true;
+        data.forEach((s) => {
+          const count = Number(s.booked_count ?? 0);
+          if (count > 0) {
+            activeBookings.push({ slot: s.slot, players: count, booking_id: `rpc_${s.slot}` });
+          }
+        });
+      }
+    } catch (_) {
+      // Fall through to direct table query
     }
-  } catch (_) {
-    // Fall through to direct table query
   }
 
-  // 2. Query public.bookings directly if RPC is not available
+  // 2. Query public.bookings directly using existing schema columns (filtered by game and campus)
   if (!rpcSucceeded) {
     try {
       const { data: dbBookings, error: dbErr } = await supabase
         .from('bookings')
-        .select('id, booking_id, slot, players, status, game_id, title')
+        .select('id, booking_id, slot, players, status, title, area_name, details')
         .eq('category', 'activity')
         .eq('date', String(dateISO))
         .in('status', ['Confirmed', 'Pending', 'confirmed', 'pending']);
 
       if (!dbErr && Array.isArray(dbBookings)) {
         dbBookings.forEach((b) => {
-          const matchesGame =
-            b.game_id === gameId ||
-            (b.title && b.title.toLowerCase().includes(gameTitle.toLowerCase())) ||
-            (!b.game_id && !b.title);
-          if (matchesGame) {
+          if (matchesActivityBooking(b, gameId, gameTitle, locationInfo)) {
             activeBookings.push(b);
           }
         });
@@ -98,18 +96,13 @@ export async function getSlotAvailability(gameId, dateISO) {
     }
   }
 
-  // 3. Always include confirmed bookings persisted on this device (covers demo mode and unpersisted RPC caches)
+  // 3. Include confirmed bookings persisted on this device for the same game & campus
   try {
     const localBookings = getLocalActiveActivityBookings();
     localBookings.forEach((lb) => {
-      const matchesGame =
-        lb.game_id === gameId ||
-        lb.gameId === gameId ||
-        lb.game === gameId ||
-        (lb.title && lb.title.toLowerCase().includes(gameTitle.toLowerCase()));
       const matchesDate = String(lb.date) === String(dateISO);
       const isCancelled = lb.status && ['cancelled', 'Cancelled'].includes(lb.status);
-      if (matchesGame && matchesDate && !isCancelled) {
+      if (matchesDate && !isCancelled && matchesActivityBooking(lb, gameId, gameTitle, locationInfo)) {
         const id = lb.booking_id || lb.bookingId || lb.id;
         const exists = activeBookings.some((ab) => (ab.booking_id || ab.bookingId || ab.id) === id);
         if (!exists) {

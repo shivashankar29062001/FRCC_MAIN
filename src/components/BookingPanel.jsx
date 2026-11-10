@@ -25,6 +25,12 @@ import {
 import { MEMBER_PROMO_NOTE } from '../config/pricing.js';
 import { SITE_INFO } from '../config/siteInfo.js';
 import { ROUTES } from '../config/routes.js';
+import {
+  HALL_MIN_GUESTS,
+  HALL_MAX_GUESTS,
+  sanitizeHallGuestsInput,
+  validateHallGuests,
+} from '../features/hall/convention/config/halls.config.js';
 
 // ---------------------------------------------------------------------------
 // THE booking bar — the one booking widget in the site. It is used
@@ -301,8 +307,8 @@ function validate(tab, v) {
   if (tab === 'hall') {
     readDate('date', 'Choose the event date.', 'Date cannot be in the past.');
     need('event', 'Choose an event type.');
-    need('guests', 'Enter the number of guests.');
-    if (v.guests && Number(v.guests) < 1) errs.guests = 'At least 1 guest.';
+    const guestErr = validateHallGuests(v.guests);
+    if (guestErr) errs.guests = guestErr;
   }
 
   if (tab === 'parking') {
@@ -385,9 +391,13 @@ function useBookingForm(defaultTab, preselect) {
     try {
       const stored = readStored()?.values || {};
       const fromUrl = readParams();
+      const hallStored = stored.hall
+        ? { ...stored.hall, guests: stored.hall.guests ? sanitizeHallGuestsInput(stored.hall.guests).value : '' }
+        : undefined;
       return {
         ...EMPTY,
         ...stored,
+        ...(hallStored ? { hall: hallStored } : {}),
         ...(fromUrl.stay ? { stay: { ...(stored.stay || {}), ...(fromUrl.stay || {}) } } : {}),
       };
     } catch {
@@ -418,6 +428,27 @@ function useBookingForm(defaultTab, preselect) {
   const patch = (p) => {
     setValues((prev) => ({ ...prev, [tab]: { ...(prev[tab] || {}), ...p } }));
     setErrors({});
+  };
+
+  const onHallGuestsChange = (raw) => {
+    const { value, overLimit } = sanitizeHallGuestsInput(raw);
+    setValues((prev) => ({ ...prev, [tab]: { ...(prev[tab] || {}), guests: value } }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (overLimit) {
+        next.guests = `Maximum ${HALL_MAX_GUESTS.toLocaleString('en-IN')} guests allowed.`;
+      } else {
+        delete next.guests;
+      }
+      return next;
+    });
+  };
+
+  const onHallGuestsBlur = () => {
+    const rawGuests = values[tab]?.guests;
+    if (!rawGuests) return;
+    const guestErr = validateHallGuests(rawGuests);
+    if (guestErr) setErrors((prev) => ({ ...prev, guests: guestErr }));
   };
 
   function selectTab(id) {
@@ -463,11 +494,11 @@ function useBookingForm(defaultTab, preselect) {
     }, 450);
   }
 
-  return { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit };
+  return { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit };
 }
 
 /** The field row for the active service: one row on desktop, stacked on mobile. */
-function Fields({ tab, v, errors, patch, busy }) {
+function Fields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlur, busy }) {
   const active = TABS.find((t) => t.id === tab) || TABS[0];
 
   return (
@@ -495,7 +526,19 @@ function Fields({ tab, v, errors, patch, busy }) {
             <DateInput id="hall-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
           </Field>
           <Field id="hall-guests" label="Guests" icon={UsersIcon} error={errors.guests}>
-            <TextInput id="hall-guests" error={errors.guests} type="number" min="1" placeholder="e.g. 200" value={v.guests || ''} onChange={(e) => patch({ guests: e.target.value })} />
+            <TextInput
+              id="hall-guests"
+              error={errors.guests}
+              type="number"
+              min={HALL_MIN_GUESTS}
+              max={HALL_MAX_GUESTS}
+              inputMode="numeric"
+              placeholder="e.g. 200"
+              value={v.guests || ''}
+              onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+              onChange={(e) => onHallGuestsChange(e.target.value)}
+              onBlur={onHallGuestsBlur}
+            />
           </Field>
           <Field id="hall-event" label="Event type" icon={HallIcon} error={errors.event}>
             <SelectInput id="hall-event" error={errors.event} value={v.event || ''} onChange={(e) => patch({ event: e.target.value })} options={EVENT_OPTIONS} placeholder="Choose…" />
@@ -673,7 +716,7 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
   );
 }
 
-function CardFields({ tab, v, errors, patch, busy, compact = false }) {
+function CardFields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlur, busy, compact = false }) {
   const active = TABS.find((t) => t.id === tab) || TABS[0];
 
   return (
@@ -709,7 +752,20 @@ function CardFields({ tab, v, errors, patch, busy, compact = false }) {
               <SelectInput inputClass="booking-field" nativeArrow id="card-hall-event" error={errors.event} value={v.event || ''} onChange={(e) => patch({ event: e.target.value })} options={EVENT_OPTIONS} placeholder="Choose…" />
             </CardField>
             <CardField id="card-hall-guests" label="Guests" icon={UsersIcon} error={errors.guests}>
-              <TextInput inputClass="booking-field" id="card-hall-guests" error={errors.guests} type="number" min="1" placeholder="e.g. 200" value={v.guests || ''} onChange={(e) => patch({ guests: e.target.value })} />
+              <TextInput
+                inputClass="booking-field"
+                id="card-hall-guests"
+                error={errors.guests}
+                type="number"
+                min={HALL_MIN_GUESTS}
+                max={HALL_MAX_GUESTS}
+                inputMode="numeric"
+                placeholder="e.g. 200"
+                value={v.guests || ''}
+                onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+                onChange={(e) => onHallGuestsChange(e.target.value)}
+                onBlur={onHallGuestsBlur}
+              />
             </CardField>
           </div>
         </>
@@ -770,7 +826,7 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
   const activeTab = service || defaultTab;
   const isServiceMode = Boolean(service);
   const isCompact = compact || isServiceMode;
-  const { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit } = useBookingForm(activeTab, Boolean(service || preselect));
+  const { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit } = useBookingForm(activeTab, Boolean(service || preselect));
   const currentTab = service || tab;
   const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
   const title = (service && SERVICE_HEADERS[service]) || 'Plan your visit';
@@ -791,7 +847,16 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
         className={isCompact ? "pt-3" : "pt-4"}
       >
         <form onSubmit={submit} noValidate>
-          <CardFields tab={currentTab} v={v} errors={errors} patch={patch} busy={busy} compact={isCompact} />
+          <CardFields
+            tab={currentTab}
+            v={v}
+            errors={errors}
+            patch={patch}
+            onHallGuestsChange={onHallGuestsChange}
+            onHallGuestsBlur={onHallGuestsBlur}
+            busy={busy}
+            compact={isCompact}
+          />
         </form>
       </div>
       {!isCompact && SITE_INFO.phone && phoneHref && (
@@ -809,7 +874,7 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
  * last tab is restored.
  */
 export function BookingBar({ defaultTab = 'stay', preselect = false, className }) {
-  const { tab, selectTab, onTabKey, tabRefs, v, patch, errors, busy, submit } = useBookingForm(defaultTab, preselect);
+  const { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit } = useBookingForm(defaultTab, preselect);
 
   return (
     <section
@@ -825,7 +890,15 @@ export function BookingBar({ defaultTab = 'stay', preselect = false, className }
         className="pt-3"
       >
         <form onSubmit={submit} noValidate>
-          <Fields tab={tab} v={v} errors={errors} patch={patch} busy={busy} />
+          <Fields
+            tab={tab}
+            v={v}
+            errors={errors}
+            patch={patch}
+            onHallGuestsChange={onHallGuestsChange}
+            onHallGuestsBlur={onHallGuestsBlur}
+            busy={busy}
+          />
         </form>
       </div>
     </section>

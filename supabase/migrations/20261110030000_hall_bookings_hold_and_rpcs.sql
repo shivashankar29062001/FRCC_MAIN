@@ -76,6 +76,11 @@ ON CONFLICT (id) DO UPDATE SET
 -- STEP 2: Add missing columns to public.convention_bookings (reuse existing)
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.convention_bookings
+  ADD COLUMN IF NOT EXISTS cancelled_at       TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS refund_percent     NUMERIC(5, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS refund_amount      NUMERIC(10, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS refund_status      TEXT DEFAULT 'NONE',
+  ADD COLUMN IF NOT EXISTS cooling            TEXT DEFAULT 'AC',
   ADD COLUMN IF NOT EXISTS hold_expires_at    TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS start_at           TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS end_at             TIMESTAMPTZ,
@@ -90,7 +95,28 @@ ALTER TABLE public.convention_bookings
   ADD COLUMN IF NOT EXISTS utr_number         TEXT,
   ADD COLUMN IF NOT EXISTS refund_method      TEXT;
 
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'convention_bookings_refund_status_chk'
+  ) THEN
+    ALTER TABLE public.convention_bookings
+      ADD CONSTRAINT convention_bookings_refund_status_chk
+      CHECK (refund_status IN ('NONE', 'PENDING', 'PROCESSED', 'NOT_APPLICABLE'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'convention_bookings_guests_bounds_chk'
+  ) THEN
+    ALTER TABLE public.convention_bookings
+      ADD CONSTRAINT convention_bookings_guests_bounds_chk
+      CHECK (guests >= 30 AND guests <= 10000) NOT VALID;
+  END IF;
+END $$;
+
 -- Drop old table-level status check constraints (excluding refund_status)
+ALTER TABLE public.convention_bookings
+  DROP CONSTRAINT IF EXISTS convention_bookings_status_check,
+  DROP CONSTRAINT IF EXISTS convention_bookings_status_chk;
+
 DO $$
 DECLARE
   v_con RECORD;
@@ -100,7 +126,8 @@ BEGIN
     FROM pg_constraint
     WHERE conrelid = 'public.convention_bookings'::regclass
       AND contype = 'c'
-      AND pg_get_constraintdef(oid) ~* '\bstatus\b'
+      AND conname <> 'convention_bookings_refund_status_chk'
+      AND pg_get_constraintdef(oid) ~* '\ystatus\y'
       AND pg_get_constraintdef(oid) NOT ILIKE '%refund_status%'
   LOOP
     EXECUTE format('ALTER TABLE public.convention_bookings DROP CONSTRAINT IF EXISTS %I', v_con.conname);
@@ -166,6 +193,9 @@ CREATE POLICY "Admins manage convention_bookings" ON public.convention_bookings
   FOR ALL TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
+
+REVOKE ALL ON public.convention_bookings FROM anon;
+GRANT SELECT ON public.convention_bookings TO authenticated;
 
 -- ----------------------------------------------------------------------------
 -- STEP 4: RPC get_hall_availability(p_hall_id, p_date)

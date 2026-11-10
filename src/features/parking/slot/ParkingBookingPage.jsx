@@ -291,6 +291,7 @@ export default function ParkingBookingPage() {
   const submittingRef = useRef(false);
   const cancelInFlightRef = useRef(false);
   const pendingBookingRef = useRef(null);
+  const refreshRequestIdRef = useRef(0);
 
   const apiConfigured = isBookingApiConfigured();
 
@@ -363,7 +364,7 @@ export default function ParkingBookingPage() {
     formData.days
   ]);
 
-  // Synchronize slot occupancy dynamically from Database & Backend API per campus
+  // Synchronize slot occupancy dynamically from Database & Backend API once a booking date is selected
   const refreshSlots = useCallback(() => {
     const cityKey = (formData.city || effectiveCampus || '').toLowerCase().includes('hyd') ? 'hyd' : 'vja';
     const campus = cityKey === 'hyd' ? 'hyderabad' : 'vijayawada';
@@ -371,7 +372,18 @@ export default function ParkingBookingPage() {
     const activeTime = formData.time ? formData.time.trim() : '';
     const activeDays = formData.days ? Number(formData.days) : '';
 
+    const reqId = ++refreshRequestIdRef.current;
+
+    if (!activeDate) {
+      setSlotStatuses((prev) => ({
+        ...prev,
+        [cityKey]: generateInitialSlots(),
+      }));
+      return;
+    }
+
     fetchParkingAvailability(campus, activeDate, activeTime, activeDays).then((slotData) => {
+      if (reqId !== refreshRequestIdRef.current) return;
       if (slotData && slotData.length > 0) {
         const bookedSet = new Set(slotData.filter((s) => s.status === 'booked').map((s) => s.id));
         setSlotStatuses((prev) => ({
@@ -556,8 +568,21 @@ export default function ParkingBookingPage() {
       };
     });
 
-    retainConfirmedBooking(booking, user?.id);
-    setConfirmedBooking(booking);
+    const canonicalRef = booking.booking_reference || booking.bookingReference || booking.bookingId;
+    const rawTime = booking.arrivalTime || booking.arrival_time || formData.time || '09:00';
+    const normalizedTime = String(rawTime).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+    const unifiedBooking = {
+      ...booking,
+      bookingReference: canonicalRef,
+      bookingId: canonicalRef,
+      booking_reference: canonicalRef,
+      arrivalTime: normalizedTime,
+      arrival_time: normalizedTime,
+      bookingTime: booking.bookingTime || normalizedTime,
+    };
+
+    retainConfirmedBooking(unifiedBooking, user?.id);
+    setConfirmedBooking(unifiedBooking);
     setIsSubmitting(false);
     submittingRef.current = false;
     pendingBookingRef.current = null;
@@ -565,23 +590,29 @@ export default function ParkingBookingPage() {
     refreshSlots();
 
     const confirmationRecord = {
-      ...booking,
-      id: booking.bookingReference || booking.bookingId,
-      bookingId: booking.bookingReference || booking.bookingId,
-      bookingRef: booking.bookingReference || booking.bookingId,
+      ...unifiedBooking,
+      id: canonicalRef,
+      bookingId: canonicalRef,
+      bookingRef: canonicalRef,
       category: 'parking',
       title: `Parking Slot ${booking.parkingSlot}`,
       slot: booking.parkingSlot,
       parkingSlot: booking.parkingSlot,
       date: booking.bookingDateISO || booking.bookingDate,
-      time: booking.arrivalTime || booking.bookingTime,
+      time: normalizedTime,
+      arrival_time: normalizedTime,
+      arrivalTime: normalizedTime,
+      bookingTime: booking.bookingTime || normalizedTime,
       areaName: booking.city?.toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
       details: {
         vehicleType: booking.vehicleType,
         vehicleNumber: booking.vehicleNumber,
         vehicleModel: booking.vehicleModel,
         city: booking.city,
+        campus: booking.campus,
         durationDays: booking.numberOfDays,
+        arrivalTime: normalizedTime,
+        bookingTime: booking.bookingTime || normalizedTime,
       },
       amount: 0,
       total: 0,
@@ -641,14 +672,28 @@ export default function ParkingBookingPage() {
 
     submitBookingToAdmin(booking)
       .then((res) => {
+        const dbData = res?.data || {};
+        const authoritativeRef = dbData.booking_reference || dbData.bookingReference || booking.bookingReference;
         setSubmissionState({ status: 'success', error: '' });
-        commitConfirmedBooking({ ...booking, id: res?.data?.id || booking.bookingReference });
+        commitConfirmedBooking({
+          ...booking,
+          id: dbData.id || authoritativeRef,
+          bookingReference: authoritativeRef,
+          bookingId: authoritativeRef,
+          booking_reference: authoritativeRef,
+          arrivalTime: dbData.arrival_time || booking.arrivalTime,
+          arrival_time: dbData.arrival_time || booking.arrivalTime,
+        });
       })
       .catch((err) => {
         setIsSubmitting(false);
         submittingRef.current = false;
         if (err && (err.code === 'SLOT_TAKEN' || err.message?.includes('SLOT_TAKEN'))) {
-          setErrors((prev) => ({ ...prev, slot: 'This slot was just booked' }));
+          const takenMsg = 'This parking slot is already booked for the selected date and time. Please choose another slot.';
+          if (typeof pushToast === 'function') {
+            pushToast(takenMsg, 'error');
+          }
+          setErrors((prev) => ({ ...prev, slot: takenMsg, payment: takenMsg }));
           setSelectedSlot(null);
           setStep(STEP_SLOT);
           refreshSlots();
@@ -659,6 +704,9 @@ export default function ParkingBookingPage() {
           return;
         }
         const message = err && err.message ? err.message : 'Could not confirm booking with database.';
+        if (typeof pushToast === 'function') {
+          pushToast(message, 'error');
+        }
         setSubmissionState({ status: 'error', error: message });
         setErrors((prev) => ({ ...prev, payment: message }));
       });

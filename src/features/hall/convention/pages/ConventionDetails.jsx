@@ -5,7 +5,12 @@ import { createHallBooking, getHallAvailability } from '../services/hallBookingS
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr } from '../utils/format';
-import { HALL_CANCELLATION_POLICY_TEXT } from '../config/halls.config.js';
+import {
+  HALL_CANCELLATION_POLICY_TEXT,
+  HALL_MIN_GUESTS,
+  HALL_MAX_GUESTS,
+  sanitizeHallGuestsInput,
+} from '../config/halls.config.js';
 import {
   INDIAN_MOBILE_MESSAGE,
   isValidIndianMobile,
@@ -125,7 +130,26 @@ export default function ConventionDetails() {
               {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
             </select></label>
           <label className="block">Guest Count {hall && <span className="text-gray-500 text-sm">(min 30, up to this hall's max of {hall.capacity.toLocaleString('en-IN')})</span>}
-            <input type="number" min="30" max="10000" className={inputClass} value={booking.guests} onChange={e => updateBooking({ guests: e.target.value })} /></label>
+            <input
+              type="number"
+              min={HALL_MIN_GUESTS}
+              max={HALL_MAX_GUESTS}
+              inputMode="numeric"
+              className={inputClass}
+              value={booking.guests}
+              onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+              onChange={(e) => {
+                const { value, overLimit } = sanitizeHallGuestsInput(e.target.value);
+                updateBooking({ guests: value });
+                if (overLimit) {
+                  setError('Guest count cannot exceed 10,000.');
+                } else if (hall && value && Number(value) > hall.capacity) {
+                  setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
+                } else {
+                  setError('');
+                }
+              }}
+            /></label>
           <p className="text-sm text-gray-600">Food: ₹1,500 – ₹3,000 per plate</p>
           <label className="block">Organizer Name
             <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: e.target.value })} /></label>

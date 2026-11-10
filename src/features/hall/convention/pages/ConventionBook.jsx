@@ -8,7 +8,14 @@ import {
 } from '../services/hallBookingService.js';
 import Stepper from '../components/Stepper';
 import HallCard from '../components/HallCard';
-import { GUEST_COUNT_CHIPS, HALL_TYPES, COOLING_OPTIONS } from '../config/halls.config.js';
+import {
+  GUEST_COUNT_CHIPS,
+  HALL_TYPES,
+  COOLING_OPTIONS,
+  HALL_MIN_GUESTS,
+  HALL_MAX_GUESTS,
+  sanitizeHallGuestsInput,
+} from '../config/halls.config.js';
 
 export default function ConventionBook() {
   const { booking, updateBooking, clearSlotError } = useBooking();
@@ -181,7 +188,10 @@ export default function ConventionBook() {
 
     const patch = {};
     if (paramDate) patch.date = paramDate;
-    if (paramGuests && Number(paramGuests) >= 30) patch.guests = String(paramGuests);
+    if (paramGuests) {
+      const { value } = sanitizeHallGuestsInput(paramGuests);
+      if (value && Number(value) >= HALL_MIN_GUESTS) patch.guests = value;
+    }
     if (paramEvent) patch.eventType = paramEvent;
 
     if (paramHall) {
@@ -352,9 +362,14 @@ export default function ConventionBook() {
           <div className="flex items-center">
             <button type="button" aria-label="Decrease guests" onClick={() => stepGuests(-10)}
               className="border border-navy text-navy rounded-l px-3 py-2 font-bold hover:bg-navy hover:text-gold">−</button>
-            <input id="guest-count" type="number" min="30" max="10000" step="10" inputMode="numeric"
+            <input id="guest-count" type="number" min={HALL_MIN_GUESTS} max={HALL_MAX_GUESTS} step="10" inputMode="numeric"
               value={booking.guests} placeholder="e.g. 100"
-              onChange={e => updateBooking({ guests: e.target.value })}
+              onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
+              onChange={(e) => {
+                const { value, overLimit } = sanitizeHallGuestsInput(e.target.value);
+                updateBooking({ guests: value });
+                setError(overLimit ? 'Guest count cannot exceed 10,000.' : '');
+              }}
               className="border-y border-navy w-28 px-3 py-2 text-center" />
             <button type="button" aria-label="Increase guests" onClick={() => stepGuests(10)}
               className="border border-navy text-navy rounded-r px-3 py-2 font-bold hover:bg-navy hover:text-gold">+</button>

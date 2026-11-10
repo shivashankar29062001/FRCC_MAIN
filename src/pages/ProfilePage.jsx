@@ -188,9 +188,13 @@ function PersonalDetails({ user, membership, pushToast }) {
       if (refreshUserData) {
         await refreshUserData();
       }
-      if (data?.user?.new_email) {
-        setEmailStatus(`Verification link sent to ${cleanEmail}. Please check your new email to confirm the change. Until confirmed, your active sign-in email remains ${realEmail}.`);
-        pushToast(`Verification link sent to ${cleanEmail}. Check your new email!`, 'success');
+      const returnedEmail = String(data?.user?.email || '').trim().toLowerCase();
+      if (data?.user?.new_email || (returnedEmail && returnedEmail !== cleanEmail)) {
+        const currentActive = data?.user?.email || realEmail;
+        setEmailStatus(
+          `Verification link sent to ${cleanEmail}. Check your new inbox (and ${currentActive} if double confirmation is required). Until confirmed, continue signing in with ${currentActive}.`,
+        );
+        pushToast(`Verification link sent to ${cleanEmail}. Check your email to confirm!`, 'success');
       } else {
         setEmailStatus(`Email updated to ${cleanEmail}.`);
         pushToast('Email updated successfully.', 'success');
@@ -346,7 +350,7 @@ function PersonalDetails({ user, membership, pushToast }) {
                 </span>
                 <div className="space-y-1">
                   <p>
-                    A verification link was sent to <strong className="font-semibold">{pendingEmail}</strong>. Please check your new inbox and click the link to confirm.
+                    A verification link was sent to <strong className="font-semibold">{pendingEmail}</strong> (and to your current email if double confirmation is enabled). Click the confirmation link(s) to complete the update.
                   </p>
                   <p className="text-amber-800 font-medium">
                     Until confirmed, your active sign-in email remains <strong className="font-semibold">{realEmail}</strong>.
@@ -607,7 +611,7 @@ export function ProfilePage({ initialTab = 'details' }) {
         prev.map((s) => (s.bookingRef === ref || s.id === bookingUuid || s.uuid === bookingUuid ? { ...s, status: 'cancelled' } : s))
       );
       setDbTableBookings((prev) =>
-        prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+        prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'CANCELLED' } : t))
       );
       setDbConventionBookings((prev) =>
         prev.map((c) => (c.bookingRef === ref || c.id === bookingUuid || c.id === ref ? { ...c, status: 'CANCELLED' } : c))
@@ -636,7 +640,7 @@ export function ProfilePage({ initialTab = 'details' }) {
           prev.map((s) => (s.bookingRef === ref || s.id === bookingUuid || s.uuid === bookingUuid ? { ...s, status: 'cancelled' } : s))
         );
         setDbTableBookings((prev) =>
-          prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'cancelled' } : t))
+          prev.map((t) => (t.bookingRef === ref || t.id === bookingUuid || t.uuid === bookingUuid ? { ...t, status: 'CANCELLED' } : t))
         );
         setDbParkingBookings((prev) =>
           prev.map((p) => (p.bookingRef === ref || p.booking_reference === ref || p.id === bookingUuid || p.id === ref ? { ...p, status: 'CANCELLED', booking_status: 'CANCELLED' } : p))
@@ -807,37 +811,53 @@ export function ProfilePage({ initialTab = 'details' }) {
       return undefined;
     }
     let mounted = true;
-    getMyTableBookings(uid)
-      .then((records) => {
-        if (!mounted || !records) return;
-        setDbTableBookings(
-          (records || []).map((r) => {
-            const uuid = r.uuid || r.rawId || r.id;
-            const ref = r.booking_ref || r.bookingRef || r.bookingId || r.id;
-            const loc = extractDiningLocation(r);
-            return {
-              ...r,
-              id: r.id,
-              uuid,
-              rawId: uuid,
-              bookingRef: ref,
-              bookingId: ref,
-              user_id: r.user_id || uid,
-              userId: r.user_id || uid,
-              cityId: loc.cityId,
-              cityName: loc.cityName,
-              areaName: loc.areaName,
-              venueLocationName: loc.venueLocationName,
-              location: loc.location,
-            };
-          })
-        );
-      })
-      .catch((err) => {
-        console.warn('Unable to load table bookings:', err);
-      });
+
+    function fetchTableBookings() {
+      getMyTableBookings(uid)
+        .then((records) => {
+          if (!mounted || !records) return;
+          setDbTableBookings(
+            (records || []).map((r) => {
+              const uuid = r.uuid || r.rawId || r.id;
+              const ref = r.booking_ref || r.bookingRef || r.bookingId || r.id;
+              const loc = extractDiningLocation(r);
+              return {
+                ...r,
+                id: r.id,
+                uuid,
+                rawId: uuid,
+                bookingRef: ref,
+                bookingId: ref,
+                user_id: r.user_id || uid,
+                userId: r.user_id || uid,
+                cityId: loc.cityId,
+                cityName: loc.cityName,
+                areaName: loc.areaName,
+                venueLocationName: loc.venueLocationName,
+                location: loc.location,
+                status: String(r.status || 'CONFIRMED').toUpperCase(),
+              };
+            })
+          );
+        })
+        .catch((err) => {
+          console.warn('Unable to load table bookings:', err);
+        });
+    }
+
+    fetchTableBookings();
+    const reloadListener = () => fetchTableBookings();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('frcc:table-bookings-changed', reloadListener);
+      window.addEventListener('frcc:booking-created', reloadListener);
+    }
+
     return () => {
       mounted = false;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('frcc:table-bookings-changed', reloadListener);
+        window.removeEventListener('frcc:booking-created', reloadListener);
+      }
     };
   }, [user?.id, user?.userId]);
 
@@ -881,8 +901,8 @@ export function ProfilePage({ initialTab = 'details' }) {
           parkingSlot: r.slot_id || r.parkingSlot || r.slot || '',
           date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
           booking_date: r.booking_date || r.bookingDateISO || r.bookingDate || r.date,
-          time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
-          arrival_time: r.arrival_time || r.arrivalTime || r.bookingTime || r.time || '09:00',
+          time: String(r.arrival_time || r.arrivalTime || r.bookingTime || r.time || r.details?.arrivalTime || r.details?.bookingTime || '09:00').replace(/^(\d{2}:\d{2}):\d{2}$/, '$1'),
+          arrival_time: String(r.arrival_time || r.arrivalTime || r.bookingTime || r.time || r.details?.arrivalTime || r.details?.bookingTime || '09:00').replace(/^(\d{2}:\d{2}):\d{2}$/, '$1'),
           duration: `${r.duration_days || r.numberOfDays || r.durationDays || 1} Day${(Number(r.duration_days || r.numberOfDays || r.durationDays) || 1) > 1 ? 's' : ''}`,
           durationDays: Number(r.duration_days || r.numberOfDays || r.durationDays) || 1,
           vehicleType: r.vehicle_type || r.vehicleType || 'Vehicle',
@@ -1075,7 +1095,7 @@ export function ProfilePage({ initialTab = 'details' }) {
         id: ref,
         uuid,
         rawId: uuid,
-        status: isCancelled ? 'cancelled' : tbl.status,
+        status: isCancelled ? 'CANCELLED' : String(tbl.status || 'CONFIRMED').toUpperCase(),
       };
       bookingsByRef.set(ref, normalized);
       registerKeys(ref, tbl);
@@ -1792,7 +1812,18 @@ export function ProfilePage({ initialTab = 'details' }) {
                               </div>
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Arrival Time</dt>
-                                <dd className="font-medium text-navy-900">{b.time || b.arrival_time}</dd>
+                                <dd className="font-medium text-navy-900">
+                                  {String(
+                                    b.arrival_time ||
+                                      b.arrivalTime ||
+                                      b.time ||
+                                      b.bookingTime ||
+                                      b.details?.arrivalTime ||
+                                      b.details?.bookingTime ||
+                                      b.details?.time ||
+                                      '—'
+                                  ).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1')}
+                                </dd>
                               </div>
                               {(b.vehicleNumber || b.details?.vehicleNumber) && (
                                 <div className="flex justify-between gap-3">
@@ -1901,6 +1932,14 @@ export function ProfilePage({ initialTab = 'details' }) {
                             </>
                           ) : (
                             <>
+                              {(b.location || b.areaName || b.area_name || b.details?.location || b.details?.areaName) && (
+                                <div className="flex justify-between gap-3">
+                                  <dt className="text-slate-500">Location</dt>
+                                  <dd className="font-medium text-navy-900">
+                                    {b.location || b.details?.location || b.areaName || b.area_name || b.details?.areaName}
+                                  </dd>
+                                </div>
+                              )}
                               <div className="flex justify-between gap-3">
                                 <dt className="text-slate-500">Date</dt>
                                 <dd className="font-medium text-navy-900">{formatDMY(b.date)}</dd>
@@ -1948,7 +1987,9 @@ export function ProfilePage({ initialTab = 'details' }) {
                                 )}
                                 <div className="flex justify-between gap-3">
                                   <dt className="text-slate-500">{cardDiscount > 0 ? 'Total' : 'Amount'}</dt>
-                                  <dd className="font-medium text-navy-900">{formatINR(rawAmount)}</dd>
+                                  <dd className={`font-medium ${rawAmount === 0 ? 'font-bold text-emerald-700' : 'text-navy-900'}`}>
+                                    {rawAmount === 0 ? 'Free' : formatINR(rawAmount)}
+                                  </dd>
                                 </div>
                               </>
                             );

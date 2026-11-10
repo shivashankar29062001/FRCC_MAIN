@@ -10,7 +10,7 @@ import { SmartImage } from '../../components/ui/media.jsx';
 import { IMAGES } from '../../config/images.js';
 import { venues } from '../../data/dining.js';
 import { phone, diningLabel } from '../../config/site.js';
-import { getTableSlots, createTableBooking } from '../../api/dining.js';
+import { getTableSlots, createTableBooking, isDiningSlotPast, stripDiningLocationTag } from '../../api/dining.js';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatDMY, parseDMY } from '../../utils/dates.js';
@@ -67,9 +67,11 @@ export function TableBookingPage() {
     return STEPS;
   }, [hasPreselectedVenue]);
 
-  // Form state
-  const [selectedCityId, setSelectedCityId] = useState('vja');
-  const [selectedVenueLocationId, setSelectedVenueLocationId] = useState('vja-dining');
+  // Form state (supports optional ?city=hyd URL param while defaulting to first city)
+  const initialCityParam = (searchParams.get('city') || searchParams.get('cityId') || '').toLowerCase();
+  const matchedInitCity = DINING_LOCATIONS.find((c) => String(c.id).toLowerCase() === initialCityParam) || DINING_LOCATIONS[0];
+  const [selectedCityId, setSelectedCityId] = useState(matchedInitCity?.id || 'vja');
+  const [selectedVenueLocationId, setSelectedVenueLocationId] = useState(matchedInitCity?.venues?.[0]?.id || 'vja-dining');
   const [selectedVenueId, setSelectedVenueId] = useState(initialVenueParam);
 
   const selectedCity = useMemo(
@@ -161,14 +163,17 @@ export function TableBookingPage() {
 
   // Step 1 validation
   const canProceedStep1 = useMemo(() => {
+    const slotItem = slotsList.find((s) => s.time === selectedSlot);
     return Boolean(
       selectedVenueId &&
       !dateError &&
       guestsCount >= 1 &&
       guestsCount <= 12 &&
-      selectedSlot
+      selectedSlot &&
+      (!slotItem || slotItem.available) &&
+      !isDiningSlotPast(dateStr, selectedSlot)
     );
-  }, [selectedVenueId, dateError, guestsCount, selectedSlot]);
+  }, [selectedVenueId, dateError, guestsCount, selectedSlot, slotsList, dateStr]);
 
   // Step 2 validation
   function validateDetails() {
@@ -220,6 +225,14 @@ export function TableBookingPage() {
   async function handleConfirmBooking() {
     if (submitting) return;
     if (!validateDetails()) return;
+    if (isDiningSlotPast(dateStr, selectedSlot)) {
+      const msg = 'Selected time slot has already passed. Please choose an upcoming time slot.';
+      setErrors({ slot: msg, form: msg });
+      setSelectedSlot('');
+      setStep(1);
+      getTableSlots(venue.id, dateStr).then(setSlotsList).catch(() => {});
+      return;
+    }
     setSubmitting(true);
     setErrors({});
     try {
@@ -252,9 +265,11 @@ export function TableBookingPage() {
     } catch (err) {
       console.error('Failed to create table booking:', err);
       const msg = err?.message || 'Unable to reserve table. Please try again.';
-      if (msg.toLowerCase().includes('capacity') || msg.toLowerCase().includes('seat') || msg.toLowerCase().includes('not available')) {
+      const lowerMsg = msg.toLowerCase();
+      if (lowerMsg.includes('capacity') || lowerMsg.includes('seat') || lowerMsg.includes('not available') || lowerMsg.includes('passed') || lowerMsg.includes('past')) {
         setStep(1); // Return to Date & Time selection
         setErrors({ slot: msg, form: msg });
+        getTableSlots(venue.id, dateStr).then(setSlotsList).catch(() => {});
       } else {
         setErrors({ form: msg });
       }
@@ -472,12 +487,22 @@ export function TableBookingPage() {
                           <span>{s.time}</span>
                         </div>
                         <p className={`text-[11px] mt-1 font-medium ${s.available ? 'text-emerald-700' : 'text-slate-400'}`}>
-                          {s.available ? `${s.seatsLeft} seats left` : 'Full'}
+                          {s.isPast ? 'Time passed' : s.available ? `${s.seatsLeft} seats left` : 'Full'}
                         </p>
                       </button>
                     );
                   })}
                 </div>
+              )}
+              {!loadingSlots && slotsList.length > 0 && slotsList.every((s) => s.isPast) && (
+                <p className="field-error mt-2" role="alert">
+                  All time slots for today have already passed. Please select a future date.
+                </p>
+              )}
+              {errors.slot && (
+                <p className="field-error mt-2" role="alert">
+                  {errors.slot}
+                </p>
               )}
             </div>
           </div>
@@ -763,10 +788,10 @@ export function TableBookingPage() {
               <span className="text-slate-500">Mobile</span>
               <span className="font-semibold text-navy-900">{confirmedBooking.guest_mobile}</span>
             </div>
-            {confirmedBooking.notes && (
+            {stripDiningLocationTag(confirmedBooking.notes) && (
               <div className="flex justify-between">
                 <span className="text-slate-500">Notes</span>
-                <span className="font-semibold text-navy-900 truncate max-w-[200px]">{confirmedBooking.notes}</span>
+                <span className="font-semibold text-navy-900 truncate max-w-[200px]">{stripDiningLocationTag(confirmedBooking.notes)}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-slate-200 pt-2">

@@ -17,10 +17,11 @@ export function StatusTag({ status = '', className }) {
       ? 'tag-green'
       : key.includes('pend') || key.includes('process') || key.includes('draft')
         ? 'tag-amber'
-        : key.includes('cancel') || key.includes('fail') || key.includes('error')
+        : key.includes('cancel') || key.includes('fail') || key.includes('error') || key.includes('expir')
           ? 'tag-red'
           : 'tag-slate';
-  return <span className={cx('tag', tone, className)}>{status}</span>;
+  const label = String(status || '').replaceAll('_', ' ').trim().toUpperCase();
+  return <span className={cx('tag', tone, className)}>{label}</span>;
 }
 
 export function SectionHeading({ eyebrow, title, sub, align = 'left' }) {

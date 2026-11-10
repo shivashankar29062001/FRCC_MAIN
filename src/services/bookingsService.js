@@ -24,6 +24,22 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
   const { data: sessionData } = await supabase.auth.getSession();
   const currentUserId = sessionData?.session?.user?.id || bookingRecord.userId || bookingRecord.user_id || null;
 
+  const arrivalTime =
+    bookingRecord.arrival_time ||
+    bookingRecord.arrivalTime ||
+    bookingRecord.time ||
+    bookingRecord.details?.arrivalTime ||
+    null;
+  const bookingTime =
+    bookingRecord.bookingTime ||
+    bookingRecord.details?.bookingTime ||
+    null;
+  const mergedDetails = {
+    ...(bookingRecord.details || bookingRecord.extras || {}),
+    ...(arrivalTime ? { arrivalTime: String(arrivalTime).replace(/^(\d{2}:\d{2}):\d{2}$/, '$1') } : {}),
+    ...(bookingTime ? { bookingTime } : {}),
+  };
+
   const payload = {
     booking_id: bookingRecord.bookingRef || bookingRecord.bookingId || bookingRecord.id,
     user_id: currentUserId,
@@ -36,7 +52,7 @@ export async function createBooking(bookingRecord, paymentRecord = null) {
     area_name: bookingRecord.areaName || null,
     guests: bookingRecord.guests || null,
     players: Number(bookingRecord.players || 1),
-    details: bookingRecord.details || bookingRecord.extras || {},
+    details: mergedDetails,
     subtotal: Number(bookingRecord.subtotal ?? bookingRecord.total ?? bookingRecord.amount ?? 0),
     discount: Number(bookingRecord.discount || 0),
     amount: Number(bookingRecord.amount ?? bookingRecord.total ?? 0),
@@ -142,10 +158,26 @@ export async function getUserBookings(userId = null) {
       booking_ref: b?.booking_id,
       user_id: b?.user_id || targetUserId,
       userId: b?.user_id || targetUserId,
+      gameId: b?.game_id || b?.details?.gameId || null,
       gameName: b?.title || 'Booking',
-      game: b?.category === 'activity' ? (b?.title || '').toLowerCase().replace(/\s+/g, '-') : (b?.title || 'Booking'),
+      game: b?.category === 'activity' ? (b?.details?.gameId || (b?.title || '').toLowerCase().replace(/\s+/g, '-')) : (b?.title || 'Booking'),
+      cityId: b?.details?.cityId || null,
+      cityName: b?.details?.cityName || b?.details?.city || null,
+      areaName:
+        b?.area_name ||
+        b?.details?.areaName ||
+        (String(b?.details?.city || '').toLowerCase().includes('hyd')
+          ? 'Hyderabad Campus'
+          : b?.details?.city
+          ? 'Vijayawada Campus'
+          : null),
+      location: b?.details?.location || b?.area_name || b?.details?.areaName || null,
       date: b?.date || b?.checkin,
       slot: b?.slot,
+      time: b?.details?.arrivalTime || b?.details?.bookingTime || b?.details?.time || null,
+      arrival_time: b?.details?.arrivalTime || b?.details?.time || null,
+      arrivalTime: b?.details?.arrivalTime || b?.details?.time || null,
+      bookingTime: b?.details?.bookingTime || null,
       players: b?.players,
       amount,
       total: amount,

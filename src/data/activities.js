@@ -166,10 +166,11 @@ export const games = [
     name: 'Carom',
     category: 'indoor',
     group: 'wellness',
-    price: 1500,
-    pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
-    unit: 'per-session',
+    price: 0,
+    pricePerSlot: 0,
+    isFree: true,
+    pricingUnit: 'free',
+    unit: 'free',
     slotMinutes: 60, // SAMPLE
     openFrom: '08:00',
     openTo: '22:00',
@@ -291,10 +292,11 @@ export const games = [
     category: 'indoor',
     subCategory: 'kids',
     group: 'wellness',
-    price: 1500,
-    pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
-    unit: 'per-session',
+    price: 0,
+    pricePerSlot: 0,
+    isFree: true,
+    pricingUnit: 'free',
+    unit: 'free',
     slotMinutes: 60, // SAMPLE
     openFrom: '09:00',
     openTo: '20:00',

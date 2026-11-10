@@ -531,6 +531,15 @@ export function AppProvider({ children }) {
   }, [user?.id]);
 
   const refreshUserData = useCallback(async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        await hydrateUserData(userData.user);
+        return;
+      }
+    } catch {
+      /* fallback to cached session */
+    }
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
       await hydrateUserData(session.user);

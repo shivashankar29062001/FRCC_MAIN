@@ -32,7 +32,40 @@ export const COOLING_OPTIONS = [
   { id: 'NON_AC', label: 'Non-AC' },
 ];
 
+export const HALL_MIN_GUESTS = 30;
+export const HALL_MAX_GUESTS = 10000;
+
 export const GUEST_COUNT_CHIPS = [30, 50, 100, 250, 500, 1000, 1500, 5000, 10000];
+
+/**
+ * Strip non-digits and cap hall guest input at HALL_MAX_GUESTS (10,000).
+ */
+export function sanitizeHallGuestsInput(raw, maxAllowed = HALL_MAX_GUESTS) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return { value: '', overLimit: false };
+  const normalized = digits.replace(/^0+/, '') || '0';
+  if (Number(normalized) > maxAllowed) {
+    return { value: String(maxAllowed), overLimit: true };
+  }
+  return { value: normalized, overLimit: false };
+}
+
+/**
+ * Validate a hall guest count against min/max capacity bounds. Returns '' if valid.
+ */
+export function validateHallGuests(raw, { min = HALL_MIN_GUESTS, max = HALL_MAX_GUESTS } = {}) {
+  if (raw === '' || raw === null || raw === undefined) {
+    return 'Enter the number of guests.';
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < min) {
+    return `Minimum ${min} guests required.`;
+  }
+  if (n > max) {
+    return `Maximum ${max.toLocaleString('en-IN')} guests allowed.`;
+  }
+  return '';
+}
 
 export const CANCELLATION_WINDOW_HOURS = 48;
 

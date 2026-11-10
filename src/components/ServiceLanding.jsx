@@ -206,6 +206,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
       }
       return filtered.map((g) => {
         const gamePrice = g.price ?? g.pricePerSlot ?? g.priceFrom ?? 1500;
+        const isFreeGame = Boolean(g.isFree || gamePrice === 0);
         const gameUnit = g.unit === 'per-session' ? 'session' : g.unit === 'per-hour' ? 'hour' : (g.unit || 'session');
         return {
           id: g.id,
@@ -214,15 +215,13 @@ export function ServiceLanding({ service = 'stay', hero }) {
           facts: [
             `Category: ${g.category.toUpperCase()}`,
             g.tag || (g.id === 'luxury-gym' ? 'Cardio, strength, steam & sauna' : 'Indoor & Outdoor courts'),
-            `Pricing: ₹${gamePrice.toLocaleString('en-IN')} / ${gameUnit}`,
+            isFreeGame ? 'Pricing: Free (Complimentary)' : `Pricing: ₹${gamePrice.toLocaleString('en-IN')} / ${gameUnit}`,
           ],
-          priceDisplay: formatInr(gamePrice),
-          priceUnit: ` / ${gameUnit}`,
-          healthCardNote: healthCardDiscountPercent
+          priceDisplay: isFreeGame ? 'Free' : formatInr(gamePrice),
+          priceUnit: isFreeGame ? '' : ` / ${gameUnit}`,
+          healthCardNote: !isFreeGame && healthCardDiscountPercent
             ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
             : null,
-          locationId: 'vja-sports',
-          locationName: 'Vijayawada Campus · Sports Complex',
           buttonLabel: 'Book session',
           to: `/book/activity?item=${encodeURIComponent(g.id)}`,
         };

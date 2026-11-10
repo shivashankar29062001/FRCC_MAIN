@@ -9,10 +9,23 @@ import { FlowShell } from '../../components/FlowShell.jsx';
 import { Reveal } from '../../components/ui/motion.jsx';
 import { IMAGES, gameSlot } from '../../config/images.js';
 import { SmartImage } from '../../components/ui/media.jsx';
-import { GAMES, gameById, quotePrice, formatINR, GAME_CATEGORIES } from './games.config.js';
+import {
+  GAMES,
+  gameById,
+  quotePrice,
+  formatINR,
+  GAME_CATEGORIES,
+  resolveActivityLocation,
+  isGroupActivity,
+  getMaxPlayersForSlot,
+  validateChildAges,
+} from './games.config.js';
 import { getSlots, getSlotAvailability } from './availability.service.js';
 import { saveActivityBooking, createActivityBookingRemote, CHANGED_EVENT } from './bookings.store.js';
 import { SlotGrid } from '../../components/booking/SlotGrid.jsx';
+import { LocationSelector } from '../../components/booking/LocationSelector.jsx';
+import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
+import { ACTIVITY_LOCATIONS } from '../../data/bookingLocations.js';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
 import {
@@ -123,15 +136,17 @@ function QrPlaceholder({ seed = 'frcc' }) {
 
 const STORAGE_KEY = 'frcc_activities_booking_draft';
 
-function blankDraft(gameId, user) {
+function blankDraft(gameId, user, cityParam = '') {
   const prefilledMobile = user?.phone || user?.mobile || (user?.emailOrPhone && !user.emailOrPhone.includes('@') ? user.emailOrPhone : '');
+  const loc = resolveActivityLocation(cityParam ? { cityId: cityParam } : {});
   return {
-
-
-
-
-
     gameId: gameId || '',
+    cityId: loc.cityId,
+    cityName: loc.cityName,
+    venueLocationId: loc.venueLocationId,
+    venueLocationName: loc.venueLocationName,
+    areaName: loc.areaName,
+    location: loc.location,
     date: '',
     slot: '',
     name: user?.name || '',
@@ -147,13 +162,14 @@ export function ActivitiesProcessPage() {
   const { user, isMember, pushToast } = useApp();
   const [params] = useSearchParams();
   const paramGame = params.get('game') || params.get('item') || '';
+  const paramCity = params.get('city') || params.get('cityId') || '';
   const paramValid = Boolean(paramGame && gameById(paramGame));
 
   const [confirmed, setConfirmed] = useState(null);
 
   const [draft, setDraft] = useState(() => {
     if (paramValid) {
-      return blankDraft(paramGame, user);
+      return blankDraft(paramGame, user, paramCity);
     }
     let saved = null;
     try {
@@ -163,12 +179,23 @@ export function ActivitiesProcessPage() {
       /* ignore */
     }
     if (saved && saved.step < 5) {
+      const base = blankDraft(saved.gameId || '', user, paramCity);
       return {
-        ...blankDraft(saved.gameId || '', user),
+        ...base,
         ...saved,
+        ...(paramCity
+          ? {
+              cityId: base.cityId,
+              cityName: base.cityName,
+              venueLocationId: base.venueLocationId,
+              venueLocationName: base.venueLocationName,
+              areaName: base.areaName,
+              location: base.location,
+            }
+          : {}),
       };
     }
-    return blankDraft('', user);
+    return blankDraft('', user, paramCity);
   });
 
   const [step, setStep] = useState(() => {
@@ -190,7 +217,19 @@ export function ActivitiesProcessPage() {
   // Reset flow when query param changes to a different game
   useEffect(() => {
     if (paramValid && paramGame && paramGame !== draft.gameId) {
-      setDraft(blankDraft(paramGame, user));
+      setDraft((prev) => {
+        const next = blankDraft(paramGame, user, paramCity);
+        if (paramCity || !prev.cityId) return next;
+        return {
+          ...next,
+          cityId: prev.cityId,
+          cityName: prev.cityName,
+          venueLocationId: prev.venueLocationId,
+          venueLocationName: prev.venueLocationName,
+          areaName: prev.areaName,
+          location: prev.location,
+        };
+      });
       setStep(1);
       setConfirmed(null);
       setErrors({});
@@ -199,7 +238,7 @@ export function ActivitiesProcessPage() {
         window.sessionStorage.removeItem('frcc_activities_confirmed');
       } catch (_) {}
     }
-  }, [paramGame, paramValid, user]);
+  }, [paramGame, paramValid, paramCity, user]);
 
   // Purge past confirmation receipt if user changes or logs out
   useEffect(() => {
@@ -251,9 +290,58 @@ export function ActivitiesProcessPage() {
     setErrors({});
   };
 
-  // Slots load per game + date from database RPC get_slot_availability / live bookings query
-  const slotsQuery = useMockQuery(() => getSlotAvailability(draft.gameId, draft.date), {
-    deps: [draft.gameId, draft.date],
+  function handleCityChange(nextCityId, cityObj, firstVenue) {
+    if (!nextCityId) {
+      patch({
+        cityId: '',
+        cityName: '',
+        venueLocationId: '',
+        venueLocationName: '',
+        areaName: '',
+        location: '',
+        slot: '',
+      });
+      return;
+    }
+    const loc = resolveActivityLocation({
+      cityId: nextCityId,
+      cityName: cityObj?.name,
+      venueLocationId: firstVenue?.id,
+      venueLocationName: firstVenue?.name,
+      areaName: firstVenue?.areaName,
+      location: firstVenue?.displayName,
+    });
+    patch({ ...loc, slot: '' });
+  }
+
+  function handleVenueChange(nextVenueId, venueObj) {
+    if (!nextVenueId) {
+      patch({
+        venueLocationId: '',
+        venueLocationName: '',
+        location: '',
+        slot: '',
+      });
+      return;
+    }
+    const loc = resolveActivityLocation({
+      cityId: draft.cityId,
+      venueLocationId: nextVenueId,
+      venueLocationName: venueObj?.name,
+      areaName: venueObj?.areaName,
+      location: venueObj?.displayName,
+    });
+    patch({ ...loc, slot: '' });
+  }
+
+  const activeLocationInfo = useMemo(
+    () => (draft.cityId ? { cityId: draft.cityId, areaName: draft.areaName, location: draft.location } : null),
+    [draft.cityId, draft.areaName, draft.location],
+  );
+
+  // Slots load per game + date + location from database RPC / live bookings query
+  const slotsQuery = useMockQuery(() => getSlotAvailability(draft.gameId, draft.date, activeLocationInfo), {
+    deps: [draft.gameId, draft.date, draft.cityId],
     delay: 200,
   });
   // Always refresh slots when opening the slot picker (step 2)
@@ -261,7 +349,7 @@ export function ActivitiesProcessPage() {
     if (step === 2 && draft.gameId && draft.date) {
       slotsQuery.retry();
     }
-  }, [step, draft.gameId, draft.date]);
+  }, [step, draft.gameId, draft.date, draft.cityId]);
 
   // Immediately refresh slots when an activity booking is confirmed or changed on this device
   useEffect(() => {
@@ -295,10 +383,10 @@ export function ActivitiesProcessPage() {
   // Inline step validation
   const isStepValid = useMemo(() => {
     if (step === 0) {
-      return Boolean(draft.gameId && gameById(draft.gameId));
+      return Boolean(draft.gameId && gameById(draft.gameId) && draft.cityId && draft.venueLocationId);
     }
     if (step === 1) {
-      return Boolean(draft.date && draft.date >= todayISO());
+      return Boolean(draft.cityId && draft.venueLocationId && draft.date && draft.date >= todayISO());
     }
     if (step === 2) {
       const s = slots.find((item) => item.time === draft.slot);
@@ -311,22 +399,21 @@ export function ActivitiesProcessPage() {
       const cleanMobile = draft.mobile.replace(/\D/g, '');
       const mobileOk = isValidIndianMobile(draft.mobile);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
-      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
-        ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)
-        : (g?.maxPlayers || 99);
+      const maxAllowed = getMaxPlayersForSlot(g, selectedSlot);
       const playersOk = Boolean(draft.players) && Number.isFinite(n) && n >= 1 && n <= maxAllowed;
       if (!nameOk || !mobileOk || !playersOk) return false;
       if (g?.extraFields) {
         for (const f of g.extraFields) {
           const v = draft.extras[f.id];
           if (f.required && (v === undefined || v === '' || v === false)) return false;
+          if (f.id === 'ages' && validateChildAges(v, n)) return false;
           if (f.type === 'number' && v !== undefined && v !== '') {
             const nv = Number(v);
             if (!Number.isFinite(nv)) return false;
             if (f.min !== undefined && nv < f.min) return false;
             if (f.max !== undefined && nv > f.max) return false;
           }
-          if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) return false;
+          if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2 && f.id !== 'ages') return false;
           if (f.type === 'tel' && v && !isValidIndianMobile(v)) return false;
         }
       }
@@ -347,10 +434,12 @@ export function ActivitiesProcessPage() {
 
   function validate(target) {
     if (target === 0) {
+      if (!draft.cityId || !draft.venueLocationId) return fail({ location: 'Select a city and campus location.' });
       if (!draft.gameId || !gameById(draft.gameId)) return fail({ gameId: 'Select a game to continue.' });
       return true;
     }
     if (target === 1) {
+      if (!draft.cityId || !draft.venueLocationId) return fail({ location: 'Select a city and campus location.' });
       if (!draft.date) return fail({ date: 'Pick a date for your game.' });
       if (draft.date < todayISO()) return fail({ date: 'Past dates are not bookable — pick today or later.' });
       return true;
@@ -370,14 +459,12 @@ export function ActivitiesProcessPage() {
       if (!isValidIndianMobile(draft.mobile)) next.mobile = INDIAN_MOBILE_MESSAGE;
       const n = Number(draft.players);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
-      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
-        ? Math.min(g?.maxPlayers || 99, selectedSlot.remaining)
-        : (g?.maxPlayers || 99);
+      const maxAllowed = getMaxPlayersForSlot(g, selectedSlot);
 
       if (!draft.players || !Number.isFinite(n) || n < 1) {
         next.players = 'Enter how many are playing.';
       } else if (n > maxAllowed) {
-        next.players = selectedSlot && selectedSlot.remaining !== undefined
+        next.players = isGroupActivity(g?.id) && selectedSlot && selectedSlot.remaining !== undefined
           ? `Only ${selectedSlot.remaining} spot${selectedSlot.remaining > 1 ? 's' : ''} available for this slot.`
           : `Max ${g?.maxPlayers} for ${g?.name}.`;
       }
@@ -386,15 +473,16 @@ export function ActivitiesProcessPage() {
           const v = draft.extras[f.id];
           if (f.required && (v === undefined || v === '' || v === false)) {
             next[`x_${f.id}`] = f.type === 'checkbox' ? `Please accept: ${f.label}.` : `“${f.label}” is required.`;
-          }
-          if (f.type === 'number' && v !== undefined && v !== '') {
+          } else if (f.id === 'ages') {
+            const ageErr = validateChildAges(v, n);
+            if (ageErr) next[`x_${f.id}`] = ageErr;
+          } else if (f.type === 'number' && v !== undefined && v !== '') {
             const nv = Number(v);
             if (!Number.isFinite(nv)) next[`x_${f.id}`] = `“${f.label}” must be a number.`;
             else if ((f.min !== undefined && nv < f.min) || (f.max !== undefined && nv > f.max)) {
               next[`x_${f.id}`] = `“${f.label}” must be between ${f.min} and ${f.max}.`;
             }
-          }
-          if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) {
+          } else if ((f.type === 'text' || f.type === 'tel') && f.required && String(v || '').trim().length < 2) {
             next[`x_${f.id}`] = `“${f.label}” is required.`;
           }
           if (f.type === 'tel' && v && !isValidIndianMobile(v)) {
@@ -413,10 +501,15 @@ export function ActivitiesProcessPage() {
     if (step === 3) {
       // Re-check slot availability before proceeding to Review & Payment
       try {
-        const freshSlots = await getSlotAvailability(draft.gameId, draft.date);
+        const freshSlots = await getSlotAvailability(draft.gameId, draft.date, activeLocationInfo);
         const freshSlot = freshSlots.find((s) => s.time === draft.slot);
         const reqPlayers = Number(draft.players || 1);
-        if (!freshSlot || freshSlot.booked || (freshSlot.remaining !== undefined && freshSlot.remaining < reqPlayers)) {
+        const slotUnavailable =
+          !freshSlot ||
+          freshSlot.booked ||
+          (freshSlot.remaining !== undefined &&
+            (isGroupActivity(draft.gameId) ? freshSlot.remaining < reqPlayers : freshSlot.remaining <= 0));
+        if (slotUnavailable) {
           pushToast('This slot is no longer available', 'error');
           setErrors({ slot: 'This slot is no longer available' });
           slotsQuery.retry();
@@ -436,13 +529,25 @@ export function ActivitiesProcessPage() {
   }
 
   function selectGame(id) {
-    setDraft((d) => ({ ...blankDraft(id, user), name: d.name, mobile: d.mobile }));
+    setDraft((d) => ({
+      ...blankDraft(id, user, paramCity),
+      cityId: d.cityId,
+      cityName: d.cityName,
+      venueLocationId: d.venueLocationId,
+      venueLocationName: d.venueLocationName,
+      areaName: d.areaName,
+      location: d.location,
+      name: d.name,
+      mobile: d.mobile,
+    }));
     setErrors({});
   }
 
+  const isFreeGame = Boolean(game && (game.isFree || (game.price ?? game.pricePerSlot) === 0));
+
   async function pay() {
     if (paying) return;
-    if (!draft.paymentMethod) {
+    if (!isFreeGame && !draft.paymentMethod) {
       pushToast('Choose a payment method.', 'error');
       setErrors({ paymentMethod: 'Choose a payment method.' });
       return;
@@ -451,6 +556,14 @@ export function ActivitiesProcessPage() {
     setErrors({});
 
     try {
+      const loc = resolveActivityLocation({
+        cityId: draft.cityId,
+        cityName: draft.cityName,
+        areaName: draft.areaName,
+        venueLocationId: draft.venueLocationId,
+        venueLocationName: draft.venueLocationName,
+        location: draft.location,
+      });
       const created = await createActivityBookingRemote({
         gameId: draft.gameId,
         date: draft.date,
@@ -459,20 +572,40 @@ export function ActivitiesProcessPage() {
         userName: draft.name,
         mobile: draft.mobile,
         email: user?.email || user?.user_metadata?.email || null,
-        paymentMethod: draft.paymentMethod,
+        paymentMethod: isFreeGame ? 'free' : draft.paymentMethod,
+        cityId: loc.cityId,
+        cityName: loc.cityName,
+        areaName: loc.areaName,
+        venueLocationId: loc.venueLocationId,
+        venueLocationName: loc.venueLocationName,
+        location: loc.location,
         details: {
           ...draft.extras,
           equipment: draft.equipment,
           gameName: game?.name,
+          isFree: isFreeGame,
+          cityId: loc.cityId,
+          cityName: loc.cityName,
+          areaName: loc.areaName,
+          venueLocationId: loc.venueLocationId,
+          venueLocationName: loc.venueLocationName,
+          location: loc.location,
         },
       });
 
       const confirmedRecord = {
         ...created,
+        isFree: Boolean(isFreeGame || created.isFree || Number(created.amount ?? 0) === 0),
         bookingId: created.booking_id,
         id: created.booking_id,
         game: created.game_id || draft.gameId,
         gameName: created.title || game?.name,
+        cityId: created.cityId || loc.cityId,
+        cityName: created.cityName || loc.cityName,
+        areaName: created.areaName || loc.areaName,
+        venueLocationId: created.venueLocationId || loc.venueLocationId,
+        venueLocationName: created.venueLocationName || loc.venueLocationName,
+        location: created.location || loc.location,
         userId: created.user_id,
         user_id: created.user_id,
       };
@@ -485,7 +618,7 @@ export function ActivitiesProcessPage() {
       setConfirmed(confirmedRecord);
       slotsQuery.retry();
       setStep(5);
-      pushToast(draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
+      pushToast(isFreeGame ? 'Complimentary booking confirmed.' : draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
     } catch (err) {
       const msg = err?.message || String(err);
       const isSlotConflict =
@@ -517,22 +650,27 @@ export function ActivitiesProcessPage() {
   function downloadReceipt() {
     if (!confirmed) return;
     const g = gameById(confirmed.game);
+    const confirmedIsFree = Boolean(confirmed.isFree || g?.isFree || (g?.price ?? g?.pricePerSlot) === 0 || Number(confirmed.amount ?? 0) === 0);
     const pricing = calculateTotal(confirmed.subtotal ?? confirmed.amount, Boolean(confirmed.isMember ?? isMember));
     const text = [
       'FRCC — Activities Booking Receipt',
       `Booking ID: ${confirmed.bookingId}`,
       `Game: ${confirmed.gameName || g?.name || confirmed.game}`,
-
+      `Location: ${confirmed.location || confirmed.areaName || draft.location}`,
       `Date: ${prettyDate(confirmed.date)}`,
       `Slot: ${confirmed.slot}`,
       `Players: ${confirmed.players}`,
-      `Subtotal: ${formatINR(pricing.subtotal)}`,
-      ...(pricing.discount > 0 ? [`${MEMBER_DISCOUNT_LABEL}: ${formatINR(-pricing.discount)}`] : []),
-      `Total: ${formatINR(pricing.total)}`,
-      `Payment: ${confirmed.paymentMethod || draft.paymentMethod} · ${formatINR(pricing.total)}`,
+      ...(confirmedIsFree
+        ? ['Rate: Complimentary (Free)', 'Total: Free (₹0)', 'Payment: Complimentary Pass']
+        : [
+            `Subtotal: ${formatINR(pricing.subtotal)}`,
+            ...(pricing.discount > 0 ? [`${MEMBER_DISCOUNT_LABEL}: ${formatINR(-pricing.discount)}`] : []),
+            `Total: ${formatINR(pricing.total)}`,
+            `Payment: ${confirmed.paymentMethod || draft.paymentMethod} · ${formatINR(pricing.total)}`,
+          ]),
       `Status: ${confirmed.status}`,
       `Booked: ${formatDMYTime(confirmed.createdAt)}`,
-      ...(!isMember ? [`Note: ${MEMBER_PROMO_NOTE}`] : []),
+      ...(!confirmedIsFree && !isMember ? [`Note: ${MEMBER_PROMO_NOTE}`] : []),
     ].join('\n');
     const blob = new Blob([text], { type: 'text/plain' });
     const a = document.createElement('a');
@@ -553,7 +691,7 @@ export function ActivitiesProcessPage() {
       /* ignore */
     }
     const keepGame = paramValid ? paramGame : '';
-    setDraft({ ...blankDraft(keepGame, user) });
+    setDraft({ ...blankDraft(keepGame, user, paramCity) });
     setConfirmed(null);
     setErrors({});
     setStep(keepGame ? 1 : 0);
@@ -593,6 +731,28 @@ export function ActivitiesProcessPage() {
       );
     }
     if (f.type === 'text') {
+      if (f.id === 'ages') {
+        const liveAgeErr = value !== undefined && String(value).trim() !== ''
+          ? validateChildAges(value, Number(draft.players))
+          : '';
+        return (
+          <Input
+            key={f.id}
+            label={f.label}
+            name={f.id}
+            type="text"
+            maxLength={40}
+            value={value}
+            onChange={(e) => {
+              const cleaned = e.target.value.replace(/[^\d,\s]/g, '').slice(0, 40);
+              patchExtra(f.id, cleaned);
+            }}
+            placeholder={f.placeholder}
+            hint="Enter age(s) between 3 and 10, separated by commas (e.g. 4, 6, 7)."
+            error={err || liveAgeErr}
+          />
+        );
+      }
       return (
         <Input key={f.id} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
       );
@@ -623,7 +783,9 @@ export function ActivitiesProcessPage() {
 
   const processSummary = useMemo(() => {
     let detailText = `${GAME_CATEGORIES[game?.category || 'indoor']} · ${game?.slotMinutes || 60} min`;
-    if (game?.id === 'luxury-gym') {
+    if (isFreeGame) {
+      detailText = `${GAME_CATEGORIES[game?.category || 'indoor']} · Free (${game?.slotMinutes || 60} min)`;
+    } else if (game?.id === 'luxury-gym') {
       detailText = 'Monthly Membership (₹8,000 / month)';
     } else if (game?.id === 'swimming-pool') {
       const hrs = Number(draft.extras.hours || 1);
@@ -634,19 +796,48 @@ export function ActivitiesProcessPage() {
     }
 
     return {
+      service: 'activities',
       name: game?.name || 'Activity',
       image: game ? gameSlot(game.imageKey) : undefined,
       detail: detailText,
       date: draft.date ? prettyDate(draft.date) : undefined,
       slot: draft.slot ? `${draft.slot} (${game?.slotMinutes || 0} min)` : undefined,
       guests: draft.players ? `${draft.players} ${game?.playerLabel || 'players'}` : undefined,
-      hideLocation: true,
+      location: draft.location || draft.areaName || undefined,
+      locationId: draft.venueLocationId || (draft.cityId === 'hyd' ? 'hyd-activities' : 'vja-activities'),
+      isFree: Boolean(quote.isFree),
 
       price: quote.subtotal,
       memberDiscount: quote.discount > 0 ? quote.discount : undefined,
       total: quote.total,
     };
-  }, [game, draft.date, draft.slot, draft.players, draft.extras, quote]);
+  }, [game, isFreeGame, draft.date, draft.slot, draft.players, draft.extras, draft.location, draft.areaName, draft.venueLocationId, draft.cityId, quote]);
+
+  const locationSelectorField = (
+    <div className="mt-5">
+      <LocationSelector
+        locations={ACTIVITY_LOCATIONS}
+        cityId={draft.cityId}
+        venueId={draft.venueLocationId}
+        cityLabel="Select City"
+        venueLabel="Select Campus / Location"
+        onCityChange={handleCityChange}
+        onVenueChange={handleVenueChange}
+        className="!mb-0"
+      />
+      {draft.venueLocationId && (
+        <div className="mt-2">
+          <LocationTrigger
+            locationId={draft.venueLocationId}
+            className="text-xs font-medium text-navy-900 hover:text-gold-600"
+          >
+            {draft.location || draft.areaName} · View on map
+          </LocationTrigger>
+        </div>
+      )}
+      {errors.location && <p role="alert" className="field-error mt-2">{errors.location}</p>}
+    </div>
+  );
 
   return (
     <FlowShell
@@ -667,11 +858,13 @@ export function ActivitiesProcessPage() {
         {step === 0 && (
           <Reveal>
             <Card>
-              <p className="eyebrow">Step 1 · Select Game</p>
-              <h2 className="h-sub mt-1">Which game are you booking?</h2>
+              <p className="eyebrow">Step 1 · Select Location &amp; Game</p>
+              <h2 className="h-sub mt-1">Which campus and game are you booking?</h2>
               <p className="mt-1 text-sm text-slate-600">
-                All facilities and courts are open daily at FRCC.
+                Choose between Vijayawada and Hyderabad sports complexes, then select your game.
               </p>
+
+              {locationSelectorField}
 
               {paramGame && !paramValid && (
                 <p className="mt-3 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-700" role="alert">
@@ -701,11 +894,13 @@ export function ActivitiesProcessPage() {
                           <strong className="truncate text-sm text-navy-900">{g.name}</strong>
                         </span>
                         <span className="mt-0.5 block text-xs text-slate-500">
-                          {g.id === 'luxury-gym'
+                          {g.isFree || (g.price ?? g.pricePerSlot) === 0
+                            ? `${GAME_CATEGORIES[g.category]} · Free`
+                            : g.id === 'luxury-gym'
                             ? '₹8,000 per month'
                             : g.id === 'swimming-pool'
-                            ? `${formatINR(g.price || 1000)} per hour`
-                            : `${GAME_CATEGORIES[g.category]} · ${formatINR(g.price || 1500)} per session`}
+                            ? `${formatINR(g.price ?? 1000)} per hour`
+                            : `${GAME_CATEGORIES[g.category]} · ${formatINR(g.price ?? 1500)} per session`}
                         </span>
                       </span>
                     </button>
@@ -721,8 +916,9 @@ export function ActivitiesProcessPage() {
             {step === 1 && game && (
               <Reveal>
                 <Card>
-                  <p className="eyebrow">Step 2 · Date & Time</p>
-                  <h2 className="h-sub mt-1">{game.name} — pick a date</h2>
+                  <p className="eyebrow">Step 2 · Location, Date &amp; Time</p>
+                  <h2 className="h-sub mt-1">{game.name} — choose campus &amp; date</h2>
+                  {locationSelectorField}
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input
                       label={draft.date ? `Date — ${formatDMY(draft.date)}` : 'Date (DD/MM/YYYY)'}
@@ -759,6 +955,11 @@ export function ActivitiesProcessPage() {
                 <Card>
                   <p className="eyebrow">Step 3 · Available Slot</p>
                   <h2 className="h-sub mt-1">Pick a {game.slotMinutes}-minute slot</h2>
+                  {draft.location && (
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Showing slots for <strong className="text-navy-900">{draft.location}</strong>
+                    </p>
+                  )}
                   <div className="mt-5">
                     <SlotGrid
                       gameId={game.id}
@@ -770,7 +971,7 @@ export function ActivitiesProcessPage() {
                       loading={slotsQuery.loading}
                       error={slotsQuery.error}
                       onRetry={slotsQuery.retry}
-                      isGroup={game.id === 'swimming-pool' || game.id === 'kids-play-area' || game.id === 'luxury-gym'}
+                      isGroup={isGroupActivity(game.id)}
                     />
                     {fullyBooked && (
                       <div className="mt-4">
@@ -810,9 +1011,7 @@ export function ActivitiesProcessPage() {
                     />
                     {(() => {
                       const selectedSlot = slots.find((s) => s.time === draft.slot);
-                      const maxAllowed = selectedSlot && selectedSlot.remaining !== undefined
-                        ? Math.min(game.maxPlayers, selectedSlot.remaining)
-                        : game.maxPlayers;
+                      const maxAllowed = getMaxPlayersForSlot(game, selectedSlot);
                       return (
                         <Input
                           label={`${game.playerLabel} (max ${maxAllowed})`}
@@ -826,7 +1025,7 @@ export function ActivitiesProcessPage() {
                         />
                       );
                     })()}
-                    {game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
+                    {!isFreeGame && game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
                       <Select
                         label="Number of Sessions (₹1,500 per session) *"
                         name="sessions"
@@ -860,11 +1059,12 @@ export function ActivitiesProcessPage() {
             {step === 4 && game && (
               <Reveal>
                 <Card>
-                  <p className="eyebrow">Step 5 · Review & Payment</p>
-                  <h2 className="h-sub mt-1">Review, then pay</h2>
+                  <p className="eyebrow">{isFreeGame ? 'Step 5 · Review & Confirm' : 'Step 5 · Review & Payment'}</p>
+                  <h2 className="h-sub mt-1">{isFreeGame ? 'Review, then confirm' : 'Review, then pay'}</h2>
                   <dl className="mt-5 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 text-sm">
                     {[
                       ['Game', game.name],
+                      ['Location', draft.location || draft.areaName || 'Sports Complex'],
                       ['Date', prettyDate(draft.date)],
                       ['Slot', `${draft.slot} (${game.slotMinutes} min)`],
                       [`${game.playerLabel}`, draft.players],
@@ -877,43 +1077,60 @@ export function ActivitiesProcessPage() {
                     ))}
                   </dl>
 
-                  <fieldset className="mt-6">
-                    <legend className="label">Payment method</legend>
-                    <div className="grid gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
-                      {PAYMENT_METHODS.map((m) => {
-                        const selected = draft.paymentMethod === m.id;
-                        return (
-                          <label
-                            key={m.id}
-                            className={`cursor-pointer rounded-xl border px-4 py-3 transition focus-within:ring-2 focus-within:ring-navy-800/30 ${
-                              selected ? 'border-navy-900 bg-navy-900 text-white shadow-card' : 'border-slate-300 bg-white hover:border-navy-900/50'
-                            }`}
-                          >
-                            <input type="radio" name="paymentMethod" className="sr-only" checked={selected} onChange={() => patch({ paymentMethod: m.id })} />
-                            <span className={`block text-sm font-semibold ${selected ? 'text-white' : 'text-navy-900'}`}>{m.label}</span>
-                            <span className={`block text-xs ${selected ? 'text-slate-300' : 'text-slate-500'}`}>{m.hint}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {errors.paymentMethod && <p role="alert" className="field-error mt-2">{errors.paymentMethod}</p>}
-                  </fieldset>
+                  {!isFreeGame && (
+                    <fieldset className="mt-6">
+                      <legend className="label">Payment method</legend>
+                      <div className="grid gap-2.5 sm:grid-cols-2" role="radiogroup" aria-label="Payment method">
+                        {PAYMENT_METHODS.map((m) => {
+                          const selected = draft.paymentMethod === m.id;
+                          return (
+                            <label
+                              key={m.id}
+                              className={`cursor-pointer rounded-xl border px-4 py-3 transition focus-within:ring-2 focus-within:ring-navy-800/30 ${
+                                selected ? 'border-navy-900 bg-navy-900 text-white shadow-card' : 'border-slate-300 bg-white hover:border-navy-900/50'
+                              }`}
+                            >
+                              <input type="radio" name="paymentMethod" className="sr-only" checked={selected} onChange={() => patch({ paymentMethod: m.id })} />
+                              <span className={`block text-sm font-semibold ${selected ? 'text-white' : 'text-navy-900'}`}>{m.label}</span>
+                              <span className={`block text-xs ${selected ? 'text-slate-300' : 'text-slate-500'}`}>{m.hint}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {errors.paymentMethod && <p role="alert" className="field-error mt-2">{errors.paymentMethod}</p>}
+                    </fieldset>
+                  )}
 
                   <div className="mt-6 rounded-xl border border-navy-900/10 bg-navy-50/60 p-4 text-sm">
-                    <dl className="space-y-1.5">
-                      {quote.lines.map((l) => (
-                        <div key={l.label} className="flex justify-between gap-3">
-                          <dt className="text-slate-500">{l.label}</dt>
-                          <dd className={`font-medium tabular-nums ${l.value < 0 ? 'text-green-700' : 'text-navy-900'}`}>{formatINR(l.value)}</dd>
+                    {quote.isFree ? (
+                      <>
+                        <div className="flex justify-between text-slate-600">
+                          <span>Rate</span>
+                          <span className="font-semibold text-emerald-700">Complimentary Pass</span>
                         </div>
-                      ))}
-                    </dl>
-                    <div className="mt-2 flex justify-between border-t border-navy-900/10 pt-2 font-semibold text-navy-900">
-                      <span>Total</span><span>{formatINR(quote.total)}</span>
-                    </div>
+                        <div className="mt-2 flex justify-between border-t border-navy-900/10 pt-2 font-semibold text-navy-900">
+                          <span>Total</span>
+                          <span className="text-emerald-700 font-bold">Free (₹0)</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <dl className="space-y-1.5">
+                          {quote.lines.map((l) => (
+                            <div key={l.label} className="flex justify-between gap-3">
+                              <dt className="text-slate-500">{l.label}</dt>
+                              <dd className={`font-medium tabular-nums ${l.value < 0 ? 'text-green-700' : 'text-navy-900'}`}>{formatINR(l.value)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <div className="mt-2 flex justify-between border-t border-navy-900/10 pt-2 font-semibold text-navy-900">
+                          <span>Total</span><span>{formatINR(quote.total)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {!isMember && (
+                  {!isFreeGame && !isMember && (
                     <div className="mt-3 rounded-xl border border-gold-200 bg-gold-50/70 p-3 text-xs text-slate-700">
                       <span>{MEMBER_PROMO_NOTE}. </span>
                       {MEMBERSHIP_REDIRECT_URL.startsWith('http') ? (
@@ -950,10 +1167,16 @@ export function ActivitiesProcessPage() {
 
                   <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500">
                     <ShieldIcon className="h-3.5 w-3.5 shrink-0 text-gold-600" />
-                    Secure payment. A receipt is issued to your account once payment is complete.
+                    {isFreeGame
+                      ? 'Complimentary access. A confirmation pass is issued to your account right away.'
+                      : 'Secure payment. A receipt is issued to your account once payment is complete.'}
                   </p>
                   <LoadingButton loading={paying} disabled={paying || Boolean(errors.alreadyBooked)} onClick={pay} className="mt-4 w-full px-6 py-3 bg-navy-900 text-white hover:bg-navy-800">
-                    {draft.paymentMethod === 'pay_at_venue' ? `Reserve for ${formatINR(quote.total)}` : `Pay ${formatINR(quote.total)}`}
+                    {isFreeGame
+                      ? 'Confirm Free Booking'
+                      : draft.paymentMethod === 'pay_at_venue'
+                      ? `Reserve for ${formatINR(quote.total)}`
+                      : `Pay ${formatINR(quote.total)}`}
                   </LoadingButton>
                 </Card>
               </Reveal>
@@ -961,6 +1184,13 @@ export function ActivitiesProcessPage() {
 
             {/* STEP 6 · Confirmation ------------------------------------------ */}
             {step === 5 && confirmed && (() => {
+              const confirmedGame = gameById(confirmed.game);
+              const confirmedIsFree = Boolean(
+                confirmed.isFree ||
+                  confirmedGame?.isFree ||
+                  (confirmedGame && (confirmedGame.price ?? confirmedGame.pricePerSlot) === 0) ||
+                  Number(confirmed.amount ?? 0) === 0
+              );
               const confirmedPricing = calculateTotal(confirmed.subtotal ?? confirmed.amount, Boolean(confirmed.isMember ?? isMember));
               return (
                 <Reveal>
@@ -991,7 +1221,12 @@ export function ActivitiesProcessPage() {
                     </div>
 
                     <div className="mx-auto mt-4 max-w-md rounded-2xl border border-slate-200 bg-slate-50/80 p-5 text-left text-sm space-y-2">
-                      
+                      {(confirmed.location || confirmed.areaName || draft.location) && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-500">Location</span>
+                          <span className="font-semibold text-navy-900 text-right">{confirmed.location || confirmed.areaName || draft.location}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-slate-500">Date</span>
                         <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>
@@ -1001,13 +1236,15 @@ export function ActivitiesProcessPage() {
                         <span className="font-semibold text-navy-900">{confirmed.slot}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">{gameById(confirmed.game)?.playerLabel || 'Players'}</span>
+                        <span className="text-slate-500">{confirmedGame?.playerLabel || 'Players'}</span>
                         <span className="font-semibold text-navy-900">{confirmed.players}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Subtotal</span>
-                        <span className="font-semibold text-navy-900">{formatINR(confirmedPricing.subtotal)}</span>
-                      </div>
+                      {!confirmedIsFree && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Subtotal</span>
+                          <span className="font-semibold text-navy-900">{formatINR(confirmedPricing.subtotal)}</span>
+                        </div>
+                      )}
                       {confirmedPricing.discount > 0 && (
                         <div className="flex justify-between text-green-700 font-medium">
                           <span>{MEMBER_DISCOUNT_LABEL}</span>
@@ -1015,8 +1252,10 @@ export function ActivitiesProcessPage() {
                         </div>
                       )}
                       <div className="flex justify-between border-t border-slate-200 pt-2 font-bold text-navy-900">
-                        <span>Total Paid</span>
-                        <span>{formatINR(confirmedPricing.total)}</span>
+                        <span>{confirmedIsFree ? 'Fee' : 'Total Paid'}</span>
+                        <span className={confirmedIsFree ? 'text-emerald-700' : ''}>
+                          {confirmedIsFree ? 'Free (₹0)' : formatINR(confirmedPricing.total)}
+                        </span>
                       </div>
                       <div className="flex justify-between text-xs text-slate-500">
                         <span>Status</span>
@@ -1024,7 +1263,7 @@ export function ActivitiesProcessPage() {
                       </div>
                     </div>
 
-                    {!isMember && (
+                    {!confirmedIsFree && !isMember && (
                       <div className="mx-auto mt-4 max-w-md rounded-xl border border-gold-200 bg-gold-50/70 p-3 text-xs text-slate-700">
                         <span>{MEMBER_PROMO_NOTE}. </span>
                         {MEMBERSHIP_REDIRECT_URL.startsWith('http') ? (
@@ -1116,7 +1355,13 @@ export function ActivitiesProcessPage() {
                     </span>
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-navy-900">{g.name}</span>
-                      <span className="block text-xs text-slate-500">{g.id === 'luxury-gym' ? `${formatINR(g.price || 8000)} / month` : `from ${formatINR(g.pricePerSlot)} · ${GAME_CATEGORIES[g.category]}`}</span>
+                      <span className="block text-xs text-slate-500">
+                        {g.isFree || (g.price ?? g.pricePerSlot) === 0
+                          ? `Free · ${GAME_CATEGORIES[g.category]}`
+                          : g.id === 'luxury-gym'
+                          ? `${formatINR(g.price ?? 8000)} / month`
+                          : `from ${formatINR(g.pricePerSlot ?? g.price)} · ${GAME_CATEGORIES[g.category]}`}
+                      </span>
                     </span>
                   </button>
                 ))}
