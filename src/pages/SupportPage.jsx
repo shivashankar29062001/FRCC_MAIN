@@ -21,6 +21,7 @@ import {
 } from '../components/ui/icons.jsx';
 import { LocationTrigger } from '../components/location/LocationTrigger.jsx';
 import { INDIAN_MOBILE_MESSAGE, isValidEmailOrIndianMobile, isPhoneLike } from '../utils/mobile.js';
+import { isValidName, normalizeName, sanitizeNameInput, nameError } from '../utils/fullName.js';
 
 // FAQ shown on the support page.
 const FAQ = [
@@ -96,7 +97,9 @@ export function SupportPage() {
   function sendContact(e) {
     e.preventDefault();
     const found = {};
-    if (!contact.name.trim()) found.name = 'Please tell us your name.';
+    const cleanName = normalizeName(contact.name);
+    if (!cleanName) found.name = 'Please tell us your name.';
+    else if (!isValidName(cleanName)) found.name = nameError('Your name');
     if (contact.email && !isValidEmailOrIndianMobile(contact.email)) {
       found.email = isPhoneLike(contact.email)
         ? INDIAN_MOBILE_MESSAGE
@@ -108,9 +111,10 @@ export function SupportPage() {
       pushToast('Please fix the highlighted fields.', 'error');
       return;
     }
+    const cleanContact = { ...contact, name: normalizeName(contact.name) };
     setBusy((b) => ({ ...b, contact: true }));
     import('../services/supportService.js')
-      .then(({ sendContactMessage }) => sendContactMessage(contact))
+      .then(({ sendContactMessage }) => sendContactMessage(cleanContact))
       .then(() => {
         setBusy((b) => ({ ...b, contact: false }));
         pushToast('Thank you! Your message has been sent to the front desk.');
@@ -238,7 +242,8 @@ export function SupportPage() {
                   type="text"
                   placeholder="Full name"
                   value={contact.name}
-                  onChange={(e) => setContact({ ...contact, name: e.target.value })}
+                  onChange={(e) => setContact({ ...contact, name: sanitizeNameInput(e.target.value) })}
+                  onBlur={(e) => setContact((prev) => ({ ...prev, name: normalizeName(e.target.value) }))}
                   className="booking-field w-full text-sm"
                 />
                 {contactErr.name && <p className="text-[11px] text-rose-300 mt-0.5">{contactErr.name}</p>}
@@ -643,7 +648,8 @@ export function SupportPage() {
                           name="c-name"
                           autoComplete="name"
                           value={contact.name}
-                          onChange={(e) => setContact({ ...contact, name: e.target.value })}
+                          onChange={(e) => setContact({ ...contact, name: sanitizeNameInput(e.target.value) })}
+                          onBlur={(e) => setContact((prev) => ({ ...prev, name: normalizeName(e.target.value) }))}
                           error={contactErr.name}
                         />
                         <Input

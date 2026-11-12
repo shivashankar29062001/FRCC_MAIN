@@ -87,6 +87,13 @@ function toTime24(timeStr) {
   return '09:00';
 }
 
+function addDaysIso(dateStr, days) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d + (Number(days) || 0)));
+  return dt.toISOString().split('T')[0];
+}
+
 // 'YYYY-MM-DD' → 'DD/MM/YYYY'
 function formatBookingDate(dateStr) {
   if (!dateStr) return '';
@@ -156,6 +163,7 @@ export function createBooking({
   pricePerDay,
   bookingDate,
   bookingTime,
+  bookingEndTime = '',
   paymentMethod,
   transactionId,
   city
@@ -203,7 +211,8 @@ export function createBooking({
     bookingTime: formatBookingTime(bookingTime), // display: h:mm AM/PM
     bookingDateISO: bookingDate || '',           // API: YYYY-MM-DD
     arrivalTime: bookingTime || '',              // API: HH:MM
-
+    endTime: bookingEndTime || '',               // API: HH:MM
+    end_time: bookingEndTime || '',
     // Payment
     paymentMethod,                                // display label
     paymentMethodCode,                            // API: UPI / CARD / CASH
@@ -230,6 +239,7 @@ export function buildAdminBookingPayload(booking) {
     city: booking.city,
     bookingDate: booking.bookingDateISO,
     arrivalTime: booking.arrivalTime,
+    endTime: booking.endTime || booking.bookingEndTime || null,
     durationDays: Number(booking.numberOfDays) || 1,
     parkingSlot: booking.parkingSlot,
     vehicleType: booking.vehicleType,
@@ -314,7 +324,9 @@ export async function submitBookingToSupabase(booking) {
   const campus = (booking.city || booking.campus || 'Vijayawada').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
   const effectiveCity = booking.city || (campus === 'hyderabad' ? 'Hyderabad' : 'Vijayawada');
   const isoDate = toIsoDate(booking.bookingDateISO || booking.bookingDate) || new Date().toISOString().split('T')[0];
+  const endDate = toIsoDate(booking.bookingEndDate || booking.endDate || booking.end_date) || null;
   const time24 = toTime24(booking.arrivalTime || booking.bookingTime);
+  const endTime24 = booking.endTime || booking.end_time || booking.bookingEndTime ? toTime24(booking.endTime || booking.end_time || booking.bookingEndTime) : null;
   const days = Math.max(1, Number(booking.numberOfDays) || 1);
 
   // 1. Try atomic SECURITY DEFINER RPC create_parking_booking
@@ -326,6 +338,7 @@ export async function submitBookingToSupabase(booking) {
       p_booking_date: isoDate,
       p_arrival_time: time24,
       p_duration_days: days,
+      p_end_time: endTime24,
       p_vehicle_type: booking.vehicleType || 'Four Wheeler',
       p_vehicle_number: booking.vehicleNumber || '',
       p_vehicle_model: booking.vehicleModel || null,
@@ -364,7 +377,20 @@ export async function submitBookingToSupabase(booking) {
 
   // 2. Direct collision check + insert fallback when RPC is unavailable/unauthenticated
   const startAtMs = new Date(`${isoDate}T${time24}:00+05:30`).getTime();
-  const endAtMs = startAtMs + days * 24 * 60 * 60 * 1000;
+  let endAtMs;
+  if (endDate && endTime24) {
+    endAtMs = new Date(`${endDate}T${endTime24}:00+05:30`).getTime();
+  } else if (endDate) {
+    endAtMs = new Date(`${endDate}T23:59:00+05:30`).getTime();
+  } else if (endTime24) {
+    const endIso = addDaysIso(isoDate, days - 1);
+    endAtMs = new Date(`${endIso}T${endTime24}:00+05:30`).getTime();
+  } else {
+    endAtMs = startAtMs + days * 24 * 60 * 60 * 1000;
+  }
+  if (!Number.isFinite(endAtMs) || endAtMs <= startAtMs) {
+    endAtMs = startAtMs + days * 24 * 60 * 60 * 1000;
+  }
 
   // Check Supabase availability via public RPC before attempting fallback insert
   try {
@@ -397,7 +423,9 @@ export async function submitBookingToSupabase(booking) {
       campus,
       city: effectiveCity,
       booking_date: isoDate,
+      end_date: endDate || null,
       arrival_time: time24,
+      end_time: endTime24 || null,
       duration_days: days,
       start_at: new Date(startAtMs).toISOString(),
       end_at: new Date(endAtMs).toISOString(),
@@ -493,7 +521,7 @@ export function cancelBookingInLocalDatabase(reference) {
   } catch (_) {}
 }
 
-export function getLocalPersistentBookedSlots(campus, date, time = '09:00', durationDays = 1) {
+export function getLocalPersistentBookedSlots(campus, date, time = '09:00', durationDays = 1, endTime = '') {
   try {
     const targetIsoDate = toIsoDate(date);
     if (!targetIsoDate) return [];
@@ -502,7 +530,14 @@ export function getLocalPersistentBookedSlots(campus, date, time = '09:00', dura
     const normalizedCampus = (campus || '').toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
     const targetTime24 = toTime24(time);
     const targetStart = new Date(`${targetIsoDate}T${targetTime24}:00+05:30`).getTime();
-    const targetEnd = targetStart + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+    let targetEnd;
+    if (endTime) {
+      const endIso = addDaysIso(targetIsoDate, (Number(durationDays) || 1) - 1);
+      const endT = toTime24(endTime);
+      targetEnd = new Date(`${endIso}T${endT}:00+05:30`).getTime();
+    } else {
+      targetEnd = targetStart + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+    }
     if (!Number.isFinite(targetStart) || !Number.isFinite(targetEnd)) return [];
 
     const bookedSet = new Set();
@@ -519,7 +554,15 @@ export function getLocalPersistentBookedSlots(campus, date, time = '09:00', dura
       const bTime24 = toTime24(b.arrivalTime || b.arrival_time || b.bookingTime || '09:00');
       const bDays = Number(b.durationDays || b.duration_days || b.numberOfDays) || 1;
       const bStart = new Date(`${bDate}T${bTime24}:00+05:30`).getTime();
-      const bEnd = bStart + bDays * 24 * 60 * 60 * 1000;
+      let bEnd;
+      const bEndTime = b.endTime || b.end_time || '';
+      if (bEndTime) {
+        const endIso = addDaysIso(bDate, bDays - 1);
+        const endT = toTime24(bEndTime);
+        bEnd = new Date(`${endIso}T${endT}:00+05:30`).getTime();
+      } else {
+        bEnd = bStart + bDays * 24 * 60 * 60 * 1000;
+      }
 
       if (!Number.isFinite(bStart) || !Number.isFinite(bEnd)) continue;
       if (targetStart < bEnd && targetEnd > bStart) {
@@ -536,7 +579,7 @@ export function getLocalPersistentBookedSlots(campus, date, time = '09:00', dura
  * Fetch occupied slots for a given campus and selected date/time range from Supabase, Backend API, and local cache.
  * Returns [] if no booking date has been selected yet (never pre-marks slots before choosing a date).
  */
-export async function fetchParkingAvailability(campus = 'vijayawada', date, time, days) {
+export async function fetchParkingAvailability(campus = 'vijayawada', date, time, days, endTime = '') {
   try {
     const targetDate = toIsoDate(date);
     if (!targetDate) return [];
@@ -546,15 +589,22 @@ export async function fetchParkingAvailability(campus = 'vijayawada', date, time
     const targetDays = Math.max(1, Number(days) || 1);
     const mergedBooked = new Set();
 
+    const startAt = new Date(`${targetDate}T${targetTime}:00+05:30`);
+    let endAt;
+    if (endTime) {
+      const endIso = addDaysIso(targetDate, targetDays - 1);
+      const endT = toTime24(endTime);
+      endAt = new Date(`${endIso}T${endT}:00+05:30`);
+    } else {
+      endAt = new Date(startAt.getTime() + targetDays * 24 * 60 * 60 * 1000);
+    }
+
     // 1. Fetch from Supabase SECURITY DEFINER RPC (authoritative DB state)
     try {
-      const startAt = new Date(`${targetDate}T${targetTime}:00+05:30`).toISOString();
-      const endAt = new Date(new Date(startAt).getTime() + targetDays * 24 * 60 * 60 * 1000).toISOString();
-
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_parking_availability', {
         p_campus: normalizedCampus,
-        p_start_at: startAt,
-        p_end_at: endAt,
+        p_start_at: startAt.toISOString(),
+        p_end_at: endAt.toISOString(),
       });
 
       if (!rpcError && Array.isArray(rpcData)) {
@@ -570,6 +620,7 @@ export async function fetchParkingAvailability(campus = 'vijayawada', date, time
     try {
       const params = new URLSearchParams({ campus: normalizedCampus, date: targetDate });
       if (targetTime) params.set('time', targetTime);
+      if (endTime) params.set('endTime', toTime24(endTime));
       if (targetDays) params.set('duration', String(targetDays));
 
       const resp = await fetch(`/api/parking/availability?${params.toString()}`);
@@ -582,7 +633,7 @@ export async function fetchParkingAvailability(campus = 'vijayawada', date, time
     } catch (_) {}
 
     // 3. Merge local persistent bookings (same browser / demo mode)
-    const localBooked = getLocalPersistentBookedSlots(normalizedCampus, targetDate, targetTime, targetDays);
+    const localBooked = getLocalPersistentBookedSlots(normalizedCampus, targetDate, targetTime, targetDays, endTime);
     localBooked.forEach((s) => mergedBooked.add(s.id));
 
     return Array.from(mergedBooked).map((id) => ({ id, status: 'booked' }));

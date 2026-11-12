@@ -42,6 +42,7 @@ import {
   isLegacySyntheticEmail,
   sanitizeMobileInput,
 } from '../utils/phone.js';
+import { isValidName, normalizeName, sanitizeNameInput, nameError } from '../utils/fullName.js';
 import {
   canCancelBooking,
   getCancellationPolicyInfo,
@@ -214,8 +215,13 @@ function PersonalDetails({ user, membership, pushToast }) {
     setErr('');
     setMobileErr('');
 
-    if (name.trim().length < 2) {
+    const cleanName = normalizeName(name);
+    if (cleanName.length < 2) {
       setErr('Please enter your full name (minimum 2 characters).');
+      return;
+    }
+    if (!isValidName(cleanName)) {
+      setErr(nameError('Full name'));
       return;
     }
 
@@ -234,7 +240,7 @@ function PersonalDetails({ user, membership, pushToast }) {
       const { updateProfile } = await import('../services/authService.js');
       if (user?.id) {
         await updateProfile(user.id, {
-          name: name.trim(),
+          name: cleanName,
           phone: cleanMob,
         });
       }
@@ -269,9 +275,10 @@ function PersonalDetails({ user, membership, pushToast }) {
             name="name"
             value={name}
             onChange={(e) => {
-              setName(e.target.value);
+              setName(sanitizeNameInput(e.target.value));
               if (err) setErr('');
             }}
+            onBlur={(e) => setName(normalizeName(e.target.value))}
             autoComplete="name"
             error={err}
           />

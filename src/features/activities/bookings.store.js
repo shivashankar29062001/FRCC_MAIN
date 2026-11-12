@@ -345,6 +345,13 @@ export async function createActivityBookingRemote({
   location = null,
   details = {},
 }) {
+  if (gameId && ['carom', 'kids-play-area'].includes(String(gameId).toLowerCase())) {
+    const err = new Error('Booking is not available for this activity');
+    err.status = 400;
+    err.statusCode = 400;
+    throw err;
+  }
+
   const loc = resolveActivityLocation({
     cityId,
     cityName,

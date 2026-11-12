@@ -224,6 +224,7 @@ export function ServiceLanding({ service = 'stay', hero }) {
             : null,
           buttonLabel: 'Book session',
           to: `/book/activity?item=${encodeURIComponent(g.id)}`,
+          bookable: g.id != 'kids-play-area' && g.id != 'carom'
         };
       });
     }
@@ -457,18 +458,22 @@ export function ServiceLanding({ service = 'stay', hero }) {
                     </div>
 
                     {/* Gold Button */}
-                    <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
-                      <Link
-                        to={item.to}
-                        onClick={(e) => handleActionClick(e, item.to)}
-                        className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
-                          isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
-                        } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
-                      >
-                        {item.buttonLabel}
-                        <ArrowRightIcon className="h-4 w-4" />
-                      </Link>
-                    </div>
+                    {item.bookable ? (
+                      <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
+                        <Link
+                          to={item.to}
+                          onClick={(e) => handleActionClick(e, item.to)}
+                          className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
+                            isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
+                          } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
+                        >
+                          {item.buttonLabel}
+                          <ArrowRightIcon className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="h-0" />
+                    )}
                   </div>
                 </article>
               );

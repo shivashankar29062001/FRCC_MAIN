@@ -1,5 +1,7 @@
 import { supabase } from './supabase.js';
 import { isValidIndianMobile } from '../utils/mobile.js';
+import { CITY_ERROR, isValidCity } from '../utils/city.js';
+import { FULL_NAME_ERROR, isValidFullName, isValidName, nameError } from '../utils/fullName.js';
 
 /**
  * Membership ID validation regex:
@@ -128,6 +130,12 @@ export async function saveUserMembership(membershipData) {
   // Note: Personal documents and details (aadhaar, spouse, children) are stored in member_profiles.
   if (membershipData.mobile && !isValidIndianMobile(membershipData.mobile)) {
     throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
+  if (!isValidFullName(membershipData.name)) {
+    throw new Error(FULL_NAME_ERROR);
+  }
+  if (!isValidCity(membershipData.city)) {
+    throw new Error(CITY_ERROR);
   }
 
   // Prevent duplicate active membership enrollment for the same user
@@ -337,6 +345,17 @@ export async function saveMemberProfileAndChildren(profileData = {}, children = 
   if (profileData.spouse_mobile && !isValidIndianMobile(profileData.spouse_mobile)) {
     throw new Error('Please enter a valid 10-digit Indian mobile number.');
   }
+  if (profileData.spouse_name && !isValidName(profileData.spouse_name)) {
+    throw new Error(nameError('Spouse name'));
+  }
+  if (Array.isArray(children)) {
+    for (const c of children) {
+      if (c?.name && !isValidName(c.name)) {
+        throw new Error(nameError('Child name'));
+      }
+    }
+  }
+
   const profilePayload = {
     user_id: currentUserId,
     marital_status: profileData.marital_status || null,

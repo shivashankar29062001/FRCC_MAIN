@@ -207,6 +207,13 @@ const getInitialCampusData = () => {
   };
 };
 
+function addDaysIso(dateStr, days) {
+  const [y, m, d] = String(dateStr || '').split('-').map(Number);
+  if (!y || !m || !d) return dateStr || '';
+  const dt = new Date(Date.UTC(y, m - 1, d + (Number(days) || 0)));
+  return dt.toISOString().split('T')[0];
+}
+
 export default function ParkingBookingPage() {
   const { user, pushToast, addBooking } = useApp();
   const [searchParams] = useSearchParams();
@@ -235,7 +242,9 @@ export default function ParkingBookingPage() {
       zoneId: resolvedZoneId,
       zone_id: resolvedZoneId,
       date: initDate,
+      endDate: initDate && initDays ? addDaysIso(initDate, (Number(initDays) || 1) - 1) : initDate,
       time: initTime,
+      endTime: '',
       days: initDays,
       vehicleType: '',
       vehicleNumber: ''
@@ -349,7 +358,7 @@ export default function ParkingBookingPage() {
       setStep(STEP_VEHICLE);
     } else if (!selectedSlot) {
       setStep(STEP_SLOT);
-    } else if (!formData.date || !formData.time || !formData.days) {
+    } else if (!formData.date || !formData.endDate || !formData.time || !formData.endTime || !formData.days) {
       setStep(STEP_SCHEDULE);
     } else {
       setStep(STEP_PAYMENT);
@@ -361,7 +370,8 @@ export default function ParkingBookingPage() {
     selectedSlot,
     formData.date,
     formData.time,
-    formData.days
+    formData.days,
+    formData.endTime
   ]);
 
   // Synchronize slot occupancy dynamically from Database & Backend API once a booking date is selected
@@ -370,6 +380,7 @@ export default function ParkingBookingPage() {
     const campus = cityKey === 'hyd' ? 'hyderabad' : 'vijayawada';
     const activeDate = formData.date ? formData.date.trim() : '';
     const activeTime = formData.time ? formData.time.trim() : '';
+    const activeEndTime = formData.endTime ? formData.endTime.trim() : '';
     const activeDays = formData.days ? Number(formData.days) : '';
 
     const reqId = ++refreshRequestIdRef.current;
@@ -382,7 +393,7 @@ export default function ParkingBookingPage() {
       return;
     }
 
-    fetchParkingAvailability(campus, activeDate, activeTime, activeDays).then((slotData) => {
+    fetchParkingAvailability(campus, activeDate, activeTime, activeDays, activeEndTime).then((slotData) => {
       if (reqId !== refreshRequestIdRef.current) return;
       if (slotData && slotData.length > 0) {
         const bookedSet = new Set(slotData.filter((s) => s.status === 'booked').map((s) => s.id));
@@ -400,7 +411,7 @@ export default function ParkingBookingPage() {
         }));
       }
     });
-  }, [formData.city, formData.date, formData.time, formData.days, effectiveCampus]);
+  }, [formData.city, formData.date, formData.time, formData.endTime, formData.days, effectiveCampus]);
 
   useEffect(() => {
     refreshSlots();
@@ -409,7 +420,7 @@ export default function ParkingBookingPage() {
   // Clear selected slot when switching campus, date, time, or duration
   useEffect(() => {
     setSelectedSlot(null);
-  }, [effectiveCampus, formData.city, formData.date, formData.time, formData.days]);
+  }, [effectiveCampus, formData.city, formData.date, formData.endDate, formData.time, formData.days]);
 
   const pricePerDay = 0;
   const numberOfDays = Number(formData.days) || 0;
@@ -419,9 +430,37 @@ export default function ParkingBookingPage() {
     const validationErrors = {};
     if (!formData.date || !formData.date.trim()) {
       validationErrors.date = 'Please select a booking date.';
+    } else {
+      const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      if (formData.date < todayIst) {
+        validationErrors.date = 'Booking start date cannot be in the past.';
+      }
+    }
+    if (!formData.endDate || !formData.endDate.trim()) {
+      validationErrors.endDate = 'Please select a booking end date.';
+    } else if (formData.date && formData.endDate < formData.date) {
+      validationErrors.endDate = 'Booking End Date cannot be before Booking Start Date.';
+    } else if (formData.date && formData.endDate) {
+      const diffDays = Math.round((new Date(`${formData.endDate}T00:00:00+05:30`).getTime() - new Date(`${formData.date}T00:00:00+05:30`).getTime()) / 86400000) + 1;
+      if (diffDays < 1 || diffDays > 7) {
+        validationErrors.endDate = 'Maximum booking span is 7 days.';
+      }
     }
     if (!formData.time || !formData.time.trim()) {
       validationErrors.time = 'Please select a booking arrival time.';
+    }
+    if (!formData.endTime || !formData.endTime.trim()) {
+      validationErrors.endTime = 'Please select a booking end time.';
+    }
+    const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    if (formData.date === todayIst && formData.time) {
+      const nowTime = new Date(Date.now() + 60000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+      if (formData.time < nowTime) {
+        validationErrors.time = 'Selected time has already passed. Please choose a later time.';
+      }
+    }
+    if (formData.time && formData.endTime && Number(formData.days) === 1 && formData.endTime <= formData.time) {
+      validationErrors.endTime = 'Booking End Time must be after Booking Time.';
     }
     if (!formData.days) {
       validationErrors.days = 'Please select number of days.';
@@ -459,8 +498,14 @@ export default function ParkingBookingPage() {
     if (!formData.date || !formData.date.trim()) {
       missingErrors.date = 'Please select a booking date.';
     }
+    if (!formData.endDate || !formData.endDate.trim()) {
+      missingErrors.endDate = 'Please select a booking end date.';
+    }
     if (!formData.time || !formData.time.trim()) {
       missingErrors.time = 'Please select a booking arrival time.';
+    }
+    if (!formData.endTime || !formData.endTime.trim()) {
+      missingErrors.endTime = 'Please select a booking end time.';
     }
     if (!formData.days) {
       missingErrors.days = 'Please select number of days.';
@@ -536,10 +581,37 @@ export default function ParkingBookingPage() {
 
     if (!formData.date || !formData.date.trim()) {
       newErrors.date = 'Please select a booking date.';
+    } else {
+      const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      if (formData.date < todayIst) newErrors.date = 'Booking start date cannot be in the past.';
+    }
+
+    if (!formData.endDate || !formData.endDate.trim()) {
+      newErrors.endDate = 'Please select a booking end date.';
+    } else if (formData.date && formData.endDate < formData.date) {
+      newErrors.endDate = 'Booking End Date cannot be before Booking Start Date.';
+    } else if (formData.date && formData.endDate) {
+      const diffDays = Math.round((new Date(`${formData.endDate}T00:00:00+05:30`).getTime() - new Date(`${formData.date}T00:00:00+05:30`).getTime()) / 86400000) + 1;
+      if (diffDays < 1 || diffDays > 7) newErrors.endDate = 'Maximum booking span is 7 days.';
     }
 
     if (!formData.time || !formData.time.trim()) {
       newErrors.time = 'Please select a booking arrival time.';
+    }
+
+    if (!formData.endTime || !formData.endTime.trim()) {
+      newErrors.endTime = 'Please select a booking end time.';
+    }
+
+    const todayIst = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    if (formData.date === todayIst && formData.time) {
+      const nowTime = new Date(Date.now() + 60000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+      if (formData.time < nowTime) {
+        newErrors.time = 'Selected time has already passed. Please choose a later time.';
+      }
+    }
+    if (formData.time && formData.endTime && Number(formData.days) === 1 && formData.endTime <= formData.time) {
+      newErrors.endTime = 'Booking End Time must be after Booking Time.';
     }
 
     if (!formData.days) {
@@ -579,6 +651,8 @@ export default function ParkingBookingPage() {
       arrivalTime: normalizedTime,
       arrival_time: normalizedTime,
       bookingTime: booking.bookingTime || normalizedTime,
+      endTime: booking.bookingEndTime || formData.endTime || '',
+      endDate: booking.bookingEndDate || formData.endDate || '',
     };
 
     retainConfirmedBooking(unifiedBooking, user?.id);
@@ -603,6 +677,8 @@ export default function ParkingBookingPage() {
       arrival_time: normalizedTime,
       arrivalTime: normalizedTime,
       bookingTime: booking.bookingTime || normalizedTime,
+      endTime: booking.bookingEndTime || formData.endTime || '',
+      endDate: booking.bookingEndDate || formData.endDate || '',
       areaName: booking.city?.toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus',
       details: {
         vehicleType: booking.vehicleType,
@@ -613,6 +689,7 @@ export default function ParkingBookingPage() {
         durationDays: booking.numberOfDays,
         arrivalTime: normalizedTime,
         bookingTime: booking.bookingTime || normalizedTime,
+        endTime: booking.bookingEndTime || formData.endTime || '',
       },
       amount: 0,
       total: 0,
@@ -660,7 +737,9 @@ export default function ParkingBookingPage() {
       pricePerDay: 0,
       totalAmount: 0,
       bookingDate: formData.date,
+      bookingEndDate: formData.endDate,
       bookingTime: formData.time,
+      bookingEndTime: formData.endTime,
       paymentMethod: 'Demo',
       transactionId: transactionId || 'DEMO-TXN-' + Date.now()
     });
@@ -726,7 +805,7 @@ export default function ParkingBookingPage() {
         targetElement = document.getElementById('vehicle-number');
       } else if (firstErrorKey === 'slot') {
         targetElement = document.getElementById('parking-slot-selection-card');
-      } else if (firstErrorKey === 'date' || firstErrorKey === 'time' || firstErrorKey === 'days') {
+      } else if (firstErrorKey === 'date' || firstErrorKey === 'endDate' || firstErrorKey === 'time' || firstErrorKey === 'endTime' || firstErrorKey === 'days') {
         targetElement = document.getElementById('date-time-card');
       }
       if (targetElement) {

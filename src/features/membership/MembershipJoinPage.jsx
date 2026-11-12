@@ -12,6 +12,22 @@ import {
   isValidIndianMobile,
   sanitizeMobileInput,
 } from '../../utils/mobile.js';
+import {
+  CITY_ERROR,
+  isValidCity,
+  normalizeCity,
+  sanitizeCityInput,
+} from '../../utils/city.js';
+import {
+  FULL_NAME_ERROR,
+  isValidFullName,
+  normalizeFullName,
+  sanitizeFullNameInput,
+  isValidName,
+  normalizeName,
+  sanitizeNameInput,
+  nameError,
+} from '../../utils/fullName.js';
 import { IMAGES } from '../../config/images.js';
 import {
   PLANS_DATA,
@@ -274,6 +290,15 @@ export function MembershipJoinPage() {
   const [isAadhaarFocused, setIsAadhaarFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState({});
+  const fullNameError = fieldErrors.fullName || (
+    formData.fullName && !isValidFullName(formData.fullName) ? FULL_NAME_ERROR : null
+  );
+  const emergencyNameError = fieldErrors.emergencyName || (
+    formData.emergencyName && !isValidName(formData.emergencyName) ? nameError('Contact person name') : null
+  );
+  const spouseNameError = fieldErrors.spouseName || (
+    formData.spouseName && !isValidName(formData.spouseName) ? nameError('Spouse name') : null
+  );
   const [submitError, setSubmitError] = useState('');
   const [paying, setPaying] = useState(false);
   const submittedRef = useRef(false);
@@ -390,7 +415,7 @@ export function MembershipJoinPage() {
   // Step 2 Validation (Registration)
   const isStep2Valid = useMemo(() => {
     return (
-      Boolean(formData.fullName.trim()) &&
+      isValidFullName(formData.fullName) &&
       isValidIndianMobile(formData.mobile) &&
       EMAIL_REGEX.test(formData.email.trim())
     );
@@ -402,10 +427,10 @@ export function MembershipJoinPage() {
       checkDOB(formData.dob) === null &&
       Boolean(formData.gender) &&
       Boolean(formData.address.trim()) &&
-      Boolean(formData.city.trim()) &&
+      isValidCity(formData.city) &&
       Boolean(formData.state.trim()) &&
       /^\d{6}$/.test(formData.pincode.replace(/\D/g, '')) &&
-      Boolean(formData.emergencyName.trim()) &&
+      isValidName(formData.emergencyName) &&
       isValidIndianMobile(formData.emergencyMobile)
     );
   }, [
@@ -425,7 +450,7 @@ export function MembershipJoinPage() {
 
     // Married checks
     if (formData.maritalStatus === 'Married') {
-      if (!formData.spouseName.trim()) return false;
+      if (!isValidName(formData.spouseName)) return false;
       if (formData.spouseDob && validateOptionalDate(formData.spouseDob)) return false;
       if (formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile)) return false;
     }
@@ -436,7 +461,7 @@ export function MembershipJoinPage() {
         if (!formData.children || formData.children.length === 0) return false;
         if (formData.children.length > 6) return false;
         const invalidChild = formData.children.some((c) => {
-          if (!c.name || !c.name.trim()) return true;
+          if (!isValidName(c.name)) return true;
           if (c.dob && validateOptionalDate(c.dob)) return true;
           return false;
         });
@@ -501,6 +526,44 @@ export function MembershipJoinPage() {
   }, [step, isStep1Valid, isStep2Valid, isStep3Valid, isStep4Valid, isStep5Valid, isStep6Valid]);
 
   function handleNext() {
+    if (step === 1) {
+      const fullName = normalizeFullName(formData.fullName);
+      if (fullName !== formData.fullName) updateForm({ fullName });
+      if (!isValidFullName(fullName)) {
+        setFieldErrors((prev) => ({ ...prev, fullName: FULL_NAME_ERROR }));
+        return;
+      }
+    }
+    if (step === 2) {
+      const city = normalizeCity(formData.city);
+      if (city !== formData.city) updateForm({ city });
+      if (!isValidCity(city)) {
+        setFieldErrors((prev) => ({ ...prev, city: CITY_ERROR }));
+        return;
+      }
+    }
+    if (step === 3) {
+      const emergencyName = normalizeName(formData.emergencyName);
+      if (emergencyName !== formData.emergencyName) updateForm({ emergencyName });
+      if (formData.emergencyName && !isValidName(emergencyName)) {
+        setFieldErrors((prev) => ({ ...prev, emergencyName: nameError('Contact person name') }));
+        return;
+      }
+    }
+    if (step === 4) {
+      if (formData.maritalStatus === 'Married') {
+        const spouseName = normalizeName(formData.spouseName);
+        if (spouseName !== formData.spouseName) updateForm({ spouseName });
+        if (formData.spouseName && !isValidName(spouseName)) {
+          setFieldErrors((prev) => ({ ...prev, spouseName: nameError('Spouse name') }));
+          return;
+        }
+      }
+      if (formData.children?.length) {
+        const children = formData.children.map((c) => ({ ...c, name: normalizeName(c.name) }));
+        if (children.some((c, i) => c.name !== formData.children[i].name)) updateForm({ children });
+      }
+    }
     if (!isCurrentStepValid) return;
     setFieldErrors({});
     setStep(Math.min(step + 1, 6));
@@ -511,6 +574,42 @@ export function MembershipJoinPage() {
     setFieldErrors({});
     setStep(Math.max(step - 1, 0));
     window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  // Full name: letters and spaces only
+  function handleFullNameChange(e) {
+    const fullName = sanitizeFullNameInput(e.target.value);
+    updateForm({ fullName });
+    if (fieldErrors.fullName && isValidFullName(fullName)) {
+      setFieldErrors((prev) => ({ ...prev, fullName: null }));
+    }
+  }
+
+  function handleFullNameBlur(e) {
+    const fullName = normalizeFullName(e.target.value);
+    updateForm({ fullName });
+    setFieldErrors((prev) => ({
+      ...prev,
+      fullName: isValidFullName(fullName) ? null : FULL_NAME_ERROR,
+    }));
+  }
+
+  // City: letters and spaces only
+  function handleCityChange(e) {
+    const city = sanitizeCityInput(e.target.value);
+    updateForm({ city });
+    if (fieldErrors.city && isValidCity(city)) {
+      setFieldErrors((prev) => ({ ...prev, city: null }));
+    }
+  }
+
+  function handleCityBlur(e) {
+    const city = normalizeCity(e.target.value);
+    updateForm({ city });
+    setFieldErrors((prev) => ({
+      ...prev,
+      city: isValidCity(city) ? null : CITY_ERROR,
+    }));
   }
 
   // DOB Formatter DD/MM/YYYY for applicant
@@ -753,6 +852,14 @@ export function MembershipJoinPage() {
       setFieldErrors({ paymentMethod: 'Choose a payment method.' });
       return;
     }
+    const city = normalizeCity(formData.city);
+    if (!isValidCity(city)) {
+      updateForm({ city });
+      setFieldErrors((prev) => ({ ...prev, city: CITY_ERROR }));
+      setStep(2);
+      return;
+    }
+    if (city !== formData.city) updateForm({ city });
     if (paying || submittedRef.current) return;
     submittedRef.current = true;
     setPaying(true);
@@ -811,7 +918,7 @@ export function MembershipJoinPage() {
           gender: formData.gender || '',
           address: formData.address || '',
           addressLine: formData.address || '',
-          city: formData.city || '',
+          city,
           state: formData.state || '',
           pincode: formData.pincode || '',
           emergencyContact,
@@ -1098,14 +1205,10 @@ export function MembershipJoinPage() {
                 id="reg-fullname"
                 name="fullName"
                 value={formData.fullName}
-                onChange={(e) => {
-                  updateForm({ fullName: e.target.value });
-                  if (e.target.value.trim()) {
-                    setFieldErrors((prev) => ({ ...prev, fullName: null }));
-                  }
-                }}
+                onChange={handleFullNameChange}
+                onBlur={handleFullNameBlur}
                 placeholder="Full name as per official ID"
-                error={fieldErrors.fullName}
+                error={fullNameError}
               />
 
               <div>
@@ -1249,7 +1352,8 @@ export function MembershipJoinPage() {
                   id="pers-city"
                   name="city"
                   value={formData.city}
-                  onChange={(e) => updateForm({ city: e.target.value })}
+                  onChange={handleCityChange}
+                  onBlur={handleCityBlur}
                   placeholder="City"
                   error={fieldErrors.city}
                 />
@@ -1298,9 +1402,23 @@ export function MembershipJoinPage() {
                     id="pers-emg-name"
                     name="emergencyName"
                     value={formData.emergencyName}
-                    onChange={(e) => updateForm({ emergencyName: e.target.value })}
+                    onChange={(e) => {
+                    const emergencyName = sanitizeNameInput(e.target.value);
+                    updateForm({ emergencyName });
+                    if (fieldErrors.emergencyName && isValidName(emergencyName)) {
+                      setFieldErrors((prev) => ({ ...prev, emergencyName: null }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const emergencyName = normalizeName(e.target.value);
+                    updateForm({ emergencyName });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      emergencyName: emergencyName && !isValidName(emergencyName) ? nameError('Contact person name') : null,
+                    }));
+                  }}
                     placeholder="Name of emergency contact"
-                    error={fieldErrors.emergencyName}
+                    error={emergencyNameError}
                   />
 
                   <div>
@@ -1435,8 +1553,23 @@ export function MembershipJoinPage() {
                         id="fam-spouse-name"
                         name="spouseName"
                         value={formData.spouseName}
-                        onChange={(e) => updateForm({ spouseName: e.target.value })}
+                        onChange={(e) => {
+                        const spouseName = sanitizeNameInput(e.target.value);
+                        updateForm({ spouseName });
+                        if (fieldErrors.spouseName && isValidName(spouseName)) {
+                          setFieldErrors((prev) => ({ ...prev, spouseName: null }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const spouseName = normalizeName(e.target.value);
+                        updateForm({ spouseName });
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          spouseName: spouseName && !isValidName(spouseName) ? nameError('Spouse name') : null,
+                        }));
+                      }}
                         placeholder="Spouse full name"
+                        error={spouseNameError}
                       />
                     </div>
                     <div>
@@ -1551,10 +1684,14 @@ export function MembershipJoinPage() {
                               <input
                                 type="text"
                                 value={child.name}
-                                onChange={(e) => handleUpdateChild(idx, { name: e.target.value })}
+                                onChange={(e) => handleUpdateChild(idx, { name: sanitizeNameInput(e.target.value) })}
+                              onBlur={(e) => handleUpdateChild(idx, { name: normalizeName(e.target.value) })}
                                 placeholder="Child full name"
                                 className="field !py-1.5 text-sm"
                               />
+                              {child.name && !isValidName(child.name) && (
+                                <p role="alert" className="field-error mt-1">{nameError('Child name')}</p>
+                              )}
                             </div>
                             <div className="sm:col-span-3">
                               <label className="text-xs font-semibold text-slate-700 block mb-1">

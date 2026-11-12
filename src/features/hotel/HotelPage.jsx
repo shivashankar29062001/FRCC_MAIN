@@ -17,6 +17,7 @@ import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
 import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE, INDIAN_MOBILE_PLACEHOLDER, sanitizeMobileInput } from '../../utils/mobile.js';
+import { isValidName, sanitizeNameInput, normalizeName, nameError } from '../../utils/fullName.js';
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
@@ -503,7 +504,7 @@ export function HotelPage() {
   const isStep4Valid = useMemo(() => {
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email.trim());
     const validSpecial = (draft.specialRequest || '').length <= 300;
-    return Boolean(draft.name.trim()) && isValidIndianMobile(draft.mobile) && validEmail && validSpecial;
+    return isValidName(draft.name) && isValidIndianMobile(draft.mobile) && validEmail && validSpecial;
   }, [draft.name, draft.mobile, draft.email, draft.specialRequest]);
 
   const mobileError = mobileTouched && !isValidIndianMobile(draft.mobile)
@@ -1264,8 +1265,10 @@ export function HotelPage() {
               <Input
                 label="Full Name (as per government photo ID) *"
                 value={draft.name}
-                onChange={(e) => updateDraft({ name: e.target.value })}
+                onChange={(e) => updateDraft({ name: sanitizeNameInput(e.target.value) })}
+                onBlur={(e) => updateDraft({ name: normalizeName(e.target.value) })}
                 placeholder="e.g. Ramesh Kumar"
+                error={draft.name && !isValidName(draft.name) ? nameError('Full name') : undefined}
               />
 
               {/* Mobile with +91 indicator */}

@@ -21,9 +21,10 @@ function DiningHeroCard() {
   const navigate = useNavigate();
   const { user } = useApp();
   const { openAuthPrompt } = useAuthModal();
-  const [venue, setVenue] = useState('restaurant');
-  const [date, setDate] = useState(() => formatDMY(todayISO()));
-  const [guests, setGuests] = useState('2');
+  const [venue, setVenue] = useState('');
+  const [date, setDate] = useState('');
+  const [guests, setGuests] = useState('');
+  const [error, setError] = useState('');
   const pickerRef = useRef(null);
 
   const isoValue = useMemo(() => {
@@ -54,6 +55,11 @@ function DiningHeroCard() {
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (!venue || !date || !guests) {
+      setError('Please select a venue, date and guests.');
+      return;
+    }
+    setError('');
     const params = new URLSearchParams();
     if (venue) params.set('venue', venue);
     if (date) params.set('date', date);
@@ -77,9 +83,10 @@ function DiningHeroCard() {
           <select
             id="hero-dining-venue"
             value={venue}
-            onChange={(e) => setVenue(e.target.value)}
+            onChange={(e) => { setVenue(e.target.value); setError(''); }}
             className="booking-field w-full text-sm"
           >
+            <option value="" className="text-navy-950 bg-white">Select venue</option>
             {venues.map((v) => (
               <option key={v.id} value={v.id} className="text-navy-950 bg-white">
                 {v.name}
@@ -100,7 +107,7 @@ function DiningHeroCard() {
                 placeholder="DD/MM/YYYY"
                 value={date}
                 onClick={openPicker}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => { setDate(e.target.value); setError(''); }}
                 className="booking-field date-picker-field w-full text-sm cursor-pointer !pr-2"
               />
               <input
@@ -124,9 +131,10 @@ function DiningHeroCard() {
               <select
                 id="hero-dining-guests"
                 value={guests}
-                onChange={(e) => setGuests(e.target.value)}
+                onChange={(e) => { setGuests(e.target.value); setError(''); }}
                 className="booking-field w-full text-sm"
               >
+                <option value="" className="text-navy-950 bg-white">Select guests</option>
                 {[1, 2, 3, 4, 5, 6, 8, 10, 12].map((g) => (
                   <option key={g} value={String(g)} className="text-navy-950 bg-white">
                     {g} {g === 1 ? 'Guest' : 'Guests'}
@@ -136,6 +144,7 @@ function DiningHeroCard() {
             </div>
           </div>
         </div>
+        {error && <p className="field-error mt-1 text-xs">{error}</p>}
         <button
           type="submit"
           className="btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 mt-1 transition"

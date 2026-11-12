@@ -78,6 +78,7 @@ export default function ConventionPayment() {
   const [otp, setOtp] = useState(null); // {attempts, resendIn}
   const [showTest, setShowTest] = useState(false);
   const pendingRef = useRef(null);
+  const paymentCompletedRef = useRef(false);
 
   useEffect(() => {
     if (!booking.hallId || !booking.date || !booking.startTime || !booking.endTime) {
@@ -85,7 +86,9 @@ export default function ConventionPayment() {
       return;
     }
     if (!booking.heldBookingId) {
-      navigate('/convention/details');
+      // A successful payment clears the hold state before the receipt route
+      // mounts. Do not bounce the user back to the details form in that case.
+      if (!paymentCompletedRef.current) navigate('/convention/details');
       return;
     }
     api('/halls', { auth: false })
@@ -200,6 +203,17 @@ export default function ConventionPayment() {
       // TODO-RAZORPAY: Replace simulated initiatePayment with Razorpay Checkout order + signature verification.
       const paymentResult = await withTimeout(pay.initiatePayment(selectedMethod, activeData));
       ref = paymentResult.ref;
+      if (paymentResult?.status && paymentResult.status !== 'SUCCESS') {
+        throw new Error('Payment failed at the gateway.');
+      }
+
+      // Only mark the booking paid after the gateway verifies an online payment.
+      if (!instant) {
+        const verification = await withTimeout(pay.verifyPayment(ref));
+        if (verification?.status !== 'SUCCESS') {
+          throw new Error('Payment failed gateway verification.');
+        }
+      }
 
       const amountPaid = advanceData?.advance != null ? advanceData.advance : instant ? 0 : total;
       const confirmedResult = await withTimeout(confirmHallBooking({
@@ -215,7 +229,11 @@ export default function ConventionPayment() {
       }));
 
       const created = confirmedResult.booking;
+      if (!created?.id) {
+        throw new Error(`Payment received but the confirmed booking could not be loaded. Reference: ${ref}.`);
+      }
       pendingRef.current = null;
+      paymentCompletedRef.current = true;
       clearHold();
       clearSlotError();
       setConfirmed(created);
@@ -223,7 +241,11 @@ export default function ConventionPayment() {
         window.dispatchEvent(new CustomEvent('frcc:convention-bookings-changed', { detail: created }));
         window.dispatchEvent(new CustomEvent('frcc:booking-created', { detail: created }));
       }
-      navigate('/convention/confirmation');
+      const paymentId = created.paymentId || created.transactionRef || ref;
+      navigate(
+        `/convention/confirmation?id=${encodeURIComponent(created.id)}&paymentId=${encodeURIComponent(paymentId)}`,
+        { replace: true },
+      );
     } catch (e) {
       console.error('Payment flow error:', e);
       if (e?.code === 'SLOT_TAKEN' || e?.code === 'ALREADY_BOOKED_BY_YOU') {

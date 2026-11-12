@@ -51,10 +51,10 @@ const GAMES = [
   { id: 'table-tennis', name: 'Table Tennis', tag: 'Indoor', image: IMAGES['table-tennis'] },
   { id: 'volleyball', name: 'Volleyball', tag: 'Outdoor', image: IMAGES.volleyball },
   { id: 'chess', name: 'Chess', tag: 'Indoor', image: IMAGES.chess },
-  { id: 'carom', name: 'Carom', tag: 'Indoor', image: IMAGES.carom },
+  { id: 'carom', name: 'Carom', tag: 'Indoor', image: IMAGES.carom, bookable: false },
   { id: 'golf', name: 'Golf', tag: 'Outdoor', image: IMAGES.golf },
   { id: 'swimming-pool', name: 'Swimming Pool', tag: 'Outdoor', image: IMAGES['swimming-pool'] },
-  { id: 'kids-play-area', name: 'Kids Play Area', tag: 'Indoor', image: IMAGES['kids-play-area'] },
+  { id: 'kids-play-area', name: 'Kids Play Area', tag: 'Indoor', image: IMAGES['kids-play-area'], bookable: false },
   { id: 'football', name: 'Football', tag: 'Outdoor', image: IMAGES.football },
 ];
 
@@ -152,7 +152,13 @@ export function HomeHubPage() {
       <ServiceHero service="hub" />
 
       {/* 2a · BOOK YOUR EXPERIENCE — five portrait service tiles */}
-      <ExperienceSection id="explore" />
+      <ExperienceSection
+        id="explore"
+        lineOverrides={{
+          hotel: 'Rooms, member rates nightly',
+          hall: 'Venues for 30 to 10000',
+        }}
+      />
 
       {/* 2b · WELCOME — plain heading below the hero */}
       <section className="band-white" aria-label="Welcome home">
@@ -378,13 +384,17 @@ export function HomeHubPage() {
                       <h3 className="font-display text-base text-navy-900">{g.name}</h3>
                       <span className={`tag ${g.tag === 'Indoor' ? 'tag-navy' : 'tag-green'}`}>{g.tag}</span>
                     </div>
-                    <Link
-                      to={`/book/activities/process?game=${g.id}`}
-                      className="btn-base mt-3 w-full bg-navy-900 px-4 py-2 text-sm text-white hover:bg-navy-800"
-                      aria-label={`Book ${g.name} now`}
-                    >
-                      Book Now
-                    </Link>
+                    {g.bookable !== false ? (
+                      <Link
+                        to={`/book/activities/process?game=${g.id}`}
+                        className="btn-base mt-3 w-full bg-navy-900 px-4 py-2 text-sm text-white hover:bg-navy-800"
+                        aria-label={`Book ${g.name} now`}
+                      >
+                        Book Now
+                      </Link>
+                    ) : (
+                      <div className="h-0" />
+                    )}
                   </div>
                 </article>
               ))}

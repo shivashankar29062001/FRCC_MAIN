@@ -5,7 +5,7 @@ import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
 import { GAMES } from '../features/activities/games.config.js';
 import { LoadingButton } from './ui/controls.jsx';
-import { todayISO, cx } from '../utils/helpers.js';
+import { todayISO, cx, isPageReload } from '../utils/helpers.js';
 import { parseDMY } from '../utils/dates.js';
 import {
   HotelIcon,
@@ -78,7 +78,7 @@ const DURATION_OPTIONS = [
 
 // Starting values, so the stay row is never blank (a hotel search always has
 // a party size and a room count).
-const DEFAULTS = { stay: { adults: '2', rooms: '1' } };
+const DEFAULTS = {};
 const EMPTY = { stay: {}, hall: {}, parking: {}, activities: {}, membership: {} };
 
 const SERVICE_HEADERS = {
@@ -91,6 +91,7 @@ const SERVICE_HEADERS = {
 
 function readParams() {
   if (typeof window === 'undefined') return {};
+  if (isPageReload()) return {};
   try {
     const sp = new URLSearchParams(window.location.search);
     const result = {};
@@ -119,6 +120,10 @@ function readParams() {
 
 function readStored() {
   try {
+    if (isPageReload()) {
+      window.sessionStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     return JSON.parse(window.sessionStorage.getItem(STORAGE_KEY)) || null;
   } catch {
     return null;
@@ -410,6 +415,23 @@ function useBookingForm(defaultTab, preselect) {
       setTab(defaultTab);
     }
   }, [defaultTab, preselect]);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isPageReload()) return;
+    const sp = new URLSearchParams(window.location.search);
+    const keys = ['checkin', 'checkout', 'adults', 'rooms', 'venue', 'date', 'guests', 'city', 'campus', 'campus_id', 'zone_id', 'duration', 'days', 'time', 'game'];
+    let changed = false;
+    keys.forEach((key) => {
+      if (sp.has(key)) {
+        sp.delete(key);
+        changed = true;
+      }
+    });
+    if (changed) {
+      const qs = sp.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+    }
+  }, []);
+
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const tabRefs = useRef({});

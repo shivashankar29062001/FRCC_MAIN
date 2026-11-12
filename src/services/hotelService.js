@@ -10,6 +10,7 @@ import {
   getMyStayBookings,
 } from '../api/stay.js';
 import { rooms as LOCAL_ROOMS } from '../data/hotel.js';
+import { isValidName, nameError } from '../utils/fullName.js';
 
 export function generateStayBookingId() {
   const year = new Date().getFullYear();
@@ -38,6 +39,10 @@ export async function checkStayAvailability(roomId, checkin, checkout) {
 }
 
 export async function createStayReservation(stayData, paymentMethod = 'upi') {
+  const rawName = stayData?.guestName || stayData?.name;
+  if (rawName && !isValidName(rawName)) {
+    throw new Error(nameError('Full name'));
+  }
   return apiCreateStayBooking({
     clientRequestId: stayData.clientRequestId || `stay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     userId: stayData.userId,

@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js';
 import { normalizeMobile } from '../utils/phone.js';
 import { isPhoneLike, isValidIndianMobile, INDIAN_MOBILE_MESSAGE } from '../utils/mobile.js';
+import { isValidName, nameError } from '../utils/fullName.js';
 
 /**
  * Format user login identifier. If legacy phone login is enabled via VITE_ENABLE_LEGACY_PHONE_LOGIN
@@ -125,6 +126,9 @@ export async function updateProfile(userId, updates) {
   if (!userId) throw new Error('Missing user id');
   if (updates?.phone && isPhoneLike(updates.phone) && !isValidIndianMobile(updates.phone)) {
     throw new Error(INDIAN_MOBILE_MESSAGE);
+  }
+  if (updates?.name && !isValidName(updates.name)) {
+    throw new Error(nameError('Full name'));
   }
   const { data, error } = await supabase
     .from('profiles')
