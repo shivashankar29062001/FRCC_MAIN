@@ -57,6 +57,26 @@ export function clearUserSessionAndDrafts(userId = null) {
     window.sessionStorage.removeItem('frcc_booking');
     window.sessionStorage.removeItem('frcc_confirmed');
     window.sessionStorage.removeItem('frcc.postLoginRedirect.v1');
+    window.sessionStorage.removeItem('frcc.membershipJoin.v1');
+    window.sessionStorage.removeItem('frcc.membershipJoin.v1.anon');
+
+    // Remove any membership join drafts in sessionStorage (unnamespaced or user-scoped)
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      for (let i = window.sessionStorage.length - 1; i >= 0; i--) {
+        const key = window.sessionStorage.key(i);
+        if (key && (
+          key.startsWith('frcc.membershipJoin') ||
+          key.startsWith('frcc_membership') ||
+          key.startsWith('frcc_stay_') ||
+          key.startsWith('frcc_activities_') ||
+          key.startsWith('frcc_parking_') ||
+          key.includes('confirmed') ||
+          key.includes('booking_draft')
+        )) {
+          window.sessionStorage.removeItem(key);
+        }
+      }
+    }
 
     // Clear user-specific storage keys if userId is known
     if (userId) {
@@ -65,6 +85,7 @@ export function clearUserSessionAndDrafts(userId = null) {
       window.localStorage.removeItem(`frcc.membership.v1.${userId}`);
       window.localStorage.removeItem(`frcc.isMember.v1.${userId}`);
       window.sessionStorage.removeItem(`frcc_parking_confirmed_bookings_v1.${userId}`);
+      window.sessionStorage.removeItem(`frcc.membershipJoin.v1.${userId}`);
     }
 
     // Always clean un-namespaced legacy keys
@@ -73,6 +94,7 @@ export function clearUserSessionAndDrafts(userId = null) {
     window.localStorage.removeItem('frcc.membership.v1');
     window.localStorage.removeItem('frcc.isMember.v1');
     window.sessionStorage.removeItem('frcc_parking_confirmed_bookings_v1');
+    window.sessionStorage.removeItem('frcc.membershipJoin.v1');
   } catch {
     /* ignore storage errors */
   }

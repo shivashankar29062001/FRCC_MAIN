@@ -169,6 +169,10 @@ function PersonalDetails({ user, membership, pushToast }) {
     e.preventDefault();
     setEmailErr('');
     setEmailStatus('');
+    if (realEmail) {
+      setEmailErr('Email change is not available.');
+      return;
+    }
     const cleanEmail = newEmail.trim().toLowerCase();
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setEmailErr('Please enter a valid email address.');
@@ -335,17 +339,19 @@ function PersonalDetails({ user, membership, pushToast }) {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setShowEmailForm((prev) => !prev);
-                setEmailErr('');
-                setEmailStatus('');
-              }}
-              className="btn-base inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-navy-900 shadow-sm hover:border-gold-500 hover:bg-slate-50 transition"
-            >
-              {showEmailForm ? 'Cancel' : realEmail ? 'Change email' : 'Add email'}
-            </button>
+            {!realEmail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmailForm((prev) => !prev);
+                  setEmailErr('');
+                  setEmailStatus('');
+                }}
+                className="btn-base inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-navy-900 shadow-sm hover:border-gold-500 hover:bg-slate-50 transition"
+              >
+                {showEmailForm ? 'Cancel' : realEmail ? 'Change email' : 'Add email'}
+              </button>
+            )}
           </div>
 
           {/* Pending Email Confirmation Notice */}
@@ -373,8 +379,8 @@ function PersonalDetails({ user, membership, pushToast }) {
             </div>
           )}
 
-          {/* Email Update / Add Form */}
-          {showEmailForm && (
+          {/* Email Update / Add Form — only for accounts without a verified email */}
+          {!realEmail && showEmailForm && (
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="max-w-md space-y-3">
                 <label className="label" htmlFor="profile-new-email">
@@ -450,6 +456,8 @@ function ChangePassword({ pushToast, isPasswordRecovery = false, onPasswordUpdat
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const samePasswordMessage = 'New password must be different from your current password.';
+  const sameAsCurrent = !isPasswordRecovery && current !== '' && next === current;
 
   async function save(e) {
     e.preventDefault();
@@ -462,10 +470,13 @@ function ChangePassword({ pushToast, isPasswordRecovery = false, onPasswordUpdat
       setErr('New passwords do not match.');
       return;
     }
+    if (sameAsCurrent) {
+      return;
+    }
     setSaving(true);
     try {
       const { updatePassword } = await import('../services/authService.js');
-      await updatePassword(next);
+      await updatePassword(next, current);
       setCurrent('');
       setNext('');
       setConfirm('');
@@ -501,8 +512,9 @@ function ChangePassword({ pushToast, isPasswordRecovery = false, onPasswordUpdat
           <Input id="pw-confirm" name="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
         </div>
         {err && <p className="field-error sm:col-span-2" role="alert">{err}</p>}
+        {!err && sameAsCurrent && <p className="field-error sm:col-span-2" role="alert">{samePasswordMessage}</p>}
         <div className="sm:col-span-2">
-          <LoadingButton loading={saving} className="px-6 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
+          <LoadingButton loading={saving} disabled={saving || sameAsCurrent} className="px-6 py-2.5 bg-navy-900 text-white hover:bg-navy-800">
             {isPasswordRecovery ? 'Save new password & unlock account' : 'Update password'}
           </LoadingButton>
         </div>

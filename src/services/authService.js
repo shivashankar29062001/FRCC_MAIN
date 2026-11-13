@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js';
-import { normalizeMobile } from '../utils/phone.js';
+import { normalizeMobile, isLegacySyntheticEmail } from '../utils/phone.js';
 import { isPhoneLike, isValidIndianMobile, INDIAN_MOBILE_MESSAGE } from '../utils/mobile.js';
 import { isValidName, nameError } from '../utils/fullName.js';
 
@@ -146,8 +146,16 @@ export async function updateProfile(userId, updates) {
 
 /**
  * Update authenticated user's password.
+ * When the current password is supplied, reject an unchanged password before
+ * making any request. Comparison is exact, case-sensitive and untrimmed.
  */
-export async function updatePassword(newPassword) {
+export async function updatePassword(newPassword, currentPassword) {
+  if (typeof currentPassword === 'string' && currentPassword !== '' && newPassword === currentPassword) {
+    const error = new Error('New password must be different from your current password.');
+    error.status = 400;
+    error.statusCode = 400;
+    throw error;
+  }
   const { data, error } = await supabase.auth.updateUser({
     password: newPassword,
   });
@@ -174,9 +182,20 @@ export function getPasswordResetRedirectUrl() {
 /**
  * Update authenticated user's email with verification.
  * Sends a confirmation email to the new address before completing the update.
+ * Changing an existing verified email is not available; adding a first email
+ * to a legacy phone-only account is still supported.
  */
 export async function updateEmail(newEmail) {
   const cleanEmail = (newEmail || '').trim().toLowerCase();
+  const { data: current, error: currentError } = await supabase.auth.getUser();
+  if (currentError) throw currentError;
+  const existingEmail = (current?.user?.email || '').trim();
+  if (existingEmail && !isLegacySyntheticEmail(existingEmail)) {
+    const error = new Error('Email change is not available.');
+    error.status = 403;
+    error.statusCode = 403;
+    throw error;
+  }
   const redirectTo = getPasswordResetRedirectUrl().replace('/profile?tab=password', '/profile');
   const { data, error } = await supabase.auth.updateUser(
     { email: cleanEmail },

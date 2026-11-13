@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { FlowShell } from '../../components/FlowShell.jsx';
@@ -61,7 +61,10 @@ import {
   ImageIcon,
 } from '../../components/ui/icons.jsx';
 
-const STORAGE_KEY = 'frcc.membershipJoin.v1';
+const BASE_STORAGE_KEY = 'frcc.membershipJoin.v1';
+function getJoinStorageKey(userId) {
+  return userId ? `${BASE_STORAGE_KEY}.${userId}` : `${BASE_STORAGE_KEY}.anon`;
+}
 
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
@@ -202,29 +205,22 @@ export function MembershipJoinPage() {
     (isMember && Boolean(activeMemberCode))
   );
 
-  // Initialize wizard state from sessionStorage or defaults
-  const [wizardState, setWizardState] = useState(() => {
-    let saved = null;
-    try {
-      const raw = window.sessionStorage.getItem(STORAGE_KEY);
-      if (raw) saved = JSON.parse(raw);
-    } catch {
-      /* ignore */
-    }
+  const currentUid = user?.id || user?.userId || null;
 
-    const matchedPlan = PLANS_DATA.find((p) => p.id === planParam);
-    const initialPlanId = matchedPlan ? matchedPlan.id : (saved?.formData?.planId || 'frcc-membership');
+  // Helper to construct fresh default form data for the active user
+  const getDefaultFormData = useCallback((targetPlanId = null) => {
+    const matchedPlan = PLANS_DATA.find((p) => p.id === (targetPlanId || planParam));
+    const initialPlanId = matchedPlan ? matchedPlan.id : 'frcc-membership';
 
-    let initialFullName = user?.name || '';
     const rawEmail = (user?.email || (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '')).trim();
     const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
-    let initialEmail = isSynthetic ? '' : rawEmail;
+    const initialEmail = isSynthetic ? '' : rawEmail;
     const rawMobile = user?.phone || user?.mobile || (isSynthetic ? rawEmail.replace(/@frcc\.member$/i, '') : (!rawEmail.includes('@') ? user?.emailOrPhone : '')) || '';
-    let initialMobile = rawMobile ? rawMobile.replace(/\D/g, '').slice(-10) : '';
+    const initialMobile = rawMobile ? rawMobile.replace(/\D/g, '').slice(-10) : '';
 
-    const initialFormData = {
+    return {
       planId: initialPlanId,
-      fullName: initialFullName,
+      fullName: user?.name || '',
       mobile: initialMobile,
       email: initialEmail,
       dob: '',
@@ -235,7 +231,6 @@ export function MembershipJoinPage() {
       pincode: '',
       emergencyName: '',
       emergencyMobile: '',
-      // Step 4: Family & Profession
       maritalStatus: '',
       spouseName: '',
       spouseDob: '',
@@ -252,29 +247,102 @@ export function MembershipJoinPage() {
       profession: '',
       organisation: '',
       familyConsent: false,
-      // Step 5: Documents
       photoPath: '',
       aadhaarLast4: '',
       aadhaarConsent: false,
       paymentMethod: 'upi',
-      memberId: saved?.formData?.memberId || membership?.memberId || '',
-      ...(saved?.formData || {}),
+      memberId: membership?.memberId || membership?.memberCode || '',
     };
+  }, [user, membership, planParam]);
 
-    if (matchedPlan) {
-      initialFormData.planId = matchedPlan.id;
+  // Initialize wizard state from user-scoped sessionStorage or defaults
+  const [wizardState, setWizardState] = useState(() => {
+    const defaults = getDefaultFormData();
+    let saved = null;
+    try {
+      const storageKey = getJoinStorageKey(currentUid);
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Only load drafts that belong to the current authenticated user (or anon)
+        if (parsed && (!parsed.userId || parsed.userId === currentUid)) {
+          saved = parsed;
+        }
+      }
+    } catch {
+      /* ignore */
     }
 
-    if (!initialFormData.fullName && user?.name) initialFormData.fullName = user.name;
-    if (!initialFormData.email && initialEmail) initialFormData.email = initialEmail;
-    if (!initialFormData.mobile && initialMobile) initialFormData.mobile = initialMobile;
-    if (!initialFormData.memberId && membership?.memberId) initialFormData.memberId = membership.memberId;
-
+    // Step 6 is the transient confirmation screen and must NEVER be restored on mount
     const initialStep =
-      typeof saved?.step === 'number' && saved.step >= 0 && saved.step < 7 ? saved.step : 0;
+      typeof saved?.step === 'number' && saved.step >= 0 && saved.step < 6 ? saved.step : 0;
+
+    const initialFormData = {
+      ...defaults,
+      ...(saved?.formData ? {
+        planId: saved.formData.planId || defaults.planId,
+        dob: saved.formData.dob || '',
+        gender: saved.formData.gender || '',
+        address: saved.formData.address || '',
+        city: saved.formData.city || '',
+        state: saved.formData.state || 'Telangana',
+        pincode: saved.formData.pincode || '',
+        emergencyName: saved.formData.emergencyName || '',
+        emergencyMobile: saved.formData.emergencyMobile || '',
+        maritalStatus: saved.formData.maritalStatus || '',
+        spouseName: saved.formData.spouseName || '',
+        spouseDob: saved.formData.spouseDob || '',
+        spouseMobile: saved.formData.spouseMobile || '',
+        hasNoChildren: Boolean(saved.formData.hasNoChildren),
+        children: saved.formData.children || [],
+        occupationType: saved.formData.occupationType || '',
+        employerName: saved.formData.employerName || '',
+        designation: saved.formData.designation || '',
+        workCity: saved.formData.workCity || '',
+        workEmail: saved.formData.workEmail || '',
+        businessName: saved.formData.businessName || '',
+        businessNature: saved.formData.businessNature || '',
+        profession: saved.formData.profession || '',
+        organisation: saved.formData.organisation || '',
+        familyConsent: Boolean(saved.formData.familyConsent),
+        photoPath: saved.formData.photoPath || '',
+        aadhaarLast4: saved.formData.aadhaarLast4 || '',
+        aadhaarConsent: Boolean(saved.formData.aadhaarConsent),
+        paymentMethod: saved.formData.paymentMethod || 'upi',
+      } : {}),
+      // Identity fields strictly bind to currently signed in user
+      fullName: user?.name || saved?.formData?.fullName || defaults.fullName,
+      email: defaults.email || saved?.formData?.email || '',
+      mobile: defaults.mobile || saved?.formData?.mobile || '',
+      memberId: membership?.memberId || membership?.memberCode || '',
+    };
 
     return { step: initialStep, formData: initialFormData };
   });
+
+  // When active user identity changes (e.g. logout or switch account), reset wizard completely
+  const prevUidRef = useRef(currentUid);
+  useEffect(() => {
+    if (prevUidRef.current !== currentUid) {
+      prevUidRef.current = currentUid;
+      setJustEnrolled(false);
+      setFieldErrors({});
+      setSubmitError('');
+      setPhotoPreviewUrl(null);
+      setAadhaarFile(null);
+      setAadhaarRaw('');
+      try {
+        window.sessionStorage.removeItem('frcc.membershipJoin.v1');
+        window.sessionStorage.removeItem('frcc.membershipJoin.v1.anon');
+      } catch {
+        /* ignore */
+      }
+      setWizardState({
+        step: 0,
+        formData: getDefaultFormData(),
+      });
+    }
+  }, [currentUid, getDefaultFormData]);
 
   const { step, formData } = wizardState;
 
@@ -372,12 +440,15 @@ export function MembershipJoinPage() {
     }
   }
 
-  // Sync wizard state to sessionStorage without file objects
+  // Sync wizard state to sessionStorage without file objects (never persist step 6)
   useEffect(() => {
+    if (step >= 6) return;
     try {
+      const storageKey = getJoinStorageKey(currentUid);
       window.sessionStorage.setItem(
-        STORAGE_KEY,
+        storageKey,
         JSON.stringify({
+          userId: currentUid,
           step,
           formData: {
             ...formData,
@@ -388,7 +459,7 @@ export function MembershipJoinPage() {
     } catch {
       /* ignore */
     }
-  }, [step, formData]);
+  }, [step, formData, currentUid]);
 
   function updateForm(patch) {
     setWizardState((prev) => ({
@@ -954,6 +1025,16 @@ export function MembershipJoinPage() {
             .catch((err) => {
               console.warn('[membership] automated WhatsApp send background error:', err);
             });
+        }
+
+        // Clear in-progress draft from sessionStorage since enrollment has been finalized
+        try {
+          const storageKey = getJoinStorageKey(currentUid);
+          window.sessionStorage.removeItem(storageKey);
+          window.sessionStorage.removeItem('frcc.membershipJoin.v1');
+          window.sessionStorage.removeItem('frcc.membershipJoin.v1.anon');
+        } catch {
+          /* ignore */
         }
 
         updateForm({ memberId: assignedCode, memberCode: assignedCode });

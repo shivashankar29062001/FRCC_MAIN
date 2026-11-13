@@ -238,6 +238,12 @@ async function fallbackCreateActivityBooking({
       ) {
         throw new Error('This slot is no longer available');
       }
+      if (insErr && String(insErr.message).includes('Adults and children together cannot exceed')) {
+        const err = new Error(insErr.message);
+        err.status = 400;
+        err.statusCode = 400;
+        throw err;
+      }
       const minimalPayload = {
         booking_id: bookingRef,
         user_id: validDbUserId,
@@ -267,10 +273,19 @@ async function fallbackCreateActivityBooking({
       ) {
         throw new Error('This slot is no longer available');
       }
+      if (minErr && String(minErr.message).includes('Adults and children together cannot exceed')) {
+        const err = new Error(minErr.message);
+        err.status = 400;
+        err.statusCode = 400;
+        throw err;
+      }
       if (minData) inserted = minData;
     }
   } catch (err) {
-    if (String(err?.message).includes('no longer available')) {
+    if (
+      String(err?.message).includes('no longer available') ||
+      String(err?.message).includes('Adults and children together cannot exceed')
+    ) {
       throw err;
     }
     console.warn('[bookings.store] Direct bookings insert error:', err);
@@ -413,6 +428,12 @@ export async function createActivityBookingRemote({
   // If slot was full, already booked, or rejected by unique constraint, re-throw business error directly
   const errMsg = String(rpcError?.message || rpcError?.details || '');
   const errCode = String(rpcError?.code || '');
+  if (errMsg.includes('Adults and children together cannot exceed')) {
+    const err = new Error(errMsg);
+    err.status = 400;
+    err.statusCode = 400;
+    throw err;
+  }
   const isConflict =
     errCode === '23505' ||
     errMsg.includes('SLOT_FULL') ||
