@@ -208,7 +208,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         const gamePrice = g.price ?? g.pricePerSlot ?? g.priceFrom ?? 1500;
         const isFreeGame = Boolean(g.isFree || gamePrice === 0);
         const gameUnit = g.unit === 'per-session' ? 'session' : g.unit === 'per-hour' ? 'hour' : (g.unit || 'session');
-        return {
+        // Book session button for all activities including carom and kids-play-area
+      return {
           id: g.id,
           name: g.name,
           image: g.image || gameSlot(g.imageKey || g.id || g.name),
@@ -223,8 +224,9 @@ export function ServiceLanding({ service = 'stay', hero }) {
             ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
             : null,
           buttonLabel: 'Book session',
-          to: `/book/activity?item=${encodeURIComponent(g.id)}`,
-          bookable: g.id != 'kids-play-area' && g.id != 'carom'
+          to: (g.id === 'carom' || g.id === 'kids-play-area')
+            ? undefined
+            : `/book/activity?item=${encodeURIComponent(g.id)}`,
         };
       });
     }
@@ -458,8 +460,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
                     </div>
 
                     {/* Gold Button */}
-                    {item.bookable ? (
-                      <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
+                    <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
+                      {item.to ? (
                         <Link
                           to={item.to}
                           onClick={(e) => handleActionClick(e, item.to)}
@@ -467,13 +469,13 @@ export function ServiceLanding({ service = 'stay', hero }) {
                             isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
                           } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
                         >
-                          {item.buttonLabel}
+                          {item.buttonLabel || 'Book now'}
                           <ArrowRightIcon className="h-4 w-4" />
                         </Link>
-                      </div>
-                    ) : (
-                      <div className="h-0" />
-                    )}
+                      ) : (
+                        <div className="h-0" />
+                      )}
+                    </div>
                   </div>
                 </article>
               );
