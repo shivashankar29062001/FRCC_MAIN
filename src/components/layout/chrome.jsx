@@ -176,7 +176,7 @@ function AccountRows({ onNavigate, isMember, isAdminUser, onLogout, isPasswordRe
         <li>
           <Link
             role="menuitem"
-            to={isPasswordRecovery ? '/profile?tab=password' : '/profile'}
+            to={isPasswordRecovery ? '/profile?tab=password' : '/profile?tab=details'}
             onClick={onNavigate}
             className={ACCOUNT_ROW_LINK}
           >
