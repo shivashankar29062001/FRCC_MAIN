@@ -16,6 +16,7 @@ import {
   isValidIndianMobile,
   sanitizeMobileInput,
 } from '../../../../utils/mobile.js';
+import { isValidName, sanitizeNameInput, normalizeName, nameError } from '../../../../utils/fullName.js';
 
 const EVENT_TYPES = ['Wedding', 'Conference', 'Birthday', 'Corporate', 'Engagement', 'Workshop', 'Social Gathering', 'Other'];
 
@@ -55,6 +56,7 @@ export default function ConventionDetails() {
       return setError(`This hall holds up to ${hall.capacity.toLocaleString('en-IN')} guests. Choose a larger hall or reduce guests.`);
     }
     if (!booking.organizerName.trim()) return setError('Enter the organizer name.');
+    if (!isValidName(booking.organizerName)) return setError(nameError('Organizer name'));
     if (!isValidIndianMobile(booking.phone)) return setError(INDIAN_MOBILE_MESSAGE);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(booking.email)) return setError('Enter a valid email address.');
 
@@ -71,7 +73,7 @@ export default function ConventionDetails() {
         endTime: booking.endTime,
         guests: Number(booking.guests),
         eventType: booking.eventType,
-        organizerName: booking.organizerName.trim(),
+        organizerName: normalizeName(booking.organizerName),
         phone: booking.phone,
         email: booking.email.trim(),
         eventDetails: booking.eventDetails || '',
@@ -152,7 +154,7 @@ export default function ConventionDetails() {
             /></label>
           <p className="text-sm text-gray-600">Food: ₹1,500 – ₹3,000 per plate</p>
           <label className="block">Organizer Name
-            <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: e.target.value })} /></label>
+            <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: sanitizeNameInput(e.target.value) })} onBlur={e => updateBooking({ organizerName: normalizeName(e.target.value) })} /></label>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block">Phone
               <input

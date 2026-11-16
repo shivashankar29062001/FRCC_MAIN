@@ -208,7 +208,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
         const gamePrice = g.price ?? g.pricePerSlot ?? g.priceFrom ?? 1500;
         const isFreeGame = Boolean(g.isFree || gamePrice === 0);
         const gameUnit = g.unit === 'per-session' ? 'session' : g.unit === 'per-hour' ? 'hour' : (g.unit || 'session');
-        return {
+        // Book session button for all activities including carom and kids-play-area
+      return {
           id: g.id,
           name: g.name,
           image: g.image || gameSlot(g.imageKey || g.id || g.name),
@@ -223,7 +224,9 @@ export function ServiceLanding({ service = 'stay', hero }) {
             ? `Health card holders get ${healthCardDiscountPercent}% discount on games.`
             : null,
           buttonLabel: 'Book session',
-          to: `/book/activity?item=${encodeURIComponent(g.id)}`,
+          to: (g.id === 'carom' || g.id === 'kids-play-area')
+            ? undefined
+            : `/book/activity?item=${encodeURIComponent(g.id)}`,
         };
       });
     }
@@ -458,16 +461,20 @@ export function ServiceLanding({ service = 'stay', hero }) {
 
                     {/* Gold Button */}
                     <div className={`${isCompact ? 'mt-3 pt-0.5' : 'mt-5 pt-1'}`}>
-                      <Link
-                        to={item.to}
-                        onClick={(e) => handleActionClick(e, item.to)}
-                        className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
-                          isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
-                        } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
-                      >
-                        {item.buttonLabel}
-                        <ArrowRightIcon className="h-4 w-4" />
-                      </Link>
+                      {item.to ? (
+                        <Link
+                          to={item.to}
+                          onClick={(e) => handleActionClick(e, item.to)}
+                          className={`btn-base bg-gold-500 text-navy-950 hover:bg-gold-400 w-full justify-center ${
+                            isCompact ? 'py-2 text-xs sm:text-sm' : 'py-2.5 text-sm'
+                          } font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shadow-sm`}
+                        >
+                          {item.buttonLabel || 'Book now'}
+                          <ArrowRightIcon className="h-4 w-4" />
+                        </Link>
+                      ) : (
+                        <div className="h-0" />
+                      )}
                     </div>
                   </div>
                 </article>

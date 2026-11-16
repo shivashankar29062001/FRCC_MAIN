@@ -7,13 +7,24 @@ import { inr, getBookingRefundPolicy, maskPhone, maskEmail, CANCELLATION_POLICY_
 import { cancelHallBooking, getHallBookingById } from '../services/hallBookingService.js';
 import { supabase } from '../../../../services/supabase.js';
 
+const RECEIPT_STATUSES = new Set(['CONFIRMED', 'PENDING_VERIFICATION', 'CANCELLED', 'COMPLETED']);
+
+function isReceiptBooking(value) {
+  return Boolean(value?.id) && RECEIPT_STATUSES.has(String(value.status || '').toUpperCase());
+}
+
 export default function ConventionConfirmation() {
   const { confirmed, setConfirmed, resetBooking } = useBooking();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [booking, setBooking] = useState(confirmed);
-  const [loading, setLoading] = useState(!confirmed);
-  const [notFound, setNotFound] = useState(false);
+  const requestedId = params.get('id') || '';
+  const paymentIdParam = params.get('paymentId') || '';
+  const initialBooking = isReceiptBooking(confirmed) && (!requestedId || confirmed.id === requestedId)
+    ? confirmed
+    : null;
+  const [booking, setBooking] = useState(initialBooking);
+  const [loading, setLoading] = useState(Boolean(requestedId) && !initialBooking);
+  const [notFound, setNotFound] = useState(!requestedId && !initialBooking);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelMsg, setCancelMsg] = useState('');
@@ -23,19 +34,55 @@ export default function ConventionConfirmation() {
   const [resendCount, setResendCount] = useState(0);
   const [resendMsg, setResendMsg] = useState('');
 
-  // Fallback: if the booking state was lost on refresh, load it directly from Supabase.
+  // Load the receipt by ID from Supabase. This keeps refresh/new-tab working
+  // and prevents an unpaid/unknown booking from rendering as a paid receipt.
   useEffect(() => {
-    if (confirmed) { setBooking(confirmed); setLoading(false); return; }
-    const id = params.get('id');
-    if (!id) { setLoading(false); setNotFound(true); return; }
-    getHallBookingById(id)
+    if (!requestedId) {
+      if (initialBooking) {
+        setBooking(initialBooking);
+        setNotFound(false);
+      } else {
+        setBooking(null);
+        setNotFound(true);
+      }
+      setLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setNotFound(false);
+    if (!initialBooking) setLoading(true);
+
+    getHallBookingById(requestedId)
       .then((found) => {
-        if (found) { setBooking(found); setConfirmed(found); }
-        else setNotFound(true);
+        if (!active) return;
+        if (isReceiptBooking(found)) {
+          setBooking(found);
+          setConfirmed(found);
+          setNotFound(false);
+        } else {
+          setBooking(null);
+          setNotFound(true);
+        }
       })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false));
-  }, [confirmed, params, setConfirmed]);
+      .catch(() => {
+        if (!active) return;
+        if (initialBooking) {
+          setBooking(initialBooking);
+          setNotFound(false);
+        } else {
+          setBooking(null);
+          setNotFound(true);
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+    // initialBooking is only a fallback for this specific requestedId.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedId, setConfirmed]);
 
   const handleResendConfirmation = async () => {
     if (!booking?.id || resending || resendCount >= 3) return;
@@ -71,11 +118,15 @@ export default function ConventionConfirmation() {
   if (notFound || !booking) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-gray-600 mb-4">No recent booking found.</p>
+        <p className="text-gray-600 mb-4">Receipt not found. This booking may not exist, or payment has not been completed.</p>
         <Link to="/convention/book" className="text-navy underline decoration-gold">Start a new booking</Link>
       </div>
     );
   }
+
+  const paymentId = booking.paymentId || booking.transactionRef || paymentIdParam || '—';
+  const paidAt = booking.updatedAt || booking.createdAt;
+  const paidAtText = paidAt ? new Date(paidAt).toLocaleString('en-IN') : '—';
 
   const downloadableReceipt = () => {
     const doc = new jsPDF();
@@ -124,21 +175,30 @@ export default function ConventionConfirmation() {
       ['Contact Phone', booking.phone],
       ['Contact Email', booking.email],
       ['Payment Method', (booking.paymentMethod || 'UPI').replaceAll('_', ' ')],
-      ['Total Paid', inr(booking.amountPaid ?? booking.amount)],
+      ['Event Type', booking.eventType || '—'],
+      ...(booking.eventDetails ? [['Event Details', booking.eventDetails]] : []),
+      ['Payment ID', paymentId],
+      ['Payment Status', booking.paymentStatus || '—'],
+      ['Payment Date & Time', paidAtText],
+      ['Hall Charge', inr(booking.hallCharge)],
+      ['GST (18%)', inr(booking.gst)],
+      ...(Number(booking.convenienceFee) > 0 ? [['Convenience Fee', inr(booking.convenienceFee)]] : []),
+      ['Amount Paid', inr(booking.amountPaid ?? booking.amount)],
+      ...(Number(booking.balanceDue) > 0 ? [['Balance Due', inr(booking.balanceDue)]] : []),
       ['Booking Status', booking.status],
     ];
 
-    let y = 100;
+    let y = 96;
     rows.forEach(([k, v]) => {
       doc.setFont('times', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(labelColor);
       doc.text(k, 20, y);
       doc.setFont('times', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(valueColor);
       doc.text(String(v), 80, y);
-      y += 10;
+      y += 8;
     });
 
     doc.setFont('times', 'normal');
@@ -199,17 +259,26 @@ export default function ConventionConfirmation() {
           <dt className="font-semibold">Date</dt><dd>{booking.date}</dd>
           <dt className="font-semibold">Time</dt><dd>{booking.startTime} – {booking.endTime}</dd>
           <dt className="font-semibold">Event</dt><dd>{booking.eventType} ({booking.guests} guests)</dd>
+          {booking.eventDetails && <><dt className="font-semibold">Event Details</dt><dd>{booking.eventDetails}</dd></>}
+          {booking.specialRequests && <><dt className="font-semibold">Special Requests</dt><dd>{booking.specialRequests}</dd></>}
           <dt className="font-semibold">Organizer</dt><dd>{booking.organizerName}</dd>
+          <dt className="font-semibold">Phone</dt><dd>{booking.phone || '—'}</dd>
+          <dt className="font-semibold">Email</dt><dd>{booking.email || '—'}</dd>
           <dt className="font-semibold">Payment Method</dt><dd>{(booking.paymentMethod || 'UPI_ID').replaceAll('_', ' ')}</dd>
           <dt className="font-semibold">Instrument</dt><dd>{booking.maskedInstrument || booking.upiIdMasked || '—'}</dd>
           {booking.emiTenure && <><dt className="font-semibold">EMI</dt><dd>{booking.emiTenure} × ₹{booking.emiMonthlyAmount}</dd></>}
           {booking.gstin && <><dt className="font-semibold">GSTIN</dt><dd>{booking.gstin}</dd></>}
           {booking.utrNumber && <><dt className="font-semibold">UTR</dt><dd>{booking.utrNumber}</dd></>}
+          {Number(booking.hallCharge) > 0 && <><dt className="font-semibold">Hall Charge</dt><dd>{inr(booking.hallCharge)}</dd></>}
+          {Number(booking.gst) > 0 && <><dt className="font-semibold">GST (18%)</dt><dd>{inr(booking.gst)}</dd></>}
+          {Number(booking.convenienceFee) > 0 && <><dt className="font-semibold">Convenience Fee</dt><dd>{inr(booking.convenienceFee)}</dd></>}
           <dt className="font-semibold">Amount</dt><dd>{inr(booking.amount)}</dd>
           <dt className="font-semibold">Amount Paid</dt><dd>{inr(booking.amountPaid ?? booking.amount)}</dd>
           {(booking.balanceDue ?? 0) > 0 && <><dt className="font-semibold">Due at venue</dt><dd className="text-amber-700 font-semibold">{inr(booking.balanceDue)}</dd></>}
-          <dt className="font-semibold">Payment Status</dt><dd>{booking.paymentStatus}</dd>
+          <dt className="font-semibold">Payment Status</dt><dd>{booking.paymentStatus || '—'}</dd>
+          <dt className="font-semibold">Payment Date &amp; Time</dt><dd>{paidAtText}</dd>
           <dt className="font-semibold">Transaction Ref</dt><dd>{booking.transactionRef || '—'}</dd>
+          {paymentId !== '—' && paymentId !== booking.transactionRef && <><dt className="font-semibold">Payment ID</dt><dd>{paymentId}</dd></>}
           <dt className="font-semibold">Status</dt><dd className={booking.status === 'CANCELLED' ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{booking.status}</dd>
           {booking.status === 'CANCELLED' && (
             <>
@@ -249,6 +318,7 @@ export default function ConventionConfirmation() {
         <p className="text-xs text-gray-500 mt-3">Cancellation policy: {CANCELLATION_POLICY_TEXT}</p>
         <div className="flex flex-wrap gap-3 mt-6">
           <button onClick={downloadableReceipt} className="bg-gold text-navy font-semibold px-5 py-2 rounded">Download Receipt (PDF)</button>
+          <button onClick={() => window.print()} className="border border-navy text-navy px-5 py-2 rounded">Print</button>
           <button onClick={() => { resetBooking(); navigate('/my-bookings'); }} className="bg-navy text-gold px-5 py-2 rounded">View My Bookings</button>
           {booking.status !== 'CANCELLED' && (
             <button disabled={!eligible} onClick={() => { setCancelOpen(true); setCancelMsg(''); setCancelErr(''); }}

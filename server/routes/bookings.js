@@ -30,6 +30,10 @@ router.post('/', auth, (req, res) => {
   const { hallId, date, startTime, endTime, guests, eventType, eventDetails, organizerName, phone, email, specialRequests, upiIdMasked, transactionRef } = req.body || {};
   if (!hallId || !date || !startTime || !endTime || !guests || !eventType || !organizerName)
     return res.status(400).json({ error: 'Missing required booking fields.' });
+  const cleanOrganizerName = String(organizerName || '').replace(/\s+/g, ' ').trim();
+  if (!/^[A-Za-z\s]+$/.test(cleanOrganizerName) || cleanOrganizerName.replace(/[^A-Za-z]/g, '').length < 2) {
+    return res.status(400).json({ error: 'Organizer name should contain only alphabets.' });
+  }
   // Validate first (server-side gate). Only after a valid phone is confirmed
   // do we normalise and store it, so old bookings are never rewritten.
   let phoneDigits = String(phone || '').replace(/\\D/g, '');

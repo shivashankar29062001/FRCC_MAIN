@@ -4,6 +4,7 @@
 
 import { supabase } from '../services/supabase.js';
 import { isValidIndianMobile } from '../utils/mobile.js';
+import { isValidName, nameError } from '../utils/fullName.js';
 import { venues as LOCAL_VENUES } from '../data/dining.js';
 import { isBookingCancelledLocally } from '../services/cancellationService.js';
 
@@ -288,6 +289,10 @@ export async function createTableBooking(payload) {
   const mobile = payload.mobile || payload.guestMobile || payload.guest_mobile;
   if (mobile && !isValidIndianMobile(mobile)) {
     throw new Error('Please enter a valid 10-digit Indian mobile number.');
+  }
+  const guestName = payload.name || payload.guestName || payload.guest_name;
+  if (guestName && !isValidName(guestName)) {
+    throw new Error(nameError('Full name'));
   }
   const clientRequestId = payload.clientRequestId || payload.client_request_id
     || `tbl_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

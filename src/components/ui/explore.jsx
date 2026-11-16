@@ -195,7 +195,7 @@ function experienceHref(key, showcase) {
  * 2 columns on tablet, 1 on mobile. Whole tile links to that service's
  * booking page. Hover is a gold border colour change only.
  */
-export function ExperienceTiles({ className }) {
+export function ExperienceTiles({ className, lineOverrides }) {
   return (
     <div className={cx('grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5', className)}>
       {EXPERIENCE.map((t) => (
@@ -218,7 +218,7 @@ export function ExperienceTiles({ className }) {
           >
             <span className="absolute inset-x-0 bottom-0 block p-5 pointer-events-none">
               <span className="block font-display text-[22px] leading-snug text-white">{t.label}</span>
-              <span className="mt-1 block text-sm text-white/80">{t.line}</span>
+              <span className="mt-1 block text-sm text-white/80">{lineOverrides?.[t.key] ?? t.line}</span>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950">
                 Book now <ArrowRightIcon className="h-4 w-4" />
               </span>
@@ -234,13 +234,13 @@ export function ExperienceTiles({ className }) {
  * Image-led section directly below the hero on / and the home hub:
  * "Book your experience" on cream with 80px vertical padding.
  */
-export function ExperienceSection({ id }) {
+export function ExperienceSection({ id, lineOverrides }) {
   return (
     <section id={id} className="bg-cream py-20" aria-label="Book your experience">
       <div className="container-x">
         <h2 className="h-section">Book your experience</h2>
         <p className="mt-3 max-w-2xl text-slate-600">Rooms, halls, parking, games and membership.</p>
-        <ExperienceTiles className="mt-8" />
+        <ExperienceTiles className="mt-8" lineOverrides={lineOverrides} />
       </div>
     </section>
   );

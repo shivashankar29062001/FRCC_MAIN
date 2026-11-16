@@ -16,10 +16,30 @@ function normalizeCampus(campus) {
   return String(campus).toLowerCase().includes('hyd') ? 'hyderabad' : 'vijayawada';
 }
 
-function parseTimeRange(dateStr, timeStr, durationDays = 1) {
+function addDaysIso(dateStr, days) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d + (Number(days) || 0)));
+  return dt.toISOString().split('T')[0];
+}
+
+function parseTimeRange(dateStr, timeStr, durationDays = 1, endTime = null, endDate = null) {
   const t = timeStr && timeStr.length === 5 ? `${timeStr}:00` : (timeStr || '09:00:00');
   const start = new Date(`${dateStr}T${t}+05:30`).getTime();
-  const end = start + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+  let end;
+  if (endDate) {
+    const et = endTime && endTime.length === 5 ? `${endTime}:00` : (endTime || '23:59:00');
+    end = new Date(`${endDate}T${et}+05:30`).getTime();
+  } else if (endTime) {
+    const endIso = addDaysIso(dateStr, (Number(durationDays) || 1) - 1);
+    const et = endTime && endTime.length === 5 ? `${endTime}:00` : (endTime || '09:00:00');
+    end = new Date(`${endIso}T${et}+05:30`).getTime();
+  } else {
+    end = start + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+  }
+  if (!Number.isFinite(end) || end <= start) {
+    end = start + (Number(durationDays) || 1) * 24 * 60 * 60 * 1000;
+  }
   return { start, end };
 }
 
@@ -32,7 +52,7 @@ function isOverlapping(startA, endA, startB, endB) {
  * Returns list of booked slot IDs for a given campus and date/time range.
  */
 router.get('/availability', (req, res) => {
-  const { campus, date, time, duration } = req.query;
+  const { campus, date, time, duration, endTime, endDate } = req.query;
   const db = readDb();
   db.parking_bookings = db.parking_bookings || [];
 
@@ -41,8 +61,10 @@ router.get('/availability', (req, res) => {
   const targetDate = hasSpecificDate ? String(date).trim() : new Date().toISOString().split('T')[0];
   const targetTime = time && String(time).trim() ? String(time).trim() : '09:00';
   const targetDuration = Number(duration) || 1;
+  const targetEndTime = endTime && String(endTime).trim() ? String(endTime).trim() : null;
+  const targetEndDate = endDate && String(endDate).trim() ? String(endDate).trim() : null;
 
-  const { start: reqStart, end: reqEnd } = parseTimeRange(targetDate, targetTime, targetDuration);
+  const { start: reqStart, end: reqEnd } = parseTimeRange(targetDate, targetTime, targetDuration, targetEndTime, targetEndDate);
   const now = Date.now();
 
   const bookedSlots = new Set();
@@ -121,7 +143,9 @@ router.post('/bookings', (req, res) => {
   const slot = (body.parkingSlot || body.slot_id || '').trim().toUpperCase();
   const campus = normalizeCampus(body.campus || body.city || body.campus_id);
   const date = body.bookingDateISO || body.bookingDate || body.booking_date || new Date().toISOString().split('T')[0];
+  const endDate = body.endDate || body.end_date || body.bookingEndDate || null;
   const time = body.arrivalTime || body.arrival_time || '09:00';
+  const endTime = body.endTime || body.end_time || body.bookingEndTime || null;
   const duration = Number(body.durationDays || body.duration_days || body.numberOfDays) || 1;
   const vehicleNumber = String(body.vehicleNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
 
@@ -135,8 +159,26 @@ router.post('/bookings', (req, res) => {
     });
   }
 
-  const { start: reqStart, end: reqEnd } = parseTimeRange(date, time, duration);
+  const { start: reqStart, end: reqEnd } = parseTimeRange(date, time, duration, endTime, endDate);
   const now = Date.now();
+
+  if (endDate) {
+    const startMs = new Date(`${date}T00:00:00+05:30`).getTime();
+    const endMs = new Date(`${endDate}T00:00:00+05:30`).getTime();
+    const diffDays = Math.round((endMs - startMs) / 86400000) + 1;
+    if (!Number.isFinite(diffDays) || diffDays < 1 || diffDays > 7 || diffDays !== duration) {
+      return res.status(400).json({ error: 'Invalid booking date range.' });
+    }
+  }
+  if (reqStart < now) {
+    return res.status(400).json({ error: 'Selected time has already passed. Please choose a later time.' });
+  }
+  if (endTime && duration === 1) {
+    const cleanEndTime = String(endTime).trim();
+    if (!/^\d{2}:\d{2}$/.test(cleanEndTime) || cleanEndTime <= String(time).trim()) {
+      return res.status(400).json({ error: 'Booking End Time must be after Booking Time.' });
+    }
+  }
 
   // Concurrency & collision check: verify slot is not already booked for an overlapping time
   const conflict = db.parking_bookings.find((b) => {
@@ -187,8 +229,12 @@ router.post('/bookings', (req, res) => {
     bookingDate: date,
     booking_date: date,
     bookingDateISO: date,
+    bookingEndDate: endDate || null,
+    end_date: endDate || null,
     arrivalTime: time,
     arrival_time: time,
+    endTime: endTime || null,
+    end_time: endTime || null,
     durationDays: duration,
     duration_days: duration,
     numberOfDays: duration,

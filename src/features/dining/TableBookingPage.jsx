@@ -22,6 +22,7 @@ import {
   isValidIndianMobile,
   sanitizeMobileInput,
 } from '../../utils/mobile.js';
+import { isValidName, normalizeName, sanitizeNameInput, nameError } from '../../utils/fullName.js';
 import {
   PrinterIcon,
   CheckCircleIcon,
@@ -180,6 +181,8 @@ export function TableBookingPage() {
     const errs = {};
     if (!guestName.trim()) {
       errs.name = 'Full name is required.';
+    } else if (!isValidName(guestName)) {
+      errs.name = nameError('Full name');
     }
     const cleanPhone = normalizeMobile(guestMobile);
     if (!cleanPhone) {
@@ -544,9 +547,10 @@ export function TableBookingPage() {
                 placeholder="e.g. Ramesh Kumar"
                 value={guestName}
                 onChange={(e) => {
-                  setGuestName(e.target.value);
+                  setGuestName(sanitizeNameInput(e.target.value));
                   if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
                 }}
+                onBlur={(e) => setGuestName(normalizeName(e.target.value))}
                 className={`field h-11 w-full text-sm ${errors.name ? 'border-rose-400' : ''}`}
               />
               {errors.name && <p className="field-error mt-1">{errors.name}</p>}

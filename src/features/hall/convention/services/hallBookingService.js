@@ -1,4 +1,5 @@
 import { supabase } from '../../../../services/supabase.js';
+import { isValidName, nameError } from '../../../../utils/fullName.js';
 import { getRefundMethod } from '../../../../../shared/refundPolicy.js';
 
 /**
@@ -257,6 +258,10 @@ export async function getHallAvailability(hallId, date) {
  */
 export async function createHallBooking(payload) {
   await requireSession();
+
+  if (payload?.organizerName && !isValidName(payload.organizerName)) {
+    throw new Error(nameError('Organizer name'));
+  }
 
   const { data, error } = await supabase.rpc('create_hall_booking', {
     p_hall_id: String(payload.hallId || ''),

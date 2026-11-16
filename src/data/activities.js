@@ -10,9 +10,9 @@ export const games = [
     group: 'court',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '06:00',
     openTo: '22:00',
     maxPlayers: 4,
@@ -35,9 +35,9 @@ export const games = [
     group: 'court',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '06:00',
     openTo: '21:00',
     maxPlayers: 4,
@@ -60,9 +60,9 @@ export const games = [
     group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '06:00',
     openTo: '20:00',
     maxPlayers: 22,
@@ -92,9 +92,9 @@ export const games = [
     group: 'court',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '07:00',
     openTo: '22:00',
     maxPlayers: 4,
@@ -117,9 +117,9 @@ export const games = [
     group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '06:00',
     openTo: '21:00',
     maxPlayers: 12,
@@ -143,9 +143,9 @@ export const games = [
     group: 'wellness',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '08:00',
     openTo: '21:00',
     maxPlayers: 2,
@@ -161,32 +161,7 @@ export const games = [
     rules: ['Silence please — the lounge hosts simultaneous casual games.', 'Tournament clocks available free at the counter.'],
     cancellationNote: 'Free cancellation up to 2 hours before the slot.',
   },
-  {
-    id: 'carom',
-    name: 'Carom',
-    category: 'indoor',
-    group: 'wellness',
-    price: 0,
-    pricePerSlot: 0,
-    isFree: true,
-    pricingUnit: 'free',
-    unit: 'free',
-    slotMinutes: 60, // SAMPLE
-    openFrom: '08:00',
-    openTo: '22:00',
-    maxPlayers: 4,
-    imageKey: 'carom',
-    blurb: 'Club-grade carom boards in the indoor games room.',
-    level: 'All levels',
-    hours: { open: 8, close: 22 },
-    playerLabel: 'Players',
-    rentalPrice: 0,
-    extraFields: [
-      { id: 'table', label: 'Board number', type: 'select', required: true, options: ['Board 1', 'Board 2', 'Board 3', 'Board 4'] },
-    ],
-    rules: ['Powder provided; please keep boards dry and covered after use.', 'Singles and doubles welcome on the same hourly slot.'],
-    cancellationNote: 'Free cancellation up to 2 hours before the slot.',
-  },
+
   {
     id: 'card-room',
     name: 'Card Room',
@@ -220,9 +195,9 @@ export const games = [
     group: 'turf',
     price: 1500,
     pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
+    pricingUnit: 'per-session',
     unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '06:00',
     openTo: '18:00',
     maxPlayers: 4,
@@ -245,11 +220,11 @@ export const games = [
     name: 'Swimming Pool',
     category: 'water',
     group: 'pool',
-    pricingUnit: 'per-hour', // Client: pricingUnit "per-hour"
-    price: 1000, // Client: price 1000
+    pricingUnit: 'per-hour',
+    price: 1000,
     pricePerSlot: 1000,
     slotMinutes: 60,
-    unit: 'per-hour', // Client specified
+    unit: 'per-hour',
     openFrom: '06:00',
     openTo: '20:00',
     maxPlayers: 20,
@@ -287,6 +262,130 @@ export const games = [
     cancellationNote: 'Free cancellation up to 6 hours before the batch.',
   },
   {
+    id: 'football',
+    name: 'Football',
+    category: 'outdoor',
+    group: 'turf',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00',
+    openTo: '21:00',
+    maxPlayers: 22,
+    imageKey: 'football',
+    blurb: 'Floodlit natural-turf ground, bookable full or half for matches.',
+    level: 'All levels',
+    hours: { open: 6, close: 21 },
+    playerLabel: 'Players (both teams)',
+    rentalPrice: 100,
+    extraFields: [
+      {
+        id: 'ground',
+        label: 'Ground size',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'full', label: 'Full ground', multiplier: 1 },
+          { value: 'half', label: 'Half ground', multiplier: 0.6 },
+        ],
+      },
+      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 3, max: 11, placeholder: 'e.g. 7' },
+    ],
+    rules: ['Studded boots allowed on turf; change off-turf before entering the lobby.', 'Bib sets issued at the counter against a refundable deposit.'],
+    cancellationNote: 'Free cancellation up to 24 hours before the slot.',
+  },
+  {
+    id: 'squash',
+    name: 'Squash',
+    category: 'indoor',
+    group: 'court',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00',
+    openTo: '22:00',
+    maxPlayers: 4,
+    imageKey: 'squash',
+    blurb: 'Two international-standard glass-back squash courts with wooden flooring.',
+    level: 'All levels',
+    hours: { open: 6, close: 22 },
+    playerLabel: 'Players',
+    rentalPrice: 50,
+    extraFields: [
+      { id: 'court', label: 'Court number', type: 'select', required: true, options: ['Court 1', 'Court 2'] },
+    ],
+    rules: ['Non-marking indoor court shoes mandatory.', 'Report 10 minutes prior to your slot time.'],
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.',
+  },
+  {
+    id: 'basketball',
+    name: 'Basketball',
+    category: 'outdoor',
+    group: 'turf',
+    price: 1500,
+    pricePerSlot: 1500,
+    pricingUnit: 'per-session',
+    unit: 'per-session',
+    slotMinutes: 60,
+    openFrom: '06:00',
+    openTo: '21:00',
+    maxPlayers: 10,
+    imageKey: 'basketball',
+    blurb: 'Full-size outdoor floodlit basketball court with tournament hoops.',
+    level: 'All levels',
+    hours: { open: 6, close: 21 },
+    playerLabel: 'Players (both teams)',
+    rentalPrice: 50,
+    extraFields: [
+      { id: 'court', label: 'Court format', type: 'select', required: true, options: ['Full court', 'Half court'] },
+      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 1, max: 5, placeholder: 'e.g. 5' },
+    ],
+    rules: ['Proper athletic basketball footwear required.', 'Balls issued at the sports reception against deposit.'],
+    cancellationNote: 'Free cancellation up to 6 hours before the slot.',
+  },
+  {
+    id: 'luxury-gym',
+    name: 'Luxury Gym',
+    category: 'fitness',
+    group: 'wellness',
+    price: 8000,
+    priceFrom: 8000,
+    priceTo: 8000,
+    pricePerSlot: 8000,
+    slotMinutes: 60,
+    unit: 'month',
+    pricingUnit: 'per-month',
+    tiers: [
+      { id: 'monthly', name: 'Monthly Membership', price: 8000, description: 'Full access to cardio, strength equipment, steam & sauna' },
+    ],
+    openFrom: '06:00',
+    openTo: '22:00',
+    maxPlayers: 30,
+    imageKey: 'luxury-gym',
+    blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna (₹8,000 monthly).',
+    level: 'All fitness levels',
+    hours: { open: 6, close: 22 },
+    playerLabel: 'Members / Guests',
+    rentalPrice: 0,
+    extraFields: [
+      {
+        id: 'tier',
+        label: 'Membership Tier',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'monthly', label: 'Monthly Membership (₹8,000 per month)', multiplier: 1 },
+        ],
+      },
+    ],
+    rules: ['Proper athletic gym attire and clean shoes required.', 'Carry your personal sweat towel.'],
+    cancellationNote: 'Free cancellation up to 24 hours before the session.',
+  },
+  {
     id: 'kids-play-area',
     name: 'Kids Play Area',
     category: 'indoor',
@@ -297,7 +396,7 @@ export const games = [
     isFree: true,
     pricingUnit: 'free',
     unit: 'free',
-    slotMinutes: 60, // SAMPLE
+    slotMinutes: 60,
     openFrom: '09:00',
     openTo: '20:00',
     maxPlayers: 10,
@@ -334,128 +433,30 @@ export const games = [
     cancellationNote: 'Free cancellation up to 4 hours before the session.',
   },
   {
-    id: 'football',
-    name: 'Football',
-    category: 'outdoor',
-    group: 'turf',
-    price: 1500,
-    pricePerSlot: 1500,
-    pricingUnit: 'per-session', // Client: pricingUnit "per-session", price 1500
-    unit: 'per-session',
-    slotMinutes: 60, // SAMPLE
-    openFrom: '06:00',
-    openTo: '21:00',
-    maxPlayers: 22,
-    imageKey: 'football',
-    blurb: 'Floodlit natural-turf ground, bookable full or half for matches.',
-    level: 'All levels',
-    hours: { open: 6, close: 21 },
-    playerLabel: 'Players (both teams)',
-    rentalPrice: 100,
-    extraFields: [
-      {
-        id: 'ground',
-        label: 'Ground size',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'full', label: 'Full ground', multiplier: 1 },
-          { value: 'half', label: 'Half ground', multiplier: 0.6 },
-        ],
-      },
-      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 3, max: 11, placeholder: 'e.g. 7' },
-    ],
-    rules: ['Studded boots allowed on turf; change off-turf before entering the lobby.', 'Bib sets issued at the counter against a refundable deposit.'],
-    cancellationNote: 'Free cancellation up to 24 hours before the slot.',
-  },
-  {
-    id: 'squash',
-    name: 'Squash',
+    id: 'carom',
+    name: 'Carom',
     category: 'indoor',
-    group: 'court',
-    price: 1500,
-    pricePerSlot: 1500,
-    pricingUnit: 'per-session',
-    unit: 'per-session',
-    slotMinutes: 60,
-    openFrom: '06:00', // SAMPLE
-    openTo: '22:00', // SAMPLE
-    maxPlayers: 4,
-    imageKey: 'squash',
-    blurb: 'Two international-standard glass-back squash courts with wooden flooring.', // SAMPLE
-    level: 'All levels', // SAMPLE
-    hours: { open: 6, close: 22 }, // SAMPLE
-    playerLabel: 'Players', // SAMPLE
-    rentalPrice: 50, // SAMPLE
-    extraFields: [
-      { id: 'court', label: 'Court number', type: 'select', required: true, options: ['Court 1', 'Court 2'] }, // SAMPLE
-    ],
-    rules: ['Non-marking indoor court shoes mandatory.', 'Report 10 minutes prior to your slot time.'], // SAMPLE
-    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
-  },
-  {
-    id: 'basketball',
-    name: 'Basketball',
-    category: 'outdoor',
-    group: 'turf',
-    price: 1500,
-    pricePerSlot: 1500,
-    pricingUnit: 'per-session',
-    unit: 'per-session',
-    slotMinutes: 60,
-    openFrom: '06:00', // SAMPLE
-    openTo: '21:00', // SAMPLE
-    maxPlayers: 10,
-    imageKey: 'basketball',
-    blurb: 'Full-size outdoor floodlit basketball court with tournament hoops.', // SAMPLE
-    level: 'All levels', // SAMPLE
-    hours: { open: 6, close: 21 }, // SAMPLE
-    playerLabel: 'Players (both teams)', // SAMPLE
-    rentalPrice: 50, // SAMPLE
-    extraFields: [
-      { id: 'court', label: 'Court format', type: 'select', required: true, options: ['Full court', 'Half court'] }, // SAMPLE
-      { id: 'teamSize', label: 'Team size (per side)', type: 'number', required: true, min: 1, max: 5, placeholder: 'e.g. 5' }, // SAMPLE
-    ],
-    rules: ['Proper athletic basketball footwear required.', 'Balls issued at the sports reception against deposit.'], // SAMPLE
-    cancellationNote: 'Free cancellation up to 6 hours before the slot.', // SAMPLE
-  },
-  {
-    id: 'luxury-gym',
-    name: 'Luxury Gym',
-    category: 'fitness',
     group: 'wellness',
-    price: 8000,
-    priceFrom: 8000,
-    priceTo: 8000,
-    pricePerSlot: 8000,
-    slotMinutes: 60, // SAMPLE
-    unit: 'month', // SAMPLE (confirm whether per month or session)
-    pricingUnit: 'per-month', // SAMPLE
-    tiers: [
-      { id: 'monthly', name: 'Monthly Membership', price: 8000, description: 'Full access to cardio, strength equipment, steam & sauna' },
-    ],
-    openFrom: '06:00',
+    price: 0,
+    pricePerSlot: 0,
+    isFree: true,
+    pricingUnit: 'free',
+    unit: 'free',
+    slotMinutes: 60,
+    openFrom: '08:00',
     openTo: '22:00',
-    maxPlayers: 30,
-    imageKey: 'luxury-gym',
-    blurb: 'State-of-the-art strength, cardio and functional training facilities with steam and sauna (₹8,000 monthly).',
-    level: 'All fitness levels',
-    hours: { open: 6, close: 22 },
-    playerLabel: 'Members / Guests',
+    maxPlayers: 4,
+    imageKey: 'carom',
+    blurb: 'Club-grade carom boards in the indoor games room.',
+    level: 'All levels',
+    hours: { open: 8, close: 22 },
+    playerLabel: 'Players',
     rentalPrice: 0,
     extraFields: [
-      {
-        id: 'tier',
-        label: 'Membership Tier',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'monthly', label: 'Monthly Membership (₹8,000 per month)', multiplier: 1 },
-        ],
-      },
+      { id: 'table', label: 'Board number', type: 'select', required: true, options: ['Board 1', 'Board 2', 'Board 3', 'Board 4'] },
     ],
-    rules: ['Proper athletic gym attire and clean shoes required.', 'Carry your personal sweat towel.'],
-    cancellationNote: 'Free cancellation up to 24 hours before the session.',
+    rules: ['Powder provided; please keep boards dry and covered after use.', 'Singles and doubles welcome on the same hourly slot.'],
+    cancellationNote: 'Free cancellation up to 2 hours before the slot.',
   },
 ];
 
@@ -474,4 +475,4 @@ export default {
   GAMES,
   getGameById,
   getGamesByCategory,
-};
+};

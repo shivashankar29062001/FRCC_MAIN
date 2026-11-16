@@ -12,6 +12,25 @@ export function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** True when the current page load is a browser reload (F5 / refresh). */
+export function isPageReload() {
+  if (typeof window === 'undefined' || typeof performance === 'undefined') return false;
+  try {
+    const nav = performance.getEntriesByType('navigation')[0];
+    if (nav && nav.type) return nav.type === 'reload';
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (performance.navigation && typeof performance.navigation.type === 'number') {
+      return performance.navigation.type === 1;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 /** First name for greetings/avatars. Never returns a raw email or phone. */
 export function firstNameOf(name) {
   const v = String(name || '').trim();

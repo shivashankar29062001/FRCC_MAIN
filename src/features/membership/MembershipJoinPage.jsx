@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { FlowShell } from '../../components/FlowShell.jsx';
@@ -12,6 +12,22 @@ import {
   isValidIndianMobile,
   sanitizeMobileInput,
 } from '../../utils/mobile.js';
+import {
+  CITY_ERROR,
+  isValidCity,
+  normalizeCity,
+  sanitizeCityInput,
+} from '../../utils/city.js';
+import {
+  FULL_NAME_ERROR,
+  isValidFullName,
+  normalizeFullName,
+  sanitizeFullNameInput,
+  isValidName,
+  normalizeName,
+  sanitizeNameInput,
+  nameError,
+} from '../../utils/fullName.js';
 import { IMAGES } from '../../config/images.js';
 import {
   PLANS_DATA,
@@ -45,7 +61,10 @@ import {
   ImageIcon,
 } from '../../components/ui/icons.jsx';
 
-const STORAGE_KEY = 'frcc.membershipJoin.v1';
+const BASE_STORAGE_KEY = 'frcc.membershipJoin.v1';
+function getJoinStorageKey(userId) {
+  return userId ? `${BASE_STORAGE_KEY}.${userId}` : `${BASE_STORAGE_KEY}.anon`;
+}
 
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
@@ -186,29 +205,22 @@ export function MembershipJoinPage() {
     (isMember && Boolean(activeMemberCode))
   );
 
-  // Initialize wizard state from sessionStorage or defaults
-  const [wizardState, setWizardState] = useState(() => {
-    let saved = null;
-    try {
-      const raw = window.sessionStorage.getItem(STORAGE_KEY);
-      if (raw) saved = JSON.parse(raw);
-    } catch {
-      /* ignore */
-    }
+  const currentUid = user?.id || user?.userId || null;
 
-    const matchedPlan = PLANS_DATA.find((p) => p.id === planParam);
-    const initialPlanId = matchedPlan ? matchedPlan.id : (saved?.formData?.planId || 'frcc-membership');
+  // Helper to construct fresh default form data for the active user
+  const getDefaultFormData = useCallback((targetPlanId = null) => {
+    const matchedPlan = PLANS_DATA.find((p) => p.id === (targetPlanId || planParam));
+    const initialPlanId = matchedPlan ? matchedPlan.id : 'frcc-membership';
 
-    let initialFullName = user?.name || '';
     const rawEmail = (user?.email || (user?.emailOrPhone && user.emailOrPhone.includes('@') ? user.emailOrPhone : '')).trim();
     const isSynthetic = rawEmail.toLowerCase().endsWith('@frcc.member');
-    let initialEmail = isSynthetic ? '' : rawEmail;
+    const initialEmail = isSynthetic ? '' : rawEmail;
     const rawMobile = user?.phone || user?.mobile || (isSynthetic ? rawEmail.replace(/@frcc\.member$/i, '') : (!rawEmail.includes('@') ? user?.emailOrPhone : '')) || '';
-    let initialMobile = rawMobile ? rawMobile.replace(/\D/g, '').slice(-10) : '';
+    const initialMobile = rawMobile ? rawMobile.replace(/\D/g, '').slice(-10) : '';
 
-    const initialFormData = {
+    return {
       planId: initialPlanId,
-      fullName: initialFullName,
+      fullName: user?.name || '',
       mobile: initialMobile,
       email: initialEmail,
       dob: '',
@@ -219,7 +231,6 @@ export function MembershipJoinPage() {
       pincode: '',
       emergencyName: '',
       emergencyMobile: '',
-      // Step 4: Family & Profession
       maritalStatus: '',
       spouseName: '',
       spouseDob: '',
@@ -236,29 +247,102 @@ export function MembershipJoinPage() {
       profession: '',
       organisation: '',
       familyConsent: false,
-      // Step 5: Documents
       photoPath: '',
       aadhaarLast4: '',
       aadhaarConsent: false,
       paymentMethod: 'upi',
-      memberId: saved?.formData?.memberId || membership?.memberId || '',
-      ...(saved?.formData || {}),
+      memberId: membership?.memberId || membership?.memberCode || '',
     };
+  }, [user, membership, planParam]);
 
-    if (matchedPlan) {
-      initialFormData.planId = matchedPlan.id;
+  // Initialize wizard state from user-scoped sessionStorage or defaults
+  const [wizardState, setWizardState] = useState(() => {
+    const defaults = getDefaultFormData();
+    let saved = null;
+    try {
+      const storageKey = getJoinStorageKey(currentUid);
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Only load drafts that belong to the current authenticated user (or anon)
+        if (parsed && (!parsed.userId || parsed.userId === currentUid)) {
+          saved = parsed;
+        }
+      }
+    } catch {
+      /* ignore */
     }
 
-    if (!initialFormData.fullName && user?.name) initialFormData.fullName = user.name;
-    if (!initialFormData.email && initialEmail) initialFormData.email = initialEmail;
-    if (!initialFormData.mobile && initialMobile) initialFormData.mobile = initialMobile;
-    if (!initialFormData.memberId && membership?.memberId) initialFormData.memberId = membership.memberId;
-
+    // Step 6 is the transient confirmation screen and must NEVER be restored on mount
     const initialStep =
-      typeof saved?.step === 'number' && saved.step >= 0 && saved.step < 7 ? saved.step : 0;
+      typeof saved?.step === 'number' && saved.step >= 0 && saved.step < 6 ? saved.step : 0;
+
+    const initialFormData = {
+      ...defaults,
+      ...(saved?.formData ? {
+        planId: saved.formData.planId || defaults.planId,
+        dob: saved.formData.dob || '',
+        gender: saved.formData.gender || '',
+        address: saved.formData.address || '',
+        city: saved.formData.city || '',
+        state: saved.formData.state || 'Telangana',
+        pincode: saved.formData.pincode || '',
+        emergencyName: saved.formData.emergencyName || '',
+        emergencyMobile: saved.formData.emergencyMobile || '',
+        maritalStatus: saved.formData.maritalStatus || '',
+        spouseName: saved.formData.spouseName || '',
+        spouseDob: saved.formData.spouseDob || '',
+        spouseMobile: saved.formData.spouseMobile || '',
+        hasNoChildren: Boolean(saved.formData.hasNoChildren),
+        children: saved.formData.children || [],
+        occupationType: saved.formData.occupationType || '',
+        employerName: saved.formData.employerName || '',
+        designation: saved.formData.designation || '',
+        workCity: saved.formData.workCity || '',
+        workEmail: saved.formData.workEmail || '',
+        businessName: saved.formData.businessName || '',
+        businessNature: saved.formData.businessNature || '',
+        profession: saved.formData.profession || '',
+        organisation: saved.formData.organisation || '',
+        familyConsent: Boolean(saved.formData.familyConsent),
+        photoPath: saved.formData.photoPath || '',
+        aadhaarLast4: saved.formData.aadhaarLast4 || '',
+        aadhaarConsent: Boolean(saved.formData.aadhaarConsent),
+        paymentMethod: saved.formData.paymentMethod || 'upi',
+      } : {}),
+      // Identity fields strictly bind to currently signed in user
+      fullName: user?.name || saved?.formData?.fullName || defaults.fullName,
+      email: defaults.email || saved?.formData?.email || '',
+      mobile: defaults.mobile || saved?.formData?.mobile || '',
+      memberId: membership?.memberId || membership?.memberCode || '',
+    };
 
     return { step: initialStep, formData: initialFormData };
   });
+
+  // When active user identity changes (e.g. logout or switch account), reset wizard completely
+  const prevUidRef = useRef(currentUid);
+  useEffect(() => {
+    if (prevUidRef.current !== currentUid) {
+      prevUidRef.current = currentUid;
+      setJustEnrolled(false);
+      setFieldErrors({});
+      setSubmitError('');
+      setPhotoPreviewUrl(null);
+      setAadhaarFile(null);
+      setAadhaarRaw('');
+      try {
+        window.sessionStorage.removeItem('frcc.membershipJoin.v1');
+        window.sessionStorage.removeItem('frcc.membershipJoin.v1.anon');
+      } catch {
+        /* ignore */
+      }
+      setWizardState({
+        step: 0,
+        formData: getDefaultFormData(),
+      });
+    }
+  }, [currentUid, getDefaultFormData]);
 
   const { step, formData } = wizardState;
 
@@ -274,6 +358,15 @@ export function MembershipJoinPage() {
   const [isAadhaarFocused, setIsAadhaarFocused] = useState(false);
 
   const [fieldErrors, setFieldErrors] = useState({});
+  const fullNameError = fieldErrors.fullName || (
+    formData.fullName && !isValidFullName(formData.fullName) ? FULL_NAME_ERROR : null
+  );
+  const emergencyNameError = fieldErrors.emergencyName || (
+    formData.emergencyName && !isValidName(formData.emergencyName) ? nameError('Contact person name') : null
+  );
+  const spouseNameError = fieldErrors.spouseName || (
+    formData.spouseName && !isValidName(formData.spouseName) ? nameError('Spouse name') : null
+  );
   const [submitError, setSubmitError] = useState('');
   const [paying, setPaying] = useState(false);
   const submittedRef = useRef(false);
@@ -347,12 +440,15 @@ export function MembershipJoinPage() {
     }
   }
 
-  // Sync wizard state to sessionStorage without file objects
+  // Sync wizard state to sessionStorage without file objects (never persist step 6)
   useEffect(() => {
+    if (step >= 6) return;
     try {
+      const storageKey = getJoinStorageKey(currentUid);
       window.sessionStorage.setItem(
-        STORAGE_KEY,
+        storageKey,
         JSON.stringify({
+          userId: currentUid,
           step,
           formData: {
             ...formData,
@@ -363,7 +459,7 @@ export function MembershipJoinPage() {
     } catch {
       /* ignore */
     }
-  }, [step, formData]);
+  }, [step, formData, currentUid]);
 
   function updateForm(patch) {
     setWizardState((prev) => ({
@@ -390,7 +486,7 @@ export function MembershipJoinPage() {
   // Step 2 Validation (Registration)
   const isStep2Valid = useMemo(() => {
     return (
-      Boolean(formData.fullName.trim()) &&
+      isValidFullName(formData.fullName) &&
       isValidIndianMobile(formData.mobile) &&
       EMAIL_REGEX.test(formData.email.trim())
     );
@@ -402,10 +498,10 @@ export function MembershipJoinPage() {
       checkDOB(formData.dob) === null &&
       Boolean(formData.gender) &&
       Boolean(formData.address.trim()) &&
-      Boolean(formData.city.trim()) &&
+      isValidCity(formData.city) &&
       Boolean(formData.state.trim()) &&
       /^\d{6}$/.test(formData.pincode.replace(/\D/g, '')) &&
-      Boolean(formData.emergencyName.trim()) &&
+      isValidName(formData.emergencyName) &&
       isValidIndianMobile(formData.emergencyMobile)
     );
   }, [
@@ -425,7 +521,7 @@ export function MembershipJoinPage() {
 
     // Married checks
     if (formData.maritalStatus === 'Married') {
-      if (!formData.spouseName.trim()) return false;
+      if (!isValidName(formData.spouseName)) return false;
       if (formData.spouseDob && validateOptionalDate(formData.spouseDob)) return false;
       if (formData.spouseMobile && !isValidIndianMobile(formData.spouseMobile)) return false;
     }
@@ -436,7 +532,7 @@ export function MembershipJoinPage() {
         if (!formData.children || formData.children.length === 0) return false;
         if (formData.children.length > 6) return false;
         const invalidChild = formData.children.some((c) => {
-          if (!c.name || !c.name.trim()) return true;
+          if (!isValidName(c.name)) return true;
           if (c.dob && validateOptionalDate(c.dob)) return true;
           return false;
         });
@@ -501,6 +597,44 @@ export function MembershipJoinPage() {
   }, [step, isStep1Valid, isStep2Valid, isStep3Valid, isStep4Valid, isStep5Valid, isStep6Valid]);
 
   function handleNext() {
+    if (step === 1) {
+      const fullName = normalizeFullName(formData.fullName);
+      if (fullName !== formData.fullName) updateForm({ fullName });
+      if (!isValidFullName(fullName)) {
+        setFieldErrors((prev) => ({ ...prev, fullName: FULL_NAME_ERROR }));
+        return;
+      }
+    }
+    if (step === 2) {
+      const city = normalizeCity(formData.city);
+      if (city !== formData.city) updateForm({ city });
+      if (!isValidCity(city)) {
+        setFieldErrors((prev) => ({ ...prev, city: CITY_ERROR }));
+        return;
+      }
+    }
+    if (step === 3) {
+      const emergencyName = normalizeName(formData.emergencyName);
+      if (emergencyName !== formData.emergencyName) updateForm({ emergencyName });
+      if (formData.emergencyName && !isValidName(emergencyName)) {
+        setFieldErrors((prev) => ({ ...prev, emergencyName: nameError('Contact person name') }));
+        return;
+      }
+    }
+    if (step === 4) {
+      if (formData.maritalStatus === 'Married') {
+        const spouseName = normalizeName(formData.spouseName);
+        if (spouseName !== formData.spouseName) updateForm({ spouseName });
+        if (formData.spouseName && !isValidName(spouseName)) {
+          setFieldErrors((prev) => ({ ...prev, spouseName: nameError('Spouse name') }));
+          return;
+        }
+      }
+      if (formData.children?.length) {
+        const children = formData.children.map((c) => ({ ...c, name: normalizeName(c.name) }));
+        if (children.some((c, i) => c.name !== formData.children[i].name)) updateForm({ children });
+      }
+    }
     if (!isCurrentStepValid) return;
     setFieldErrors({});
     setStep(Math.min(step + 1, 6));
@@ -511,6 +645,42 @@ export function MembershipJoinPage() {
     setFieldErrors({});
     setStep(Math.max(step - 1, 0));
     window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  // Full name: letters and spaces only
+  function handleFullNameChange(e) {
+    const fullName = sanitizeFullNameInput(e.target.value);
+    updateForm({ fullName });
+    if (fieldErrors.fullName && isValidFullName(fullName)) {
+      setFieldErrors((prev) => ({ ...prev, fullName: null }));
+    }
+  }
+
+  function handleFullNameBlur(e) {
+    const fullName = normalizeFullName(e.target.value);
+    updateForm({ fullName });
+    setFieldErrors((prev) => ({
+      ...prev,
+      fullName: isValidFullName(fullName) ? null : FULL_NAME_ERROR,
+    }));
+  }
+
+  // City: letters and spaces only
+  function handleCityChange(e) {
+    const city = sanitizeCityInput(e.target.value);
+    updateForm({ city });
+    if (fieldErrors.city && isValidCity(city)) {
+      setFieldErrors((prev) => ({ ...prev, city: null }));
+    }
+  }
+
+  function handleCityBlur(e) {
+    const city = normalizeCity(e.target.value);
+    updateForm({ city });
+    setFieldErrors((prev) => ({
+      ...prev,
+      city: isValidCity(city) ? null : CITY_ERROR,
+    }));
   }
 
   // DOB Formatter DD/MM/YYYY for applicant
@@ -753,6 +923,14 @@ export function MembershipJoinPage() {
       setFieldErrors({ paymentMethod: 'Choose a payment method.' });
       return;
     }
+    const city = normalizeCity(formData.city);
+    if (!isValidCity(city)) {
+      updateForm({ city });
+      setFieldErrors((prev) => ({ ...prev, city: CITY_ERROR }));
+      setStep(2);
+      return;
+    }
+    if (city !== formData.city) updateForm({ city });
     if (paying || submittedRef.current) return;
     submittedRef.current = true;
     setPaying(true);
@@ -811,7 +989,7 @@ export function MembershipJoinPage() {
           gender: formData.gender || '',
           address: formData.address || '',
           addressLine: formData.address || '',
-          city: formData.city || '',
+          city,
           state: formData.state || '',
           pincode: formData.pincode || '',
           emergencyContact,
@@ -847,6 +1025,16 @@ export function MembershipJoinPage() {
             .catch((err) => {
               console.warn('[membership] automated WhatsApp send background error:', err);
             });
+        }
+
+        // Clear in-progress draft from sessionStorage since enrollment has been finalized
+        try {
+          const storageKey = getJoinStorageKey(currentUid);
+          window.sessionStorage.removeItem(storageKey);
+          window.sessionStorage.removeItem('frcc.membershipJoin.v1');
+          window.sessionStorage.removeItem('frcc.membershipJoin.v1.anon');
+        } catch {
+          /* ignore */
         }
 
         updateForm({ memberId: assignedCode, memberCode: assignedCode });
@@ -1098,14 +1286,10 @@ export function MembershipJoinPage() {
                 id="reg-fullname"
                 name="fullName"
                 value={formData.fullName}
-                onChange={(e) => {
-                  updateForm({ fullName: e.target.value });
-                  if (e.target.value.trim()) {
-                    setFieldErrors((prev) => ({ ...prev, fullName: null }));
-                  }
-                }}
+                onChange={handleFullNameChange}
+                onBlur={handleFullNameBlur}
                 placeholder="Full name as per official ID"
-                error={fieldErrors.fullName}
+                error={fullNameError}
               />
 
               <div>
@@ -1249,7 +1433,8 @@ export function MembershipJoinPage() {
                   id="pers-city"
                   name="city"
                   value={formData.city}
-                  onChange={(e) => updateForm({ city: e.target.value })}
+                  onChange={handleCityChange}
+                  onBlur={handleCityBlur}
                   placeholder="City"
                   error={fieldErrors.city}
                 />
@@ -1298,9 +1483,23 @@ export function MembershipJoinPage() {
                     id="pers-emg-name"
                     name="emergencyName"
                     value={formData.emergencyName}
-                    onChange={(e) => updateForm({ emergencyName: e.target.value })}
+                    onChange={(e) => {
+                    const emergencyName = sanitizeNameInput(e.target.value);
+                    updateForm({ emergencyName });
+                    if (fieldErrors.emergencyName && isValidName(emergencyName)) {
+                      setFieldErrors((prev) => ({ ...prev, emergencyName: null }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const emergencyName = normalizeName(e.target.value);
+                    updateForm({ emergencyName });
+                    setFieldErrors((prev) => ({
+                      ...prev,
+                      emergencyName: emergencyName && !isValidName(emergencyName) ? nameError('Contact person name') : null,
+                    }));
+                  }}
                     placeholder="Name of emergency contact"
-                    error={fieldErrors.emergencyName}
+                    error={emergencyNameError}
                   />
 
                   <div>
@@ -1435,8 +1634,23 @@ export function MembershipJoinPage() {
                         id="fam-spouse-name"
                         name="spouseName"
                         value={formData.spouseName}
-                        onChange={(e) => updateForm({ spouseName: e.target.value })}
+                        onChange={(e) => {
+                        const spouseName = sanitizeNameInput(e.target.value);
+                        updateForm({ spouseName });
+                        if (fieldErrors.spouseName && isValidName(spouseName)) {
+                          setFieldErrors((prev) => ({ ...prev, spouseName: null }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const spouseName = normalizeName(e.target.value);
+                        updateForm({ spouseName });
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          spouseName: spouseName && !isValidName(spouseName) ? nameError('Spouse name') : null,
+                        }));
+                      }}
                         placeholder="Spouse full name"
+                        error={spouseNameError}
                       />
                     </div>
                     <div>
@@ -1551,10 +1765,14 @@ export function MembershipJoinPage() {
                               <input
                                 type="text"
                                 value={child.name}
-                                onChange={(e) => handleUpdateChild(idx, { name: e.target.value })}
+                                onChange={(e) => handleUpdateChild(idx, { name: sanitizeNameInput(e.target.value) })}
+                              onBlur={(e) => handleUpdateChild(idx, { name: normalizeName(e.target.value) })}
                                 placeholder="Child full name"
                                 className="field !py-1.5 text-sm"
                               />
+                              {child.name && !isValidName(child.name) && (
+                                <p role="alert" className="field-error mt-1">{nameError('Child name')}</p>
+                              )}
                             </div>
                             <div className="sm:col-span-3">
                               <label className="text-xs font-semibold text-slate-700 block mb-1">

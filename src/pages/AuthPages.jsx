@@ -7,6 +7,7 @@ import { Logo } from '../components/Logo.jsx';
 import { ArrowRightIcon } from '../components/ui/icons.jsx';
 import { IMAGES } from '../config/images.js';
 import { isValidMobile, normalizeMobile, formatMobileDisplay, sanitizeMobileInput } from '../utils/phone.js';
+import { isValidName, normalizeName, sanitizeNameInput, nameError } from '../utils/fullName.js';
 
 // ---------------------------------------------------------------------------
 // /signin & /signup — Public auth routes. Split-screen layout on desktop,
@@ -89,8 +90,11 @@ export function SignupPage() {
 
   function validate() {
     const next = {};
-    if (!form.name.trim()) {
+    const cleanName = normalizeName(form.name);
+    if (!cleanName) {
       next.name = 'Please enter your full name.';
+    } else if (!isValidName(cleanName)) {
+      next.name = nameError('Full name');
     }
     const cleanEmail = form.email.trim();
     if (!cleanEmail) {
@@ -127,7 +131,7 @@ export function SignupPage() {
     }
     setBusy(true);
     signup({
-      name: form.name.trim(),
+      name: normalizeName(form.name),
       email: form.email.trim().toLowerCase(),
       mobile: normalizeMobile(form.mobile),
       password: form.password,
@@ -178,7 +182,8 @@ export function SignupPage() {
             name="name"
             autoComplete="name"
             value={form.name}
-            onChange={(e) => handleFieldChange('name', e.target.value)}
+            onChange={(e) => handleFieldChange('name', sanitizeNameInput(e.target.value))}
+            onBlur={(e) => setForm((f) => ({ ...f, name: normalizeName(e.target.value) }))}
             placeholder="Your full name"
             error={errors.name}
           />

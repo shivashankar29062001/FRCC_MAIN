@@ -170,15 +170,27 @@ export default function BookingConfirmation({
     },
     {
       key: 'date',
-      label: 'Booking Date',
+      label: 'Booking Start Date',
       icon: <Calendar size={15} />,
       value: booking.bookingDate
+    },
+    {
+      key: 'endDate',
+      label: 'Booking End Date',
+      icon: <Calendar size={15} />,
+      value: booking.endDate || booking.bookingEndDate || ''
     },
     {
       key: 'time',
       label: 'Arrival Time',
       icon: <Clock size={15} />,
       value: booking.bookingTime
+    },
+    {
+      key: 'endTime',
+      label: 'Booking End Time',
+      icon: <Clock size={15} />,
+      value: booking.endTime || booking.bookingEndTime || ''
     },
     {
       key: 'duration',

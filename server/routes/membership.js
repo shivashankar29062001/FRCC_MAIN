@@ -26,6 +26,15 @@ router.post('/send-whatsapp', async (req, res) => {
         error: 'Field "mobile" is required to send WhatsApp confirmation',
       });
     }
+    if (name) {
+      const cleanName = String(name).replace(/\s+/g, ' ').trim();
+      if (!/^[A-Za-z\s]+$/.test(cleanName) || cleanName.replace(/[^A-Za-z]/g, '').length < 2) {
+        return res.status(400).json({
+          success: false,
+          error: 'Name should contain only alphabets.',
+        });
+      }
+    }
     if (!isValidIndianMobile(mobile)) {
       return res.status(400).json({
         success: false,

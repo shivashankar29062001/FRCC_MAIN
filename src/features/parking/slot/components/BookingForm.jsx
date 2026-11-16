@@ -29,10 +29,33 @@ export default function BookingForm({
   isSubmitting = false
 }) {
   const handleInputChange = (field, value) => {
-    onChange({
+    const next = {
       ...formData,
       [field]: value
-    });
+    };
+    if (field === 'date') {
+      const days = Number(next.days) || 1;
+      if (value) next.endDate = addDaysIso(value, days - 1);
+      else next.endDate = '';
+    } else if (field === 'days') {
+      const days = value ? Number(value) : '';
+      next.days = days;
+      if (next.date && days) next.endDate = addDaysIso(next.date, days - 1);
+    } else if (field === 'endDate') {
+      if (next.date && value) {
+        const diffDays = Math.round((new Date(`${value}T00:00:00+05:30`).getTime() - new Date(`${next.date}T00:00:00+05:30`).getTime()) / 86400000) + 1;
+        if (diffDays < 1) {
+          next.days = 1;
+          next.endDate = next.date;
+        } else if (diffDays > 7) {
+          next.days = 7;
+          next.endDate = addDaysIso(next.date, 6);
+        } else {
+          next.days = diffDays;
+        }
+      }
+    }
+    onChange(next);
   };
 
   const handleVehicleNumberChange = (e) => {
@@ -75,7 +98,14 @@ export default function BookingForm({
     }
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const minTime = new Date(Date.now() + 60000).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
+  const addDaysIso = (dateStr, days) => {
+    const [y, m, d] = String(dateStr || '').split('-').map(Number);
+    if (!y || !m || !d) return dateStr || '';
+    const dt = new Date(Date.UTC(y, m - 1, d + (Number(days) || 0)));
+    return dt.toISOString().split('T')[0];
+  };
   const effectiveCity = formData.city || (formData.campus_id === 'hyd' ? 'Hyderabad' : 'Vijayawada');
   const campusLabel = effectiveCity === 'Hyderabad' ? 'Hyderabad Campus' : 'Vijayawada Campus';
   const isVehicleValid = isValidVehicleNumber(formData.vehicleNumber);
@@ -244,7 +274,7 @@ export default function BookingForm({
             <div className="date-time-inputs-row">
               <div className="form-field-group">
                 <label className="field-label" htmlFor="booking-date-input">
-                  Booking Date <span className="req-star">*</span>
+                  Booking Start Date <span className="req-star">*</span>
                 </label>
                 <div className="input-with-icon">
                   <input
@@ -269,6 +299,33 @@ export default function BookingForm({
               </div>
 
               <div className="form-field-group">
+                <label className="field-label" htmlFor="booking-end-date-input">
+                  Booking End Date <span className="req-star">*</span>
+                </label>
+                <div className="input-with-icon">
+                  <input
+                    type="date"
+                    id="booking-end-date-input"
+                    className={`form-input date-picker-field ${errors.endDate ? 'input-error' : ''}`}
+                    value={formData.endDate || ''}
+                    min={formData.date || todayStr}
+                    max={formData.date ? addDaysIso(formData.date, 6) : undefined}
+                    placeholder="DD-MM-YYYY"
+                    onChange={(e) => handleInputChange('endDate', e.target.value)}
+                    disabled={isSubmitting}
+                    aria-invalid={Boolean(errors.endDate)}
+                    aria-describedby={errors.endDate ? 'booking-end-date-error' : undefined}
+                  />
+                  <Calendar size={18} className="input-right-icon pointer-events-none" aria-hidden="true" />
+                </div>
+                {errors.endDate && (
+                  <span id="booking-end-date-error" className="field-error-text">
+                    {errors.endDate}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-field-group">
                 <label className="field-label" htmlFor="booking-time-input">
                   Booking Time <span className="req-star">*</span>
                 </label>
@@ -278,6 +335,7 @@ export default function BookingForm({
                     id="booking-time-input"
                     className={`form-input ${errors.time ? 'input-error' : ''}`}
                     value={formData.time || ''}
+                    min={formData.date === todayStr ? minTime : undefined}
                     placeholder="HH:MM"
                     onChange={(e) => handleInputChange('time', e.target.value)}
                     disabled={isSubmitting}
@@ -289,6 +347,32 @@ export default function BookingForm({
                 {errors.time && (
                   <span id="booking-time-error" className="field-error-text">
                     {errors.time}
+                  </span>
+                )}
+              </div>
+
+              <div className="form-field-group">
+                <label className="field-label" htmlFor="booking-end-time-input">
+                  Booking End Time <span className="req-star">*</span>
+                </label>
+                <div className="input-with-icon">
+                  <input
+                    type="time"
+                    id="booking-end-time-input"
+                    className={`form-input ${errors.endTime ? 'input-error' : ''}`}
+                    value={formData.endTime || ''}
+                    min={formData.time || (formData.date === todayStr ? minTime : undefined)}
+                    placeholder="HH:MM"
+                    onChange={(e) => handleInputChange('endTime', e.target.value)}
+                    disabled={isSubmitting}
+                    aria-invalid={Boolean(errors.endTime)}
+                    aria-describedby={errors.endTime ? 'booking-end-time-error' : undefined}
+                  />
+                  <Clock size={18} className="input-right-icon pointer-events-none" aria-hidden="true" />
+                </div>
+                {errors.endTime && (
+                  <span id="booking-end-time-error" className="field-error-text">
+                    {errors.endTime}
                   </span>
                 )}
               </div>

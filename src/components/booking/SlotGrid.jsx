@@ -33,6 +33,7 @@ export function SlotGrid({
   dateLabel = '',
   gameName = '',
   isGroup = false,
+  hideTotal = false,
 }) {
   if (loading) {
     return (
@@ -69,7 +70,7 @@ export function SlotGrid({
   return (
     <fieldset>
       <legend className="label">
-        Slots{gameName ? ` for ${gameName}` : ''}{dateLabel ? ` — ${dateLabel}` : ''} · {totalAvailable} of {totalCapacity} available
+        Slots{gameName ? ` for ${gameName}` : ''}{dateLabel ? ` — ${dateLabel}` : ''}{hideTotal ? '' : ` · ${totalAvailable} of ${totalCapacity} available`}
       </legend>
       <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Available slots">
         {slots.map((s) => {

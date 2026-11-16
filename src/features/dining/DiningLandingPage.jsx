@@ -36,9 +36,10 @@ export function DiningLandingPage() {
   }, [location.state, user, openAuthPrompt, navigate, location.pathname, location.search]);
 
   // Book a table bar state
-  const [barVenue, setBarVenue] = useState('restaurant');
-  const [barDate, setBarDate] = useState(() => formatDMY(todayISO()));
-  const [barGuests, setBarGuests] = useState('2');
+  const [barVenue, setBarVenue] = useState('');
+  const [barDate, setBarDate] = useState('');
+  const [barGuests, setBarGuests] = useState('');
+  const [barError, setBarError] = useState('');
   const barPickerRef = useRef(null);
 
   const barIsoValue = useMemo(() => {
@@ -69,6 +70,11 @@ export function DiningLandingPage() {
 
   function handleFindTable(e) {
     e.preventDefault();
+    if (!barVenue || !barDate || !barGuests) {
+      setBarError('Please select a venue, date and guests.');
+      return;
+    }
+    setBarError('');
     const params = new URLSearchParams();
     if (barVenue) params.set('venue', barVenue);
     if (barDate) params.set('date', barDate);
@@ -118,9 +124,10 @@ export function DiningLandingPage() {
               <select
                 id="bar-venue"
                 value={barVenue}
-                onChange={(e) => setBarVenue(e.target.value)}
+                onChange={(e) => { setBarVenue(e.target.value); setBarError(''); }}
                 className="field h-11 w-full text-sm"
               >
+                <option value="">Select venue</option>
                 {venues.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
@@ -139,7 +146,7 @@ export function DiningLandingPage() {
                   placeholder="DD/MM/YYYY"
                   value={barDate}
                   onClick={openBarPicker}
-                  onChange={(e) => setBarDate(e.target.value)}
+                  onChange={(e) => { setBarDate(e.target.value); setBarError(''); }}
                   className="field date-picker-field h-11 w-full !pl-10 !pr-2 text-sm cursor-pointer"
                 />
                 <input
@@ -164,9 +171,10 @@ export function DiningLandingPage() {
                 <select
                   id="bar-guests"
                   value={barGuests}
-                  onChange={(e) => setBarGuests(e.target.value)}
+                  onChange={(e) => { setBarGuests(e.target.value); setBarError(''); }}
                   className="field h-11 w-full !pl-10 text-sm"
                 >
+                  <option value="">Select guests</option>
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
                     <option key={n} value={n}>{n} {n === 1 ? 'Guest' : 'Guests'}</option>
                   ))}
@@ -182,6 +190,7 @@ export function DiningLandingPage() {
                 Find a table
               </button>
             </div>
+            {barError && <p role="alert" className="field-error mt-1 sm:col-span-4">{barError}</p>}
           </form>
         </section>
 

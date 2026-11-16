@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../app/store/AppContext.jsx';
 import { useMockQuery } from '../../app/hooks/useMockQuery.js';
@@ -165,6 +165,13 @@ export function ActivitiesProcessPage() {
   const paramCity = params.get('city') || params.get('cityId') || '';
   const paramValid = Boolean(paramGame && gameById(paramGame));
 
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (paramGame === 'carom' || paramGame === 'kids-play-area') {
+      navigate('/activities', { replace: true });
+    }
+  }, [paramGame, navigate]);
+
   const [confirmed, setConfirmed] = useState(null);
 
   const [draft, setDraft] = useState(() => {
@@ -281,6 +288,23 @@ export function ActivitiesProcessPage() {
   }, [draft, step]);
 
   const game = gameById(draft.gameId);
+  const hasAdultsChildrenFields = Boolean(
+    game?.extraFields?.some((f) => f.id === 'adults') && game?.extraFields?.some((f) => f.id === 'children'),
+  );
+  const isGymFlow = draft.gameId === 'luxury-gym';
+
+  // The Swimming Pool collects Adults + Children separately from the Swimmers
+  // field. Keep Swimmers equal to that combined party size.
+  useEffect(() => {
+    if (!hasAdultsChildrenFields) return;
+    const adults = draft.extras?.adults;
+    const children = draft.extras?.children;
+    if ((adults === undefined || adults === '') && (children === undefined || children === '')) return;
+    const total = String(Math.max(0, Number(adults || 0)) + Math.max(0, Number(children || 0)));
+    if (String(draft.players) !== total) {
+      setDraft((d) => ({ ...d, players: total }));
+    }
+  }, [hasAdultsChildrenFields, draft.extras?.adults, draft.extras?.children, draft.players]);
   const patch = (p) => {
     setDraft((d) => ({ ...d, ...p }));
     setErrors({});
@@ -346,10 +370,17 @@ export function ActivitiesProcessPage() {
   });
   // Always refresh slots when opening the slot picker (step 2)
   useEffect(() => {
-    if (step === 2 && draft.gameId && draft.date) {
+    if (step === 2 && !isGymFlow && draft.gameId && draft.date) {
       slotsQuery.retry();
     }
-  }, [step, draft.gameId, draft.date, draft.cityId]);
+  }, [step, draft.gameId, draft.date, draft.cityId, isGymFlow]);
+
+  // Gym has no slot step: redirect away if somehow landed on step 2
+  useEffect(() => {
+    if (isGymFlow && step === 2) {
+      setStep(3);
+    }
+  }, [isGymFlow, step]);
 
   // Immediately refresh slots when an activity booking is confirmed or changed on this device
   useEffect(() => {
@@ -376,7 +407,7 @@ export function ActivitiesProcessPage() {
       { label: 'Game', value: game.name },
       { label: 'Date', value: draft.date ? prettyDate(draft.date) : '—' },
       { label: 'Slot', value: draft.slot ? `${draft.slot} (${game.slotMinutes} min)` : '—' },
-      { label: game.playerLabel, value: draft.players || '—' },
+      ...(game?.id === 'luxury-gym' ? [] : [{ label: game.playerLabel, value: draft.players || '—' }]),
     ];
   }, [game, draft.date, draft.slot, draft.players]);
 
@@ -400,7 +431,13 @@ export function ActivitiesProcessPage() {
       const mobileOk = isValidIndianMobile(draft.mobile);
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = getMaxPlayersForSlot(g, selectedSlot);
-      const playersOk = Boolean(draft.players) && Number.isFinite(n) && n >= 1 && n <= maxAllowed;
+      const partyTotal = hasAdultsChildrenFields
+        ? Number(draft.extras.adults || 0) + Number(draft.extras.children || 0)
+        : null;
+      const playersOk = game?.id === 'luxury-gym'
+        || (hasAdultsChildrenFields
+          ? partyTotal >= 1 && partyTotal <= maxAllowed
+          : Boolean(draft.players) && Number.isFinite(n) && n >= 1 && n <= maxAllowed);
       if (!nameOk || !mobileOk || !playersOk) return false;
       if (g?.extraFields) {
         for (const f of g.extraFields) {
@@ -423,7 +460,7 @@ export function ActivitiesProcessPage() {
       return Boolean(draft.paymentMethod);
     }
     return true;
-  }, [step, draft, slots, game]);
+  }, [step, draft, slots, game, hasAdultsChildrenFields]);
 
   function fail(next) {
     setErrors(next);
@@ -461,9 +498,9 @@ export function ActivitiesProcessPage() {
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = getMaxPlayersForSlot(g, selectedSlot);
 
-      if (!draft.players || !Number.isFinite(n) || n < 1) {
+      if (g?.id !== 'luxury-gym' && (!draft.players || !Number.isFinite(n) || n < 1)) {
         next.players = 'Enter how many are playing.';
-      } else if (n > maxAllowed) {
+      } else if (g?.id !== 'luxury-gym' && n > maxAllowed) {
         next.players = isGroupActivity(g?.id) && selectedSlot && selectedSlot.remaining !== undefined
           ? `Only ${selectedSlot.remaining} spot${selectedSlot.remaining > 1 ? 's' : ''} available for this slot.`
           : `Max ${g?.maxPlayers} for ${g?.name}.`;
@@ -490,6 +527,12 @@ export function ActivitiesProcessPage() {
           }
         }
       }
+      if (hasAdultsChildrenFields) {
+        const partyTotal = Number(draft.extras.adults || 0) + Number(draft.extras.children || 0);
+        if (Number.isFinite(partyTotal) && partyTotal > maxAllowed) {
+          next.x_adults = `Adults and children together cannot exceed ${maxAllowed}.`;
+        }
+      }
       if (Object.keys(next).length > 0) return fail(next);
       return true;
     }
@@ -498,12 +541,14 @@ export function ActivitiesProcessPage() {
 
   async function goNext() {
     if (!validate(step)) return;
-    if (step === 3) {
+    if (!isGymFlow && step === 3) {
       // Re-check slot availability before proceeding to Review & Payment
       try {
         const freshSlots = await getSlotAvailability(draft.gameId, draft.date, activeLocationInfo);
         const freshSlot = freshSlots.find((s) => s.time === draft.slot);
-        const reqPlayers = Number(draft.players || 1);
+        const reqPlayers = hasAdultsChildrenFields
+          ? Number(draft.extras.adults || 0) + Number(draft.extras.children || 0)
+          : Number(draft.players || 1);
         const slotUnavailable =
           !freshSlot ||
           freshSlot.booked ||
@@ -520,11 +565,20 @@ export function ActivitiesProcessPage() {
         console.warn('Slot pre-check warning:', err);
       }
     }
+    // Gym: skip the (removed) slot step
+    if (isGymFlow && step === 1) {
+      setStep(3);
+      return;
+    }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
   function goBack() {
     setErrors({});
+    if (isGymFlow && step === 3) {
+      setStep(1);
+      return;
+    }
     setStep((s) => Math.max(s - 1, 0));
   }
 
@@ -547,6 +601,17 @@ export function ActivitiesProcessPage() {
 
   async function pay() {
     if (paying) return;
+    if (hasAdultsChildrenFields) {
+      const selectedSlot = slots.find((s) => s.time === draft.slot);
+      const maxAllowed = getMaxPlayersForSlot(game, selectedSlot);
+      const partyTotal = Number(draft.extras.adults || 0) + Number(draft.extras.children || 0);
+      if (partyTotal > maxAllowed) {
+        const msg = `Adults and children together cannot exceed ${maxAllowed}.`;
+        pushToast(msg, 'error');
+        setErrors({ submit: msg });
+        return;
+      }
+    }
     if (!isFreeGame && !draft.paymentMethod) {
       pushToast('Choose a payment method.', 'error');
       setErrors({ paymentMethod: 'Choose a payment method.' });
@@ -567,8 +632,12 @@ export function ActivitiesProcessPage() {
       const created = await createActivityBookingRemote({
         gameId: draft.gameId,
         date: draft.date,
-        slot: draft.slot,
-        players: Number(draft.players || 1),
+        slot: isGymFlow ? '06:00' : draft.slot,
+        players: Number(
+          (hasAdultsChildrenFields
+            ? Number(draft.extras.adults || 0) + Number(draft.extras.children || 0)
+            : draft.players) || 1,
+        ),
         userName: draft.name,
         mobile: draft.mobile,
         email: user?.email || user?.user_metadata?.email || null,
@@ -637,7 +706,7 @@ export function ActivitiesProcessPage() {
           alreadyBooked: 'This slot is no longer available. Please select another slot.',
         });
         slotsQuery.retry();
-        setStep(2); // Return to Available Slot step
+        setStep(isGymFlow ? 1 : 2); // Return to Date & Time (gym) or Available Slot step
       } else {
         pushToast(msg || 'Failed to complete booking. Please try again.', 'error');
         setErrors({ submit: msg });
@@ -658,8 +727,8 @@ export function ActivitiesProcessPage() {
       `Game: ${confirmed.gameName || g?.name || confirmed.game}`,
       `Location: ${confirmed.location || confirmed.areaName || draft.location}`,
       `Date: ${prettyDate(confirmed.date)}`,
-      `Slot: ${confirmed.slot}`,
-      `Players: ${confirmed.players}`,
+      ...(g?.id === 'luxury-gym' ? [] : [`Slot: ${confirmed.slot}`]),
+      ...(g?.id === 'luxury-gym' ? [] : [`Players: ${confirmed.players}`]),
       ...(confirmedIsFree
         ? ['Rate: Complimentary (Free)', 'Total: Free (₹0)', 'Payment: Complimentary Pass']
         : [
@@ -707,8 +776,48 @@ export function ActivitiesProcessPage() {
       );
     }
     if (f.type === 'number') {
+      const isPartyField = hasAdultsChildrenFields && (f.id === 'adults' || f.id === 'children');
+      const selectedSlot = isPartyField ? slots.find((s) => s.time === draft.slot) : null;
+      const maxTotal = isPartyField ? getMaxPlayersForSlot(game, selectedSlot) : null;
+      const otherValue = isPartyField
+        ? Math.max(0, Number(draft.extras[f.id === 'adults' ? 'children' : 'adults'] || 0))
+        : 0;
+      const fieldMax = isPartyField ? Math.max(0, maxTotal - otherValue) : f.max;
+      const livePartyErr = isPartyField
+        ? Number(draft.extras.adults || 0) + Number(draft.extras.children || 0) > maxTotal
+          ? `Adults and children together cannot exceed ${maxTotal}.`
+          : ''
+        : '';
       return (
-        <Input key={f.id} label={f.label} name={f.id} type="number" min={f.min} max={f.max} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} error={err} />
+        <Input
+          key={f.id}
+          label={f.label}
+          name={f.id}
+          type="number"
+          min={f.min}
+          max={fieldMax}
+          value={value}
+          onChange={(e) => {
+            if (!isPartyField) {
+              patchExtra(f.id, e.target.value);
+              return;
+            }
+            const raw = e.target.value;
+            if (raw === '') {
+              patchExtra(f.id, '');
+              return;
+            }
+            const num = Number(raw);
+            if (!Number.isFinite(num)) {
+              patchExtra(f.id, '');
+              return;
+            }
+            const min = f.min ?? 0;
+            patchExtra(f.id, String(Math.min(Math.max(num, min), fieldMax)));
+          }}
+          placeholder={f.placeholder}
+          error={err || (f.id === 'adults' ? livePartyErr : '')}
+        />
       );
     }
     if (f.type === 'tel') {
@@ -843,12 +952,20 @@ export function ActivitiesProcessPage() {
     <FlowShell
       service="activities"
       title={game ? `Book ${game.name}` : 'Book your game'}
-      steps={STEPS.map((s) => s.title)}
-      currentStep={step}
+      steps={(isGymFlow ? STEPS.filter((s) => s.id !== 'slot') : STEPS).map((s) => s.title)}
+      currentStep={isGymFlow ? (step <= 1 ? step : step - 1) : step}
       onStepClick={(i) => {
-        if (i < step && step < 5) {
-          setErrors({});
-          setStep(i);
+        if (isGymFlow) {
+          const internal = i <= 1 ? i : i + 1;
+          if (internal < step && step < 5) {
+            setErrors({});
+            setStep(internal);
+          }
+        } else {
+          if (i < step && step < 5) {
+            setErrors({});
+            setStep(i);
+          }
         }
       }}
       summary={processSummary}
@@ -950,7 +1067,7 @@ export function ActivitiesProcessPage() {
             )}
 
             {/* STEP 3 · Slot ----------------------------------------------- */}
-            {step === 2 && game && (
+            {step === 2 && game && !isGymFlow && (
               <Reveal>
                 <Card>
                   <p className="eyebrow">Step 3 · Available Slot</p>
@@ -972,6 +1089,7 @@ export function ActivitiesProcessPage() {
                       error={slotsQuery.error}
                       onRetry={slotsQuery.retry}
                       isGroup={isGroupActivity(game.id)}
+                      hideTotal={game?.id === 'luxury-gym'}
                     />
                     {fullyBooked && (
                       <div className="mt-4">
@@ -992,7 +1110,7 @@ export function ActivitiesProcessPage() {
             {step === 3 && game && (
               <Reveal>
                 <Card>
-                  <p className="eyebrow">Step 4 · Player / Guest Details</p>
+                  <p className="eyebrow">{isGymFlow ? 'Step 3' : 'Step 4'} · Player / Guest Details</p>
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
@@ -1009,7 +1127,7 @@ export function ActivitiesProcessPage() {
                       onChange={(e) => patch({ mobile: sanitizeMobileInput(e.target.value) })}
                       error={errors.mobile}
                     />
-                    {(() => {
+                    {game?.id !== 'luxury-gym' && (() => {
                       const selectedSlot = slots.find((s) => s.time === draft.slot);
                       const maxAllowed = getMaxPlayersForSlot(game, selectedSlot);
                       return (
@@ -1059,15 +1177,15 @@ export function ActivitiesProcessPage() {
             {step === 4 && game && (
               <Reveal>
                 <Card>
-                  <p className="eyebrow">{isFreeGame ? 'Step 5 · Review & Confirm' : 'Step 5 · Review & Payment'}</p>
+                  <p className="eyebrow">{isFreeGame ? (isGymFlow ? 'Step 4 · Review & Confirm' : 'Step 5 · Review & Confirm') : (isGymFlow ? 'Step 4 · Review & Payment' : 'Step 5 · Review & Payment')}</p>
                   <h2 className="h-sub mt-1">{isFreeGame ? 'Review, then confirm' : 'Review, then pay'}</h2>
                   <dl className="mt-5 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 text-sm">
                     {[
                       ['Game', game.name],
                       ['Location', draft.location || draft.areaName || 'Sports Complex'],
                       ['Date', prettyDate(draft.date)],
-                      ['Slot', `${draft.slot} (${game.slotMinutes} min)`],
-                      [`${game.playerLabel}`, draft.players],
+                      ...(isGymFlow ? [] : [['Slot', `${draft.slot} (${game.slotMinutes} min)`]]),
+                      ...(game?.id === 'luxury-gym' ? [] : [[`${game.playerLabel}`, draft.players]]),
                       ['Booker', `${draft.name} · ${draft.mobile}`],
                     ].map(([k, v]) => (
                       <div key={k} className="flex items-center justify-between gap-4 bg-white px-4 py-2.5">
@@ -1231,14 +1349,18 @@ export function ActivitiesProcessPage() {
                         <span className="text-slate-500">Date</span>
                         <span className="font-semibold text-navy-900">{prettyDate(confirmed.date)}</span>
                       </div>
+                      {confirmedGame?.id !== 'luxury-gym' && (
                       <div className="flex justify-between">
                         <span className="text-slate-500">Slot</span>
                         <span className="font-semibold text-navy-900">{confirmed.slot}</span>
                       </div>
+                      )}
+                      {confirmedGame?.id !== 'luxury-gym' && (
                       <div className="flex justify-between">
                         <span className="text-slate-500">{confirmedGame?.playerLabel || 'Players'}</span>
                         <span className="font-semibold text-navy-900">{confirmed.players}</span>
                       </div>
+                      )}
                       {!confirmedIsFree && (
                         <div className="flex justify-between">
                           <span className="text-slate-500">Subtotal</span>
