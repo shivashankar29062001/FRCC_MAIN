@@ -5,7 +5,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { HERO_SLIDES } from '../data/heroSlides.js';
 import { localFor, REMOTE, FALLBACK, getObjectPosition } from '../config/images.js';
-import { ChevronLeftIcon, ChevronRightIcon } from './ui/icons.jsx';
 
 export function HeroSlider({ slotsKey = 'home', interval = 6000, children }) {
   // Resolve slides for the chosen key
@@ -179,57 +178,30 @@ export function HeroSlider({ slotsKey = 'home', interval = 6000, children }) {
         ))}
       </div>
 
-      {/* Navigation arrows (shown only when 2 or more slides exist) */}
+      {/* Dots Indicator — bottom centre (shown only when 2 or more slides exist) */}
       {hasMultiple && (
-        <>
-          <button
-            type="button"
-            aria-label="Previous slide"
-            onClick={(e) => {
-              e.stopPropagation();
-              goToPrev();
-            }}
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-xs transition hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
-          >
-            <ChevronLeftIcon className="h-6 w-6" />
-          </button>
-
-          <button
-            type="button"
-            aria-label="Next slide"
-            onClick={(e) => {
-              e.stopPropagation();
-              goToNext();
-            }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-xs transition hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
-          >
-            <ChevronRightIcon className="h-6 w-6" />
-          </button>
-
-          {/* Dots Indicator — bottom centre */}
-          <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
-            {slides.map((slide, idx) => {
-              const isActive = idx === currentIndex;
-              return (
-                <button
-                  key={slide.slot}
-                  type="button"
-                  aria-label={`Go to slide ${idx + 1}`}
-                  aria-current={isActive ? 'true' : undefined}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    goToSlide(idx);
-                  }}
-                  className={`h-2 rounded-full cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gold-500 ${
-                    isActive
-                      ? 'w-6 bg-gold-500'
-                      : 'w-2 bg-white/50 hover:bg-white/80'
-                  }`}
-                />
-              );
-            })}
-          </div>
-        </>
+        <div className="absolute bottom-3 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {slides.map((slide, idx) => {
+            const isActive = idx === currentIndex;
+            return (
+              <button
+                key={slide.slot}
+                type="button"
+                aria-label={`Go to slide ${idx + 1}`}
+                aria-current={isActive ? 'true' : undefined}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToSlide(idx);
+                }}
+                className={`h-2 rounded-full cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gold-500 ${
+                  isActive
+                    ? 'w-6 bg-gold-500'
+                    : 'w-2 bg-white/50 hover:bg-white/80'
+                }`}
+              />
+            );
+          })}
+        </div>
       )}
     </div>
   );

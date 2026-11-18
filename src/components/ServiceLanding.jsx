@@ -11,9 +11,9 @@ import { ServiceHero } from './ServiceHero.jsx';
 import { SmartImage } from './ui/media.jsx';
 import { IMAGES, roomSlot, gameSlot } from '../config/images.js';
 import { ROUTES } from '../config/routes.js';
-import { areas as hotelAreas, rooms as hotelRooms } from '../data/hotel.js';
-import { areas as hallAreas, halls as hallItems } from '../data/halls.js';
-import { areas as parkingAreas, zones as parkingZones } from '../data/parking.js';
+import { rooms as hotelRooms } from '../data/hotel.js';
+import { halls as hallItems } from '../data/halls.js';
+import { zones as parkingZones } from '../data/parking.js';
 import { games as activityGames } from '../data/activities.js';
 import { formatInr } from '../utils/pricing.js';
 import { HALL_BOOKING_URL, PARKING_BOOKING_URL } from '../config/redirects.js';
@@ -98,16 +98,8 @@ export function ServiceLanding({ service = 'stay', hero }) {
   const normService = service === 'hotel' ? 'stay' : service === 'hall' ? 'halls' : service;
   const heroService = normService === 'halls' ? 'hall' : normService;
 
-  // 1. Determine Areas (Only if data has more than one area)
-  const serviceAreas = useMemo(() => {
-    if (normService === 'stay') return hotelAreas;
-    if (normService === 'halls') return hallAreas;
-    if (normService === 'parking') return parkingAreas;
-    return [];
-  }, [normService]);
-
-  const hasAreas = serviceAreas && serviceAreas.length > 1;
-  const [selectedArea, setSelectedArea] = useState(() => (hasAreas ? serviceAreas[0]?.id : ''));
+  // 1. Location area (defaults to all/empty)
+  const selectedArea = '';
 
   // 2. Filter Chips (for Halls and Activities)
   const [hallFilter, setHallFilter] = useState('all');
@@ -256,14 +248,6 @@ export function ServiceLanding({ service = 'stay', hero }) {
 
   // 4. Determine Filter Chips
   const filterChips = useMemo(() => {
-    if (normService === 'halls') {
-      return [
-        { id: 'all', label: 'All Spaces' },
-        { id: 'Convention Hall', label: 'Convention Hall' },
-        { id: 'Banquet Hall', label: 'Banquet Hall' },
-        { id: 'Board Room', label: 'Board Rooms' },
-      ];
-    }
     if (normService === 'activities') {
       return [
         { id: 'all', label: 'All Activities' },
@@ -307,26 +291,6 @@ export function ServiceLanding({ service = 'stay', hero }) {
               {normService === 'membership' && 'Select your tier to unlock access across sports, stay, and grand events.'}
             </p>
           </div>
-
-          {/* Area Switcher Pills (If service has multiple areas) */}
-          {hasAreas && (
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-              {serviceAreas.map((area) => (
-                <button
-                  key={area.id}
-                  type="button"
-                  onClick={() => setSelectedArea(area.id)}
-                  className={`rounded-full px-5 py-2 text-sm font-semibold transition-colors duration-150 ${
-                    selectedArea === area.id
-                      ? 'bg-navy-900 text-white shadow-sm'
-                      : 'bg-white text-slate-700 hover:text-navy-900 border border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  {area.name}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Filter Chips (Halls or Activities) */}
           {filterChips.length > 0 && (
