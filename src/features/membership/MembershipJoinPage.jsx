@@ -1775,6 +1775,7 @@ export function MembershipJoinPage() {
                     <input
                       type="checkbox"
                       id="fam-no-children"
+                      name="hasNoChildren"
                       checked={formData.hasNoChildren}
                       onChange={(e) => {
                         const checked = e.target.checked;
@@ -1805,10 +1806,12 @@ export function MembershipJoinPage() {
                             className="p-4 rounded-xl border border-slate-200 bg-white grid grid-cols-1 sm:grid-cols-12 gap-3 items-end shadow-sm"
                           >
                             <div className="sm:col-span-5">
-                              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                              <label htmlFor={`child-name-${idx}`} className="text-xs font-semibold text-slate-700 block mb-1">
                                 Child {idx + 1} Name *
                               </label>
                               <input
+                                id={`child-name-${idx}`}
+                                name={`childName_${idx}`}
                                 type="text"
                                 value={child.name}
                                 onChange={(e) => handleUpdateChild(idx, { name: sanitizeNameInput(e.target.value) })}
@@ -1821,10 +1824,12 @@ export function MembershipJoinPage() {
                               )}
                             </div>
                             <div className="sm:col-span-3">
-                              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                              <label htmlFor={`child-dob-${idx}`} className="text-xs font-semibold text-slate-700 block mb-1">
                                 DOB (DD/MM/YYYY)
                               </label>
                               <input
+                                id={`child-dob-${idx}`}
+                                name={`childDob_${idx}`}
                                 type="text"
                                 maxLength="10"
                                 value={child.dob}
@@ -1834,10 +1839,12 @@ export function MembershipJoinPage() {
                               />
                             </div>
                             <div className="sm:col-span-3">
-                              <label className="text-xs font-semibold text-slate-700 block mb-1">
+                              <label htmlFor={`child-gender-${idx}`} className="text-xs font-semibold text-slate-700 block mb-1">
                                 Gender
                               </label>
                               <select
+                                id={`child-gender-${idx}`}
+                                name={`childGender_${idx}`}
                                 value={child.gender}
                                 onChange={(e) => handleUpdateChild(idx, { gender: e.target.value })}
                                 className="field !py-1.5 text-sm"
@@ -1981,10 +1988,11 @@ export function MembershipJoinPage() {
 
               {/* Required confirmation checkbox */}
               <div className="border-t border-slate-100 pt-5 space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
+                <label htmlFor="fam-consent" className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     id="fam-consent"
+                    name="familyConsent"
                     checked={formData.familyConsent}
                     onChange={(e) => {
                       const checked = e.target.checked;
@@ -2076,6 +2084,7 @@ export function MembershipJoinPage() {
                           Replace photo
                           <input
                             id="passport-photo-replace"
+                            name="passportPhotoReplace"
                             type="file"
                             accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                             onChange={handlePhotoFileSelect}
@@ -2110,6 +2119,7 @@ export function MembershipJoinPage() {
                           <span>Upload passport photograph</span>
                           <input
                             id="passport-photo-upload"
+                            name="passportPhotoUpload"
                             type="file"
                             accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                             onChange={handlePhotoFileSelect}
@@ -2137,6 +2147,7 @@ export function MembershipJoinPage() {
                   </label>
                   <input
                     id="aadhaar-number"
+                    name="aadhaarNumber"
                     type="text"
                     maxLength="14"
                     placeholder="XXXX XXXX 1234"
@@ -2180,6 +2191,7 @@ export function MembershipJoinPage() {
                             <span>Upload Aadhaar document</span>
                             <input
                               id="aadhaar-file-upload"
+                              name="aadhaarFileUpload"
                               type="file"
                               accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                               onChange={handleAadhaarFileUpload}
@@ -2228,9 +2240,11 @@ export function MembershipJoinPage() {
 
                 {/* Aadhaar consent checkbox */}
                 <div className="space-y-2 border-t border-slate-100 pt-4">
-                  <label className="flex items-start gap-2.5 cursor-pointer">
+                  <label htmlFor="aadhaar-consent-checkbox" className="flex items-start gap-2.5 cursor-pointer">
                     <input
                       type="checkbox"
+                      id="aadhaar-consent-checkbox"
+                      name="aadhaarConsent"
                       checked={formData.aadhaarConsent}
                       onChange={(e) => updateForm({ aadhaarConsent: e.target.checked })}
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-navy-900 accent-navy-900"
@@ -2342,6 +2356,8 @@ export function MembershipJoinPage() {
                       <div className="space-y-2">
                         <div className="flex gap-2">
                           <input
+                            id="membership-coupon-code"
+                            name="couponCode"
                             type="text"
                             value={couponInput}
                             onChange={(e) => {

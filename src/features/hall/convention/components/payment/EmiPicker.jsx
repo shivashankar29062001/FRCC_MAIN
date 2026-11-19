@@ -29,12 +29,12 @@ export default function EmiPicker({ amount, kind, onValid }) {
   return (
     <div className="space-y-3 max-w-md">
       <label className="block text-sm">Bank
-        <select className="border rounded p-2 w-full mt-1" value={bank} onChange={e => { setBank(e.target.value); pick(e.target.value, tenure); }}>
+        <select id="emi-bank" name="emiBank" className="border rounded p-2 w-full mt-1" value={bank} onChange={e => { setBank(e.target.value); pick(e.target.value, tenure); }}>
           <option value="">Select bank</option>
           {BANKS.map(b => <option key={b}>{b}</option>)}
         </select></label>
       <label className="block text-sm">Tenure
-        <select className="border rounded p-2 w-full mt-1" value={tenure} onChange={e => { setTenure(e.target.value); pick(bank, e.target.value); }}>
+        <select id="emi-tenure" name="emiTenure" className="border rounded p-2 w-full mt-1" value={tenure} onChange={e => { setTenure(e.target.value); pick(bank, e.target.value); }}>
           <option value="">Select tenure</option>
           {tenureOptions.map(t => <option key={t} value={t}>{t} months</option>)}
         </select></label>

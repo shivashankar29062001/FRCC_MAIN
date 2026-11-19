@@ -178,6 +178,7 @@ export function SignupPage() {
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
           <Input
+            id="signup-name"
             label="Full Name *"
             name="name"
             autoComplete="name"
@@ -188,6 +189,7 @@ export function SignupPage() {
             error={errors.name}
           />
           <Input
+            id="signup-email"
             label="Email Address *"
             name="email"
             type="email"
@@ -198,6 +200,7 @@ export function SignupPage() {
             error={errors.email}
           />
           <Input
+            id="signup-mobile"
             label="Mobile Number *"
             name="mobile"
             type="tel"
@@ -211,6 +214,7 @@ export function SignupPage() {
             error={errors.mobile}
           />
           <PasswordInput
+            id="signup-password"
             label="Create Password *"
             name="password"
             autoComplete="new-password"
@@ -411,6 +415,7 @@ export function SigninPage() {
 
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
           <Input
+            id="signin-email"
             label="Email"
             name="email"
             type="email"
@@ -421,6 +426,7 @@ export function SigninPage() {
             error={errors.email}
           />
           <PasswordInput
+            id="signin-password"
             label="Password"
             name="password"
             autoComplete="current-password"

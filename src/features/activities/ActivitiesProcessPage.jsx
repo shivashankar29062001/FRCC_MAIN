@@ -785,10 +785,11 @@ export function ActivitiesProcessPage() {
   function renderExtraField(f) {
     const err = errors[`x_${f.id}`];
     const value = draft.extras[f.id] ?? '';
+    const fieldId = `act-extra-${f.id}`;
     if (f.type === 'select') {
       const opts = f.options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
       return (
-        <Select key={f.id} label={f.label} name={f.id} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} options={opts} error={err} />
+        <Select key={f.id} id={fieldId} label={f.label} name={f.id} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} options={opts} error={err} />
       );
     }
     if (f.type === 'number') {
@@ -807,6 +808,7 @@ export function ActivitiesProcessPage() {
       return (
         <Input
           key={f.id}
+          id={fieldId}
           label={f.label}
           name={f.id}
           type="number"
@@ -846,6 +848,7 @@ export function ActivitiesProcessPage() {
       return (
         <Input
           key={f.id}
+          id={fieldId}
           label={f.label}
           name={f.id}
           type="tel"
@@ -869,6 +872,7 @@ export function ActivitiesProcessPage() {
         return (
           <Input
             key={f.id}
+            id={fieldId}
             label={f.label}
             name={f.id}
             type="text"
@@ -885,7 +889,7 @@ export function ActivitiesProcessPage() {
         );
       }
       return (
-        <Input key={f.id} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
+        <Input key={f.id} id={fieldId} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
       );
     }
     if (f.type === 'checkbox') {
@@ -1062,6 +1066,7 @@ export function ActivitiesProcessPage() {
                   {locationSelectorField}
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input
+                      id="activity-booking-date"
                       label={draft.date ? `Date — ${formatDMY(draft.date)}` : 'Date (DD/MM/YYYY)'}
                       name="date"
                       type="date"
@@ -1137,8 +1142,9 @@ export function ActivitiesProcessPage() {
                   <p className="eyebrow">{isGymFlow ? 'Step 3' : 'Step 4'} · Player / Guest Details</p>
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
+                    <Input id="activity-player-name" label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
                     <Input
+                      id="activity-player-mobile"
                       label="Mobile"
                       name="mobile"
                       type="tel"
@@ -1156,6 +1162,7 @@ export function ActivitiesProcessPage() {
                       const maxAllowed = getMaxPlayersForSlot(game, selectedSlot);
                       return (
                         <Input
+                          id="activity-player-count"
                           label={`${game.playerLabel} (max ${maxAllowed})`}
                           name="players"
                           type="number"
@@ -1178,6 +1185,7 @@ export function ActivitiesProcessPage() {
                     })()}
                     {!isFreeGame && game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
                       <Select
+                        id="activity-sessions-count"
                         label="Number of Sessions (₹1,500 per session) *"
                         name="sessions"
                         value={draft.extras.sessions || '1'}

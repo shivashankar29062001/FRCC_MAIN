@@ -80,12 +80,13 @@ export function Select({ label, id, error, options = [], placeholder = 'Selectâ€
 }
 
 export function DatePicker({ label, id, error, ...props }) {
-  return <Input label={label} id={id} error={error} type="date" {...props} />;
+  return <Input label={label} id={id} name={props.name || id} error={error} type="date" {...props} />;
 }
 
 /** Password input with an accessible show/hide toggle. */
 export function PasswordInput({ label, id, error, hint, name, ...props }) {
   const inputId = id || name;
+  const inputName = name || id;
   const [visible, setVisible] = useState(false);
   return (
     <div>
@@ -93,7 +94,7 @@ export function PasswordInput({ label, id, error, hint, name, ...props }) {
       <div className="relative">
         <input
           id={inputId}
-          name={name}
+          name={inputName}
           type={visible ? 'text' : 'password'}
           className="field pr-12"
           aria-invalid={!!error}

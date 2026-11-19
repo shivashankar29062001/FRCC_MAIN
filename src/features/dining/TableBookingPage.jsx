@@ -420,6 +420,7 @@ export function TableBookingPage() {
                 </span>
                 <input
                   id="booking-date"
+                  name="date"
                   type="text"
                   placeholder="DD/MM/YYYY"
                   value={dateStr}
@@ -440,6 +441,7 @@ export function TableBookingPage() {
                 </span>
                 <select
                   id="booking-guests"
+                  name="guests"
                   value={guestsCount}
                   onChange={(e) => setGuestsCount(Number(e.target.value))}
                   className="field h-12 w-full !pl-10 text-sm"
@@ -543,6 +545,7 @@ export function TableBookingPage() {
               <label htmlFor="details-name" className="label">Full Name *</label>
               <input
                 id="details-name"
+                name="name"
                 type="text"
                 placeholder="e.g. Ramesh Kumar"
                 value={guestName}
@@ -582,6 +585,7 @@ export function TableBookingPage() {
                 <label htmlFor="details-email" className="label">Email Address *</label>
                 <input
                   id="details-email"
+                  name="email"
                   type="email"
                   placeholder="name@example.com"
                   value={guestEmail}
@@ -599,6 +603,7 @@ export function TableBookingPage() {
               <label htmlFor="details-notes" className="label">Special Requests / Notes (Optional)</label>
               <textarea
                 id="details-notes"
+                name="notes"
                 rows={3}
                 placeholder="Seating preferences, anniversary, high chair, etc."
                 value={notes}
@@ -619,6 +624,7 @@ export function TableBookingPage() {
                   <input
                     type="checkbox"
                     id="details-age-confirm"
+                    name="ageConfirmed"
                     checked={ageConfirmed}
                     onChange={(e) => {
                       const checked = e.target.checked;

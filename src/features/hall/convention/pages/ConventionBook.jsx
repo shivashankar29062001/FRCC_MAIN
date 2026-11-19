@@ -319,7 +319,7 @@ export default function ConventionBook() {
 
       {/* Location, filters & sort */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <select className="border rounded p-2 w-full bg-white text-navy-900" value={cityId}
+        <select id="hall-filter-city" name="cityId" className="border rounded p-2 w-full bg-white text-navy-900" value={cityId}
           aria-label="City"
           onChange={e => {
             const val = e.target.value;
@@ -330,14 +330,14 @@ export default function ConventionBook() {
           {Array.isArray(citiesData) && citiesData.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
 
-        <select className="border rounded p-2 w-full bg-white text-navy-900" value={roomType}
+        <select id="hall-filter-room-type" name="roomType" className="border rounded p-2 w-full bg-white text-navy-900" value={roomType}
           aria-label="Room type"
           onChange={e => { setRoomType(e.target.value); updateBooking({ hallId: null }); }}>
           <option value="ALL">All types</option>
           {roomTypes.map(rt => <option key={rt} value={rt}>{rt}</option>)}
         </select>
 
-        <select className="border rounded p-2 w-full bg-white text-navy-900" value={cooling}
+        <select id="hall-filter-cooling" name="cooling" className="border rounded p-2 w-full bg-white text-navy-900" value={cooling}
           aria-label="Cooling"
           onChange={e => { setCooling(e.target.value); updateBooking({ hallId: null }); }}>
           <option value="ALL">All cooling</option>
@@ -345,7 +345,7 @@ export default function ConventionBook() {
           <option value="NON_AC">Non-AC</option>
         </select>
 
-        <select className="border rounded p-2 w-full bg-white text-navy-900" value={sortBy}
+        <select id="hall-filter-sort-by" name="sortBy" className="border rounded p-2 w-full bg-white text-navy-900" value={sortBy}
           aria-label="Sort by"
           onChange={e => setSortBy(e.target.value)}>
           <option value="price-asc">Price: Low to High</option>
@@ -362,7 +362,7 @@ export default function ConventionBook() {
           <div className="flex items-center">
             <button type="button" aria-label="Decrease guests" onClick={() => stepGuests(-10)}
               className="border border-navy text-navy rounded-l px-3 py-2 font-bold hover:bg-navy hover:text-gold">−</button>
-            <input id="guest-count" type="number" min={HALL_MIN_GUESTS} max={HALL_MAX_GUESTS} step="10" inputMode="numeric"
+            <input id="guest-count" name="guests" type="number" min={HALL_MIN_GUESTS} max={HALL_MAX_GUESTS} step="10" inputMode="numeric"
               value={booking.guests} placeholder="e.g. 100"
               onKeyDown={(e) => { if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault(); }}
               onChange={(e) => {

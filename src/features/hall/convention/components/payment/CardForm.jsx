@@ -35,24 +35,24 @@ export default function CardForm({ kind, onValid }) {
   return (
     <div className="space-y-3 max-w-md">
       <label className="block text-sm">Card Number
-        <input className={input} inputMode="numeric" value={num} placeholder="1234 5678 9012 3456"
+        <input id="card-number" name="cardNumber" autoComplete="cc-number" className={input} inputMode="numeric" value={num} placeholder="1234 5678 9012 3456"
           onChange={e => { const v = formatCardNumber(e.target.value); setNum(v); report(v, name, exp, cvv, save); }} />
         {num && !numOk && <span className="text-red-600 text-xs">Invalid card number (Luhn check failed)</span>}
         {brand && <span className="text-navy text-sm ml-2">{BRAND_ICONS[brand] || brand}</span>}
       </label>
       <label className="block text-sm">Name on Card
-        <input className={input} value={name} onChange={e => { setName(e.target.value); report(num, e.target.value, exp, cvv, save); }} /></label>
+        <input id="card-name" name="cardholderName" autoComplete="cc-name" className={input} value={name} onChange={e => { setName(e.target.value); report(num, e.target.value, exp, cvv, save); }} /></label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">Expiry (MM/YY)
-          <input className={input} placeholder="MM/YY" value={exp}
+          <input id="card-expiry" name="cardExpiry" autoComplete="cc-exp" className={input} placeholder="MM/YY" value={exp}
             onChange={e => { let v = e.target.value.replace(/\D/g, '').slice(0, 4); if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2); setExp(v); report(num, name, v, cvv, save); }} />
           {exp && !expOk && <span className="text-red-600 text-xs">Past or invalid expiry</span>}</label>
         <label className="block text-sm">CVV
-          <input className={input} type="password" inputMode="numeric" maxLength={cvvLength(brand)} value={cvv}
+          <input id="card-cvv" name="cardCvv" autoComplete="cc-csc" className={input} type="password" inputMode="numeric" maxLength={cvvLength(brand)} value={cvv}
             onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, cvvLength(brand)); setCvv(v); report(num, name, exp, v, save); }} /></label>
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={save} onChange={e => { setSave(e.target.checked); report(num, name, exp, cvv, e.target.checked); }} />
+        <input id="card-save" name="saveCard" type="checkbox" checked={save} onChange={e => { setSave(e.target.checked); report(num, name, exp, cvv, e.target.checked); }} />
         Save this card for future payments
       </label>
       {kind === 'credit' && <p className="text-xs text-gray-500">🌐 International cards accepted</p>}

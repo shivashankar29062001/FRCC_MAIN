@@ -239,6 +239,7 @@ export function SupportPage() {
                 <label htmlFor="hero-contact-name" className="booking-label">Your Name</label>
                 <input
                   id="hero-contact-name"
+                  name="name"
                   type="text"
                   placeholder="Full name"
                   value={contact.name}
@@ -253,6 +254,7 @@ export function SupportPage() {
                 <label htmlFor="hero-contact-email" className="booking-label">Email or Phone</label>
                 <input
                   id="hero-contact-email"
+                  name="email"
                   type="text"
                   placeholder="name@example.com"
                   value={contact.email}
@@ -266,6 +268,7 @@ export function SupportPage() {
                 <label htmlFor="hero-contact-msg" className="booking-label">Your Query / Message</label>
                 <textarea
                   id="hero-contact-msg"
+                  name="message"
                   rows={2}
                   placeholder="How can we assist you today?"
                   value={contact.message}
@@ -588,6 +591,7 @@ export function SupportPage() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Select
                           label="Category *"
+                          id="ticket-category"
                           name="t-cat"
                           value={ticket.category}
                           onChange={(e) => setTicket({ ...ticket, category: e.target.value })}
@@ -596,6 +600,7 @@ export function SupportPage() {
                         />
                         <Select
                           label="Priority level"
+                          id="ticket-priority"
                           name="t-pri"
                           value={ticket.priority}
                           onChange={(e) => setTicket({ ...ticket, priority: e.target.value })}
@@ -604,6 +609,7 @@ export function SupportPage() {
                       </div>
                       <Input
                         label="Subject *"
+                        id="ticket-subject"
                         name="t-sub"
                         value={ticket.subject}
                         onChange={(e) => setTicket({ ...ticket, subject: e.target.value })}
@@ -612,6 +618,7 @@ export function SupportPage() {
                       />
                       <TextArea
                         label="Detailed description"
+                        id="ticket-details"
                         name="t-det"
                         rows={4}
                         value={ticket.details}
@@ -645,6 +652,7 @@ export function SupportPage() {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Input
                           label="Your Name *"
+                          id="contact-name"
                           name="c-name"
                           autoComplete="name"
                           value={contact.name}
@@ -654,6 +662,7 @@ export function SupportPage() {
                         />
                         <Input
                           label="Email or Phone"
+                          id="contact-email"
                           name="c-email"
                           type="text"
                           value={contact.email}
@@ -664,6 +673,7 @@ export function SupportPage() {
                       </div>
                       <TextArea
                         label="Message *"
+                        id="contact-message"
                         name="c-msg"
                         rows={4}
                         value={contact.message}

@@ -16,10 +16,10 @@ export default function BankTransferForm({ onValid, bookingRef }) {
         <p><strong>Remarks / Payment Ref:</strong> {payRef} <button type="button" className="text-navy underline text-xs" onClick={() => count(payRef)}>Copy</button></p>
       </div>
       <label className="block text-sm">UTR / Transaction Number
-        <input className="border rounded p-2 w-full mt-1" value={utr} placeholder="Enter UTR/IMPS/NEFT reference"
+        <input id="bank-transfer-utr" name="utrNumber" className="border rounded p-2 w-full mt-1" value={utr} placeholder="Enter UTR/IMPS/NEFT reference"
           onChange={e => { setUtr(e.target.value); report(e.target.value); }} /></label>
       <label className="block text-sm">Upload payment screenshot (optional)
-        <input type="file" accept="image/*" className="block mt-1 text-sm" /></label>
+        <input id="bank-transfer-screenshot" name="paymentScreenshot" type="file" accept="image/*" className="block mt-1 text-sm" /></label>
       <p className="text-xs text-gray-500">Your booking will be marked <strong>PENDING_VERIFICATION</strong> until an admin confirms receipt.</p>
     </div>
   );

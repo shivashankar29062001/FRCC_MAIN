@@ -35,7 +35,7 @@ export default function UpiIdFlow({ onValid }) {
   return (
     <div className="space-y-3">
       <label className="block text-sm">UPI ID
-        <input className="border rounded p-2 w-full" placeholder="name@bank" value={upiId}
+        <input id="upi-vpa-id" name="upiId" className="border rounded p-2 w-full" placeholder="name@bank" value={upiId}
           onChange={e => update(e.target.value, 'idle', '', false)} />
       </label>
       <div className="flex items-center gap-3 flex-wrap">
@@ -51,7 +51,7 @@ export default function UpiIdFlow({ onValid }) {
         <div className="border border-gold bg-amber-50 rounded p-4">
           <p>UPI ID belongs to: <strong>{accountName}</strong>. Is this you / the correct payee?</p>
           <label className="flex items-center gap-2 mt-2">
-            <input type="checkbox" checked={confirmedTick}
+            <input id="upi-confirm-checkbox" name="upiConfirm" type="checkbox" checked={confirmedTick}
               onChange={e => { setConfirmedTick(e.target.checked); onValid(e.target.checked, { maskedInstrument: maskUpi(upiId), upiId }); }} />
             Confirm UPI ID
           </label>
