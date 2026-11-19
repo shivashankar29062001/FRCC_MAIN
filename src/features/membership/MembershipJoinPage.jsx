@@ -17,6 +17,9 @@ import {
   isValidCity,
   normalizeCity,
   sanitizeCityInput,
+  isValidPincode,
+  PINCODE_ERROR,
+  isValidAddress,
 } from '../../utils/city.js';
 import {
   FULL_NAME_ERROR,
@@ -497,10 +500,10 @@ export function MembershipJoinPage() {
     return (
       checkDOB(formData.dob) === null &&
       Boolean(formData.gender) &&
-      Boolean(formData.address.trim()) &&
+      isValidAddress(formData.address) &&
       isValidCity(formData.city) &&
       Boolean(formData.state.trim()) &&
-      /^\d{6}$/.test(formData.pincode.replace(/\D/g, '')) &&
+      isValidPincode(formData.pincode) &&
       isValidName(formData.emergencyName) &&
       isValidIndianMobile(formData.emergencyMobile)
     );
@@ -606,12 +609,22 @@ export function MembershipJoinPage() {
       }
     }
     if (step === 2) {
+      let step2HasError = false;
+      if (!isValidAddress(formData.address)) {
+        setFieldErrors((prev) => ({ ...prev, address: 'Please enter a valid address (at least 5 characters).' }));
+        step2HasError = true;
+      }
       const city = normalizeCity(formData.city);
       if (city !== formData.city) updateForm({ city });
       if (!isValidCity(city)) {
         setFieldErrors((prev) => ({ ...prev, city: CITY_ERROR }));
-        return;
+        step2HasError = true;
       }
+      if (!isValidPincode(formData.pincode)) {
+        setFieldErrors((prev) => ({ ...prev, pincode: PINCODE_ERROR }));
+        step2HasError = true;
+      }
+      if (step2HasError) return;
     }
     if (step === 3) {
       const emergencyName = normalizeName(formData.emergencyName);
@@ -923,6 +936,12 @@ export function MembershipJoinPage() {
       setFieldErrors({ paymentMethod: 'Choose a payment method.' });
       return;
     }
+    const address = (formData.address || '').trim();
+    if (!isValidAddress(address)) {
+      setFieldErrors((prev) => ({ ...prev, address: 'Please enter a valid address (at least 5 characters).' }));
+      setStep(2);
+      return;
+    }
     const city = normalizeCity(formData.city);
     if (!isValidCity(city)) {
       updateForm({ city });
@@ -931,6 +950,11 @@ export function MembershipJoinPage() {
       return;
     }
     if (city !== formData.city) updateForm({ city });
+    if (!isValidPincode(formData.pincode)) {
+      setFieldErrors((prev) => ({ ...prev, pincode: PINCODE_ERROR }));
+      setStep(2);
+      return;
+    }
     if (paying || submittedRef.current) return;
     submittedRef.current = true;
     setPaying(true);
@@ -1422,7 +1446,19 @@ export function MembershipJoinPage() {
                 id="pers-address"
                 name="address"
                 value={formData.address}
-                onChange={(e) => updateForm({ address: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  updateForm({ address: val });
+                  if (fieldErrors.address && isValidAddress(val)) {
+                    setFieldErrors((prev) => ({ ...prev, address: null }));
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = e.target.value;
+                  if (val && !isValidAddress(val)) {
+                    setFieldErrors((prev) => ({ ...prev, address: 'Please enter a valid address (at least 5 characters).' }));
+                  }
+                }}
                 placeholder="Flat/House no., Building, Street address"
                 error={fieldErrors.address}
               />
@@ -1458,12 +1494,22 @@ export function MembershipJoinPage() {
                     id="pers-pincode"
                     name="pincode"
                     type="text"
+                    inputMode="numeric"
                     maxLength="6"
                     placeholder="6-digit pincode"
                     value={formData.pincode}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                       updateForm({ pincode: val });
+                      if (fieldErrors.pincode && isValidPincode(val)) {
+                        setFieldErrors((prev) => ({ ...prev, pincode: null }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = e.target.value.trim();
+                      if (val && !isValidPincode(val)) {
+                        setFieldErrors((prev) => ({ ...prev, pincode: PINCODE_ERROR }));
+                      }
                     }}
                     className="field"
                   />

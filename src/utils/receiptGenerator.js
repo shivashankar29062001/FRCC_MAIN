@@ -161,7 +161,9 @@ export function generateBookingReceiptPdf(booking) {
         : booking.payment_method || booking.paymentMethod || (isFreeTotal ? 'Complimentary Pass' : 'Online (UPI/Card)')
     ),
   ]);
-  rows.push(['Booking Status', String(booking.status || 'Confirmed')]);
+  const rawStatus = String(booking.status || 'CONFIRMED');
+  const displayStatus = rawStatus.toLowerCase() === 'confirmed' ? 'CONFIRMED' : rawStatus;
+  rows.push(['Booking Status', displayStatus]);
 
   // 4 · Render Card-like Table
   let y = 70;

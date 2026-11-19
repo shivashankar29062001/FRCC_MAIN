@@ -3,8 +3,10 @@
 // Small provider abstraction for sending SMS booking notifications
 // ---------------------------------------------------------------------------
 
+declare const Deno: any;
+
 export interface SmsNotificationDetails {
-  serviceType: 'hall' | 'parking';
+  serviceType: 'hall' | 'parking' | 'stay' | 'activity';
   eventType: 'booking_confirmed' | 'booking_cancelled';
   bookingReference: string;
   title: string;

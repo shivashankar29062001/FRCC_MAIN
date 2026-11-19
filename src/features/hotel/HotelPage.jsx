@@ -21,6 +21,7 @@ import { isValidName, sanitizeNameInput, normalizeName, nameError } from '../../
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
+import { supabase } from '../../services/supabase.js';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   CheckCircleIcon,
@@ -652,6 +653,16 @@ export function HotelPage() {
       if (addBooking) {
         await addBooking(confirmationRecord);
       }
+
+      try {
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            booking_id: bookingRef || bookingId,
+            service_type: 'stay',
+            event_type: 'booking_confirmed',
+          },
+        }).catch(() => {});
+      } catch (_) {}
 
       try {
         if (typeof window !== 'undefined' && window.localStorage) {

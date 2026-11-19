@@ -82,6 +82,7 @@ function DiningHeroCard() {
           <label htmlFor="hero-dining-venue" className="booking-label">Venue</label>
           <select
             id="hero-dining-venue"
+            name="venue"
             value={venue}
             onChange={(e) => { setVenue(e.target.value); setError(''); }}
             className="booking-field w-full text-sm"
@@ -103,6 +104,7 @@ function DiningHeroCard() {
               </span>
               <input
                 id="hero-dining-date"
+                name="date"
                 type="text"
                 placeholder="DD/MM/YYYY"
                 value={date}
@@ -112,6 +114,8 @@ function DiningHeroCard() {
               />
               <input
                 ref={pickerRef}
+                id="hero-dining-native-date-picker"
+                name="dateNative"
                 type="date"
                 value={isoValue}
                 min={todayISO()}
@@ -130,6 +134,7 @@ function DiningHeroCard() {
               </span>
               <select
                 id="hero-dining-guests"
+                name="guests"
                 value={guests}
                 onChange={(e) => { setGuests(e.target.value); setError(''); }}
                 className="booking-field w-full text-sm"

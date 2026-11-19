@@ -5,6 +5,8 @@
 // Runs server-side with service role; safe idempotent execution.
 // ---------------------------------------------------------------------------
 
+declare const Deno: any;
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { sendNotificationEmail } from './email.ts';
@@ -34,12 +36,10 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
     const body = await req.json().catch(() => ({}));
-    const {
-      booking_id,
-      is_resend = false,
-      event_type = 'booking_confirmed', // 'booking_confirmed' | 'booking_cancelled'
-      service_type: requestedServiceType,
-    } = body;
+    const booking_id = body.booking_id || body.bookingId;
+    const is_resend = Boolean(body.is_resend);
+    const event_type = body.event_type || (String(body.type || '').includes('cancel') ? 'booking_cancelled' : 'booking_confirmed');
+    const requestedServiceType = body.service_type || body.serviceType || (String(body.type || '').startsWith('hall') ? 'hall' : undefined);
 
     if (!booking_id) {
       return new Response(
@@ -48,9 +48,9 @@ serve(async (req) => {
       );
     }
 
-    // 1. Fetch booking record from parking_bookings or convention_bookings
+    // 1. Fetch booking record from convention_bookings, parking_bookings, stay_bookings, or bookings
     let booking: any = null;
-    let serviceType: 'hall' | 'parking' = 'parking';
+    let serviceType: 'hall' | 'parking' | 'stay' | 'activity' = 'parking';
 
     if (requestedServiceType === 'hall' || String(booking_id).startsWith('FRCC-H-')) {
       const { data: hallBooking } = await supabaseAdmin
@@ -65,7 +65,48 @@ serve(async (req) => {
       }
     }
 
+    if (!booking && (requestedServiceType === 'parking' || String(booking_id).includes('PARK'))) {
+      const { data: parkingBooking } = await supabaseAdmin
+        .from('parking_bookings')
+        .select('*')
+        .or(`id.eq.${booking_id},booking_reference.eq.${booking_id}`)
+        .maybeSingle();
+
+      if (parkingBooking) {
+        booking = parkingBooking;
+        serviceType = 'parking';
+      }
+    }
+
+    if (!booking && (requestedServiceType === 'stay' || String(booking_id).includes('STAY') || String(booking_id).startsWith('FRCC-S-'))) {
+      const { data: stayBooking } = await supabaseAdmin
+        .from('stay_bookings')
+        .select('*, room_types(*)')
+        .or(`id.eq.${booking_id},booking_ref.eq.${booking_id}`)
+        .maybeSingle();
+
+      if (stayBooking) {
+        booking = stayBooking;
+        serviceType = 'stay';
+      }
+    }
+
     if (!booking) {
+      // General bookings table (activities, dining, etc.)
+      const { data: genBooking } = await supabaseAdmin
+        .from('bookings')
+        .select('*')
+        .or(`id.eq.${booking_id},booking_id.eq.${booking_id}`)
+        .maybeSingle();
+
+      if (genBooking) {
+        booking = genBooking;
+        serviceType = genBooking.category === 'activity' ? 'activity' : 'hall';
+      }
+    }
+
+    if (!booking) {
+      // Fallback: check parking_bookings
       const { data: parkingBooking } = await supabaseAdmin
         .from('parking_bookings')
         .select('*')
@@ -79,7 +120,7 @@ serve(async (req) => {
     }
 
     if (!booking) {
-      // Check convention_bookings if not found yet
+      // Fallback: check convention_bookings
       const { data: hallBooking } = await supabaseAdmin
         .from('convention_bookings')
         .select('*')
@@ -89,6 +130,20 @@ serve(async (req) => {
       if (hallBooking) {
         booking = hallBooking;
         serviceType = 'hall';
+      }
+    }
+
+    if (!booking) {
+      // Fallback: check stay_bookings
+      const { data: stayBooking } = await supabaseAdmin
+        .from('stay_bookings')
+        .select('*, room_types(*)')
+        .or(`id.eq.${booking_id},booking_ref.eq.${booking_id}`)
+        .maybeSingle();
+
+      if (stayBooking) {
+        booking = stayBooking;
+        serviceType = 'stay';
       }
     }
 
@@ -130,9 +185,9 @@ serve(async (req) => {
     }
 
     // Direct fallbacks from booking record
-    registeredEmail = registeredEmail || booking.email || '';
-    registeredMobile = registeredMobile || booking.mobile || booking.phone || '';
-    registeredName = registeredName || booking.organizer_name || booking.guest_name || '';
+    registeredEmail = registeredEmail || booking.email || booking.guest_email || booking.details?.email || '';
+    registeredMobile = registeredMobile || booking.mobile || booking.phone || booking.guest_mobile || booking.details?.mobile || '';
+    registeredName = registeredName || booking.organizer_name || booking.guest_name || booking.user_name || booking.name || '';
 
     // 3. Rate-limiting for resends (max 3 resends per booking)
     if (is_resend) {
@@ -176,27 +231,47 @@ serve(async (req) => {
 
     // Format common details depending on service
     const isHall = serviceType === 'hall';
+    const isStay = serviceType === 'stay';
+    const isParking = serviceType === 'parking';
+    const isActivity = serviceType === 'activity';
+
     const title = isHall
       ? (booking.hall_name || 'Convention Hall')
-      : `Parking Slot ${booking.slot_id || 'A01'}`;
+      : isStay
+      ? (booking.room_types?.name || booking.room_name || 'Stay & Accommodation')
+      : isParking
+      ? `Parking Slot ${booking.slot_id || booking.parkingSlot || 'A01'}`
+      : (booking.title || booking.details?.gameName || 'Activity Reservation');
 
     const campus = isHall
       ? (booking.venue_name || (booking.city ? `${booking.city} Club` : 'Hyderabad Club'))
-      : (booking.campus ? (booking.campus.toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus') : 'Vijayawada Campus');
+      : isStay
+      ? (booking.venue_name || booking.area_name || 'Vijayawada Campus')
+      : isParking
+      ? (booking.campus ? (booking.campus.toLowerCase().includes('hyd') ? 'Hyderabad Campus' : 'Vijayawada Campus') : 'Vijayawada Campus')
+      : (booking.area_name || booking.details?.areaName || booking.details?.location || 'Vijayawada Campus');
 
-    const dateStr = booking.date || booking.booking_date || '';
+    const dateStr = booking.date || booking.booking_date || booking.check_in || '';
     const timeStr = isHall
       ? `${booking.start_time || ''} – ${booking.end_time || ''}`
-      : (booking.arrival_time || '');
+      : isStay
+      ? `Check-in: ${booking.check_in || ''}, Check-out: ${booking.check_out || ''}`
+      : isParking
+      ? (booking.arrival_time || '')
+      : (booking.slot || '');
 
     const totalAmount = isHall
       ? (booking.amount || booking.amount_paid || 0)
-      : (booking.total_amount ?? 0);
+      : isStay
+      ? (booking.total ?? 0)
+      : isParking
+      ? (booking.total_amount ?? 0)
+      : (booking.amount ?? booking.subtotal ?? 0);
 
-    const refundAmount = isHall ? booking.refund_amount : undefined;
-    const refundStatusText = isHall
-      ? (booking.refund_status === 'PROCESSED' ? 'Refund processed' : booking.refund_amount > 0 ? 'Refund pending' : 'No refund due')
-      : undefined;
+    const refundAmount = booking.refund_amount;
+    const refundStatusText = booking.refund_status === 'PROCESSED'
+      ? 'Refund processed'
+      : (booking.refund_amount > 0 ? 'Refund pending' : 'No refund due');
 
     // 5. Send Email
     const emailResult = registeredEmail

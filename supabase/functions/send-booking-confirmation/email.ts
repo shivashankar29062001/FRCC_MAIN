@@ -3,8 +3,10 @@
 // Small provider abstraction for sending HTML confirmation & cancellation emails
 // ---------------------------------------------------------------------------
 
+declare const Deno: any;
+
 export interface EmailNotificationDetails {
-  serviceType: 'hall' | 'parking';
+  serviceType: 'hall' | 'parking' | 'stay' | 'activity';
   eventType: 'booking_confirmed' | 'booking_cancelled';
   bookingReference: string;
   title: string; // e.g. "Board Room (AC)" or "Parking Slot A01"
@@ -30,9 +32,14 @@ export interface SendResult {
 
 export function buildEmailHtml(d: EmailNotificationDetails): string {
   const isCancelled = d.eventType === 'booking_cancelled';
+  const serviceLabel =
+    d.serviceType === 'hall' ? 'Convention Hall' :
+      d.serviceType === 'parking' ? 'Parking' :
+        d.serviceType === 'stay' ? 'Stay & Hotel' :
+          'Sports & Activity';
   const headerSubtitle = isCancelled
-    ? `${d.serviceType === 'hall' ? 'Convention Hall' : 'Parking'} Cancellation Notice`
-    : `${d.serviceType === 'hall' ? 'Convention Hall' : 'Parking'} Reservation Confirmation`;
+    ? `${serviceLabel} Cancellation Notice`
+    : `${serviceLabel} Reservation Confirmation`;
 
   const headingText = isCancelled
     ? `Booking Cancellation Confirmation`
@@ -65,8 +72,8 @@ export function buildEmailHtml(d: EmailNotificationDetails): string {
               <h2 style="margin: 0 0 12px 0; color: #0B1833; font-size: 18px;">${headingText}</h2>
               <p style="margin: 0 0 20px 0; color: #475569; font-size: 14px; line-height: 1.5;">
                 Hello ${d.recipientName || 'Member'}, ${isCancelled
-                  ? `your reservation for <strong>${d.title}</strong> has been cancelled.`
-                  : `your reservation for <strong>${d.title}</strong> is confirmed. Please keep this reference for your visit.`}
+      ? `your reservation for <strong>${d.title}</strong> has been cancelled.`
+      : `your reservation for <strong>${d.title}</strong> is confirmed. Please keep this reference for your visit.`}
               </p>
 
               <!-- Reference Badge -->

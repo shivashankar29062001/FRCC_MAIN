@@ -367,6 +367,23 @@ export async function createActivityBookingRemote({
     throw err;
   }
 
+  const numPlayers = Number(players);
+  if (gameId !== 'luxury-gym') {
+    if (!Number.isInteger(numPlayers) || numPlayers < 1) {
+      const err = new Error('Player count must be a valid positive number of at least 1.');
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+    const g = gameById(gameId);
+    if (g && g.maxPlayers && numPlayers > g.maxPlayers) {
+      const err = new Error(`Player count cannot exceed ${g.maxPlayers} for ${g.name}.`);
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
   const loc = resolveActivityLocation({
     cityId,
     cityName,

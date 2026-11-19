@@ -178,25 +178,31 @@ function Field({ id, label, icon: Icon, error, children }) {
 const inputCls = 'field h-12 !pl-10 w-full';
 
 function TextInput({ id, error, inputClass = inputCls, ...props }) {
+  const inputId = id || props.name;
+  const inputName = props.name || id;
   return (
     <input
-      id={id}
+      id={inputId}
+      name={inputName}
       className={inputClass}
       aria-invalid={!!error}
-      aria-describedby={error ? `${id}-error` : undefined}
+      aria-describedby={error ? `${inputId}-error` : undefined}
       {...props}
     />
   );
 }
 
 function SelectInput({ id, error, inputClass = inputCls, nativeArrow = false, options, placeholder = 'Select…', ...props }) {
+  const selectId = id || props.name;
+  const selectName = props.name || id;
   return (
     <>
       <select
-        id={id}
+        id={selectId}
+        name={selectName}
         className={nativeArrow ? inputClass : cx(inputClass, 'appearance-none pr-9')}
         aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={error ? `${selectId}-error` : undefined}
         {...props}
       >
         <option value="">{placeholder}</option>
@@ -263,6 +269,8 @@ function DateInput({ id, error, value, onChange, inputClass, min, ...props }) {
       />
       <input
         ref={pickerRef}
+        id={`${id}-native-picker`}
+        name={`${props.name || id}-picker`}
         type="date"
         value={isoValue}
         min={min || todayISO()}

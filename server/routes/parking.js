@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { readDb, writeDb, uid } = require('../db');
+const notifications = require('../services/notifications');
 
 const router = express.Router();
 
@@ -252,6 +253,20 @@ router.post('/bookings', (req, res) => {
 
   db.parking_bookings.push(newBooking);
   writeDb(db);
+
+  // Trigger booking confirmation notifications if contact details are present
+  const userRecord = newBooking.userId && Array.isArray(db.users)
+    ? db.users.find((u) => u.id === newBooking.userId)
+    : null;
+  const notifyBooking = {
+    ...newBooking,
+    email: newBooking.email || userRecord?.email || body.email || '',
+    phone: newBooking.phone || userRecord?.phone || userRecord?.mobile || body.phone || body.mobile || '',
+    status: 'CONFIRMED',
+  };
+  if (notifyBooking.email || notifyBooking.phone) {
+    notifications.sendBookingConfirmed(notifyBooking).catch((e) => console.error('[notify] parking confirmed dispatch failed:', e.message));
+  }
 
   res.status(200).json({
     ok: true,

@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 import { isValidIndianMobile } from '../utils/mobile.js';
-import { CITY_ERROR, isValidCity } from '../utils/city.js';
+import { CITY_ERROR, isValidCity, isValidPincode, PINCODE_ERROR, isValidAddress } from '../utils/city.js';
 import { FULL_NAME_ERROR, isValidFullName, isValidName, nameError } from '../utils/fullName.js';
 
 /**
@@ -136,6 +136,12 @@ export async function saveUserMembership(membershipData) {
   }
   if (!isValidCity(membershipData.city)) {
     throw new Error(CITY_ERROR);
+  }
+  if (membershipData.address && !isValidAddress(membershipData.address)) {
+    throw new Error('Please enter a valid residential address.');
+  }
+  if (membershipData.pincode && !isValidPincode(membershipData.pincode)) {
+    throw new Error(PINCODE_ERROR);
   }
 
   // Prevent duplicate active membership enrollment for the same user

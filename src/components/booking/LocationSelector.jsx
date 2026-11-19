@@ -28,10 +28,12 @@ export function LocationSelector({
     <div className={`flex flex-col sm:flex-row gap-4 mb-6 ${className}`}>
       {/* City Dropdown */}
       <div className="flex-1">
-        <label className="block text-xs font-semibold text-slate-700 mb-1">
+        <label htmlFor="booking-location-city" className="block text-xs font-semibold text-slate-700 mb-1">
           {cityLabel} <span className="text-red-500">*</span>
         </label>
         <select
+          id="booking-location-city"
+          name="cityId"
           className="border border-slate-300 rounded-xl p-2.5 w-full text-sm bg-white font-medium text-navy-950 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 transition shadow-xs"
           value={cityId}
           onChange={(e) => {
@@ -52,10 +54,12 @@ export function LocationSelector({
 
       {/* Venue Dropdown */}
       <div className="flex-1">
-        <label className="block text-xs font-semibold text-slate-700 mb-1">
+        <label htmlFor="booking-location-venue" className="block text-xs font-semibold text-slate-700 mb-1">
           {venueLabel} <span className="text-red-500">*</span>
         </label>
         <select
+          id="booking-location-venue"
+          name="venueId"
           className="border border-slate-300 rounded-xl p-2.5 w-full text-sm bg-white font-medium text-navy-950 focus:border-navy-900 focus:ring-1 focus:ring-navy-900 disabled:opacity-50 disabled:bg-slate-50 transition shadow-xs"
           value={venueId}
           disabled={!cityId || venues.length === 0}
