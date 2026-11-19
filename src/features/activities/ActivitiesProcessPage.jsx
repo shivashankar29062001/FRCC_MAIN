@@ -1165,7 +1165,9 @@ export function ActivitiesProcessPage() {
                           id="activity-player-count"
                           label={`${game.playerLabel} (max ${maxAllowed})`}
                           name="players"
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           min={1}
                           max={maxAllowed}
                           step={1}
@@ -1176,7 +1178,9 @@ export function ActivitiesProcessPage() {
                             }
                           }}
                           onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '');
+                            const val = e.target.value;
+                            // Digits only — reject e/E notation, decimals, signs.
+                            if (!/^\d*$/.test(val)) return;
                             patch({ players: val });
                           }}
                           error={errors.players}

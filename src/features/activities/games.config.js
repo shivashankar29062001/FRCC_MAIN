@@ -37,9 +37,16 @@ export function isGroupActivity(gameId) {
   return gameId === 'swimming-pool' || gameId === 'kids-play-area' || gameId === 'luxury-gym';
 }
 
+/** Configured maximum players for booking an activity, per game (data/activities.js). */
+export function getActivityMaxPlayers(gameIdOrGame) {
+  const game = typeof gameIdOrGame === 'string' ? gameById(gameIdOrGame) : gameIdOrGame;
+  if (!game) return 99;
+  return game.maxPlayers || 99;
+}
+
 /** Maximum bookable players for a game + slot selection. */
 export function getMaxPlayersForSlot(game, slotItem = null) {
-  const baseMax = game?.maxPlayers || 99;
+  const baseMax = getActivityMaxPlayers(game);
   if (isGroupActivity(game?.id) && slotItem && slotItem.remaining !== undefined) {
     return Math.min(baseMax, slotItem.remaining);
   }

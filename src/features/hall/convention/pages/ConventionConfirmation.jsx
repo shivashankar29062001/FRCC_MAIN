@@ -164,6 +164,10 @@ export default function ConventionConfirmation() {
     const labelColor = '#0F1F3D';
     const valueColor = '#0F1F3D';
 
+    // jsPDF's built-in Times font has no ₹ glyph, so it was rendered as a stray
+    // leading "1" before every amount. Format the digits only for the PDF.
+    const inrPdf = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
     const rows = [
       ['Booking Reference', booking.id],
       ['Hall & Type', booking.hallName || 'Convention Hall'],
@@ -180,11 +184,11 @@ export default function ConventionConfirmation() {
       ['Payment ID', paymentId],
       ['Payment Status', booking.paymentStatus || '—'],
       ['Payment Date & Time', paidAtText],
-      ['Hall Charge', inr(booking.hallCharge)],
-      ['GST (18%)', inr(booking.gst)],
-      ...(Number(booking.convenienceFee) > 0 ? [['Convenience Fee', inr(booking.convenienceFee)]] : []),
-      ['Amount Paid', inr(booking.amountPaid ?? booking.amount)],
-      ...(Number(booking.balanceDue) > 0 ? [['Balance Due', inr(booking.balanceDue)]] : []),
+      ['Hall Charge', inrPdf(booking.hallCharge)],
+      ['GST (18%)', inrPdf(booking.gst)],
+      ...(Number(booking.convenienceFee) > 0 ? [['Convenience Fee', inrPdf(booking.convenienceFee)]] : []),
+      ['Amount Paid', inrPdf(booking.amountPaid ?? booking.amount)],
+      ...(Number(booking.balanceDue) > 0 ? [['Balance Due', inrPdf(booking.balanceDue)]] : []),
       ['Booking Status', String(booking.status || '').toUpperCase() === 'CONFIRMED' ? 'CONFIRMED' : booking.status],
     ];
 

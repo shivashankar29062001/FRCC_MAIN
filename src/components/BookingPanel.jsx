@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../app/store/AppContext.jsx';
 import { useAuthModal } from '../app/context/AuthModalContext.jsx';
 import { getRedirect, isPlaceholder, OPEN_IN_NEW_TAB } from '../config/redirects.js';
-import { GAMES } from '../features/activities/games.config.js';
+import { GAMES, getActivityMaxPlayers } from '../features/activities/games.config.js';
 import { LoadingButton } from './ui/controls.jsx';
 import { todayISO, cx, isPageReload } from '../utils/helpers.js';
 import { parseDMY } from '../utils/dates.js';
@@ -334,7 +334,24 @@ function validate(tab, v) {
     readDate('date', 'Choose a date.', 'Date cannot be in the past.');
     need('game', 'Choose a game.');
     need('players', 'Enter the number of players.');
-    if (v.players && Number(v.players) < 1) errs.players = 'At least 1 player.';
+    if (v.players !== undefined && v.players !== null && String(v.players).trim() !== '') {
+      const rawPlayers = String(v.players).trim();
+      if (!/^\d+$/.test(rawPlayers)) {
+        errs.players = 'Enter a valid whole number of players.';
+      } else {
+        const num = Number(rawPlayers);
+        if (num < 1) {
+          errs.players = 'At least 1 player.';
+        } else if (v.game) {
+          const max = getActivityMaxPlayers(v.game);
+          const gameObj = (GAMES || []).find((g) => g.id === v.game);
+          const gameName = gameObj?.name || 'this game';
+          if (num > max) {
+            errs.players = `Maximum ${max} player${max > 1 ? 's' : ''} allowed for ${gameName}.`;
+          }
+        }
+      }
+    }
   }
 
   return errs;
@@ -481,6 +498,102 @@ function useBookingForm(defaultTab, preselect) {
     if (guestErr) setErrors((prev) => ({ ...prev, guests: guestErr }));
   };
 
+  const onActivityGameChange = (gameId) => {
+    const currentActivities = values.activities || {};
+    const rawPlayers = currentActivities.players;
+    const hasPlayers = rawPlayers !== undefined && rawPlayers !== null && String(rawPlayers).trim() !== '';
+    const max = getActivityMaxPlayers(gameId);
+    const num = Number(rawPlayers);
+    // A count that was valid for the previous game may exceed the new one, so
+    // it is cleared on switch instead of being carried over.
+    const invalidForNewGame = hasPlayers
+      && (!/^\d+$/.test(String(rawPlayers).trim()) || num < 1 || (gameId && num > max));
+    const nextActivities = {
+      ...currentActivities,
+      game: gameId,
+      ...(invalidForNewGame ? { players: '' } : {}),
+    };
+    setValues((prev) => ({ ...prev, activities: nextActivities }));
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.game;
+      delete next.players;
+      if (invalidForNewGame) {
+        const gameObj = (GAMES || []).find((g) => g.id === gameId);
+        const gameName = gameObj?.name || 'this game';
+        next.players = `Player count must be between 1 and ${max} for ${gameName}.`;
+      }
+      return next;
+    });
+  };
+
+  const onActivityPlayersKeyDown = (e) => {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const onActivityPlayersChange = (raw) => {
+    const cleaned = String(raw ?? '');
+    // Only digits may reach the state: pasted values such as 1e5, 2.5 or -5
+    // are rejected outright instead of being salvaged into a number.
+    if (!/^\d*$/.test(cleaned)) {
+      setErrors((prev) => ({ ...prev, players: 'Enter a valid whole number of players.' }));
+      return;
+    }
+    setValues((prev) => ({
+      ...prev,
+      activities: { ...(prev.activities || {}), players: cleaned },
+    }));
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (!cleaned) {
+        delete next.players;
+        return next;
+      }
+      const num = Number(cleaned);
+      const currentGameId = values.activities?.game;
+      const max = getActivityMaxPlayers(currentGameId);
+      const gameObj = (GAMES || []).find((g) => g.id === currentGameId);
+      const gameName = gameObj?.name || 'this game';
+
+      if (num < 1) {
+        next.players = 'At least 1 player.';
+      } else if (currentGameId && num > max) {
+        next.players = `Maximum ${max} player${max > 1 ? 's' : ''} allowed for ${gameName}.`;
+      } else {
+        delete next.players;
+      }
+      return next;
+    });
+  };
+
+  const onActivityPlayersBlur = () => {
+    const raw = values.activities?.players;
+    const currentGameId = values.activities?.game;
+    if (!raw) return;
+    const num = Number(raw);
+    const max = getActivityMaxPlayers(currentGameId);
+    const gameObj = (GAMES || []).find((g) => g.id === currentGameId);
+    const gameName = gameObj?.name || 'this game';
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (!/^\d+$/.test(String(raw).trim())) {
+        next.players = 'Enter a valid whole number of players.';
+      } else if (num < 1) {
+        next.players = 'At least 1 player.';
+      } else if (currentGameId && num > max) {
+        next.players = `Maximum ${max} player${max > 1 ? 's' : ''} allowed for ${gameName}.`;
+      } else {
+        delete next.players;
+      }
+      return next;
+    });
+  };
+
   function selectTab(id) {
     if (id === 'membership') {
       navigate(ROUTES.membership);
@@ -524,11 +637,39 @@ function useBookingForm(defaultTab, preselect) {
     }, 450);
   }
 
-  return { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit };
+  return {
+    tab,
+    selectTab,
+    onTabKey,
+    tabRefs,
+    v,
+    patch,
+    onHallGuestsChange,
+    onHallGuestsBlur,
+    onActivityGameChange,
+    onActivityPlayersChange,
+    onActivityPlayersBlur,
+    onActivityPlayersKeyDown,
+    errors,
+    busy,
+    submit,
+  };
 }
 
 /** The field row for the active service: one row on desktop, stacked on mobile. */
-function Fields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlur, busy }) {
+function Fields({
+  tab,
+  v,
+  errors,
+  patch,
+  onHallGuestsChange,
+  onHallGuestsBlur,
+  onActivityGameChange,
+  onActivityPlayersChange,
+  onActivityPlayersBlur,
+  onActivityPlayersKeyDown,
+  busy,
+}) {
   const active = TABS.find((t) => t.id === tab) || TABS[0];
 
   return (
@@ -593,13 +734,34 @@ function Fields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlur, b
       {tab === 'activities' && (
         <>
           <Field id="activities-game" label="Game" icon={GamepadIcon} error={errors.game}>
-            <SelectInput id="activities-game" error={errors.game} value={v.game || ''} onChange={(e) => patch({ game: e.target.value })} options={GAME_OPTIONS} placeholder="Choose a game…" />
+            <SelectInput
+              id="activities-game"
+              name="game"
+              error={errors.game}
+              value={v.game || ''}
+              onChange={(e) => onActivityGameChange(e.target.value)}
+              options={GAME_OPTIONS}
+              placeholder="Choose a game…"
+            />
           </Field>
           <Field id="activities-date" label="Date" icon={CalendarIcon} error={errors.date}>
             <DateInput id="activities-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
           </Field>
           <Field id="activities-players" label="Players" icon={UsersIcon} error={errors.players}>
-            <TextInput id="activities-players" error={errors.players} type="number" min="1" placeholder="e.g. 4" value={v.players || ''} onChange={(e) => patch({ players: e.target.value })} />
+            <TextInput
+              id="activities-players"
+              name="players"
+              error={errors.players}
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max={v.game ? getActivityMaxPlayers(v.game) : undefined}
+              placeholder={v.game ? `Max ${getActivityMaxPlayers(v.game)}` : 'e.g. 4'}
+              value={v.players || ''}
+              onKeyDown={onActivityPlayersKeyDown}
+              onChange={(e) => onActivityPlayersChange(e.target.value)}
+              onBlur={onActivityPlayersBlur}
+            />
           </Field>
         </>
       )}
@@ -746,7 +908,20 @@ function CardTabs({ tab, onTabKey, tabRefs, selectTab }) {
   );
 }
 
-function CardFields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlur, busy, compact = false }) {
+function CardFields({
+  tab,
+  v,
+  errors,
+  patch,
+  onHallGuestsChange,
+  onHallGuestsBlur,
+  onActivityGameChange,
+  onActivityPlayersChange,
+  onActivityPlayersBlur,
+  onActivityPlayersKeyDown,
+  busy,
+  compact = false,
+}) {
   const active = TABS.find((t) => t.id === tab) || TABS[0];
 
   return (
@@ -820,14 +995,38 @@ function CardFields({ tab, v, errors, patch, onHallGuestsChange, onHallGuestsBlu
       {tab === 'activities' && (
         <>
           <CardField id="card-activities-game" label="Game" icon={GamepadIcon} error={errors.game}>
-            <SelectInput inputClass="booking-field" nativeArrow id="card-activities-game" error={errors.game} value={v.game || ''} onChange={(e) => patch({ game: e.target.value })} options={GAME_OPTIONS} placeholder="Choose a game…" />
+            <SelectInput
+              inputClass="booking-field"
+              nativeArrow
+              id="card-activities-game"
+              name="game"
+              error={errors.game}
+              value={v.game || ''}
+              onChange={(e) => onActivityGameChange(e.target.value)}
+              options={GAME_OPTIONS}
+              placeholder="Choose a game…"
+            />
           </CardField>
           <div className={compact ? "grid grid-cols-2 gap-[10px]" : "grid grid-cols-2 gap-3"}>
             <CardField id="card-activities-date" label="Date" icon={CalendarIcon} error={errors.date}>
               <DateInput inputClass="booking-field" id="card-activities-date" error={errors.date} value={v.date} onChange={(val) => patch({ date: val })} />
             </CardField>
             <CardField id="card-activities-players" label="Players" icon={UsersIcon} error={errors.players}>
-              <TextInput inputClass="booking-field" id="card-activities-players" error={errors.players} type="number" min="1" placeholder="e.g. 4" value={v.players || ''} onChange={(e) => patch({ players: e.target.value })} />
+              <TextInput
+                inputClass="booking-field"
+                id="card-activities-players"
+                name="players"
+                error={errors.players}
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max={v.game ? getActivityMaxPlayers(v.game) : undefined}
+                placeholder={v.game ? `Max ${getActivityMaxPlayers(v.game)}` : 'e.g. 4'}
+                value={v.players || ''}
+                onKeyDown={onActivityPlayersKeyDown}
+                onChange={(e) => onActivityPlayersChange(e.target.value)}
+                onBlur={onActivityPlayersBlur}
+              />
             </CardField>
           </div>
         </>
@@ -856,7 +1055,23 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
   const activeTab = service || defaultTab;
   const isServiceMode = Boolean(service);
   const isCompact = compact || isServiceMode;
-  const { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit } = useBookingForm(activeTab, Boolean(service || preselect));
+  const {
+    tab,
+    selectTab,
+    onTabKey,
+    tabRefs,
+    v,
+    patch,
+    onHallGuestsChange,
+    onHallGuestsBlur,
+    onActivityGameChange,
+    onActivityPlayersChange,
+    onActivityPlayersBlur,
+    onActivityPlayersKeyDown,
+    errors,
+    busy,
+    submit,
+  } = useBookingForm(activeTab, Boolean(service || preselect));
   const currentTab = service || tab;
   const phoneHref = SITE_INFO.phone ? `tel:${SITE_INFO.phone.replace(/\s/g, '')}` : null;
   const title = (service && SERVICE_HEADERS[service]) || 'Plan your visit';
@@ -884,6 +1099,10 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
             patch={patch}
             onHallGuestsChange={onHallGuestsChange}
             onHallGuestsBlur={onHallGuestsBlur}
+            onActivityGameChange={onActivityGameChange}
+            onActivityPlayersChange={onActivityPlayersChange}
+            onActivityPlayersBlur={onActivityPlayersBlur}
+            onActivityPlayersKeyDown={onActivityPlayersKeyDown}
             busy={busy}
             compact={isCompact}
           />
@@ -904,7 +1123,23 @@ export function BookingCard({ defaultTab = 'stay', preselect = false, className,
  * last tab is restored.
  */
 export function BookingBar({ defaultTab = 'stay', preselect = false, className }) {
-  const { tab, selectTab, onTabKey, tabRefs, v, patch, onHallGuestsChange, onHallGuestsBlur, errors, busy, submit } = useBookingForm(defaultTab, preselect);
+  const {
+    tab,
+    selectTab,
+    onTabKey,
+    tabRefs,
+    v,
+    patch,
+    onHallGuestsChange,
+    onHallGuestsBlur,
+    onActivityGameChange,
+    onActivityPlayersChange,
+    onActivityPlayersBlur,
+    onActivityPlayersKeyDown,
+    errors,
+    busy,
+    submit,
+  } = useBookingForm(defaultTab, preselect);
 
   return (
     <section
@@ -927,6 +1162,10 @@ export function BookingBar({ defaultTab = 'stay', preselect = false, className }
             patch={patch}
             onHallGuestsChange={onHallGuestsChange}
             onHallGuestsBlur={onHallGuestsBlur}
+            onActivityGameChange={onActivityGameChange}
+            onActivityPlayersChange={onActivityPlayersChange}
+            onActivityPlayersBlur={onActivityPlayersBlur}
+            onActivityPlayersKeyDown={onActivityPlayersKeyDown}
             busy={busy}
           />
         </form>
