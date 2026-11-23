@@ -131,7 +131,28 @@ BEGIN
 
   v_available := v_room.rooms_total - v_booked_rooms;
   IF v_available < p_rooms THEN
-    RAISE EXCEPTION 'Insufficient room availability for the requested dates (% available, % requested)', v_available, p_rooms;
+    DECLARE
+      v_user_conflict TEXT;
+    BEGIN
+      SELECT sb.booking_ref INTO v_user_conflict
+      FROM public.stay_bookings sb
+      WHERE sb.room_type_id = v_room.id
+        AND sb.check_in < p_check_out
+        AND sb.check_out > p_check_in
+        AND (
+          sb.status = 'confirmed'
+          OR (sb.status = 'pending' AND sb.hold_expires_at > NOW())
+        )
+        AND (sb.user_id = v_uid OR (p_guest_mobile <> '' AND sb.guest_mobile = p_guest_mobile))
+      ORDER BY sb.created_at DESC
+      LIMIT 1;
+
+      IF v_user_conflict IS NOT NULL THEN
+        RAISE EXCEPTION 'ROOM_ALREADY_BOOKED_BY_YOU:%', v_user_conflict;
+      ELSE
+        RAISE EXCEPTION 'ROOM_ALREADY_BOOKED: Insufficient room availability for the requested dates (% available, % requested)', v_available, p_rooms;
+      END IF;
+    END;
   END IF;
 
   -- 6. Recalculate price on the server
@@ -251,5 +272,67 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_stay_booking(
   INTEGER, DATE, DATE, INTEGER, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, TEXT, INTEGER, TEXT, UUID
 ) TO authenticated, anon;
+
+-- 4. Recreate get_available_rooms to ensure cancelled bookings are excluded
+CREATE OR REPLACE FUNCTION public.get_available_rooms(
+  p_check_in DATE,
+  p_check_out DATE
+)
+RETURNS TABLE (
+  id TEXT,
+  area_id TEXT,
+  category TEXT,
+  name TEXT,
+  description TEXT,
+  bed_type TEXT,
+  view TEXT,
+  size_sqft INTEGER,
+  max_guests INTEGER,
+  rooms_total INTEGER,
+  price_per_night INTEGER,
+  amenities TEXT[],
+  active BOOLEAN,
+  available INTEGER
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    rt.id,
+    rt.area_id,
+    rt.category,
+    rt.name,
+    rt.description,
+    rt.bed_type,
+    rt.view,
+    rt.size_sqft,
+    rt.max_guests,
+    rt.rooms_total,
+    rt.price_per_night,
+    rt.amenities,
+    rt.active,
+    GREATEST(0, rt.rooms_total - COALESCE(
+      (
+        SELECT SUM(sb.rooms)::INTEGER
+        FROM public.stay_bookings sb
+        WHERE sb.room_type_id = rt.id
+          AND sb.check_in < p_check_out
+          AND sb.check_out > p_check_in
+          AND (
+            sb.status = 'confirmed'
+            OR (sb.status = 'pending' AND sb.hold_expires_at > NOW())
+          )
+      ), 0)
+    ) AS available
+  FROM public.room_types rt
+  WHERE rt.active = true
+  ORDER BY rt.price_per_night ASC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_available_rooms(DATE, DATE) TO authenticated, anon;
 
 NOTIFY pgrst, 'reload schema';

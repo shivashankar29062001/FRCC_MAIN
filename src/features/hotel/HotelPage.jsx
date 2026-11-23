@@ -18,7 +18,8 @@ import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
 import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE, INDIAN_MOBILE_PLACEHOLDER, sanitizeMobileInput } from '../../utils/mobile.js';
 import { isValidName, sanitizeNameInput, normalizeName, nameError } from '../../utils/fullName.js';
-import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes } from '../../api/stay.js';
+import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes, getMyStayBookings } from '../../api/stay.js';
+import { cancelBooking, CANCELLATION_CHANGED_EVENT, isBookingCancelledLocally } from '../../services/cancellationService.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
 import { QRCodeSVG } from 'qrcode.react';
@@ -285,6 +286,23 @@ export function HotelPage() {
   // Live Availability for Step 3
   const [availabilityRooms, setAvailabilityRooms] = useState([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityRev, setAvailabilityRev] = useState(0);
+
+  useEffect(() => {
+    function handleCancellationEvent() {
+      setAvailabilityRev((prev) => prev + 1);
+      setBookingConflict(null);
+      setSubmitError('');
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener(CANCELLATION_CHANGED_EVENT, handleCancellationEvent);
+      window.addEventListener('storage', handleCancellationEvent);
+      return () => {
+        window.removeEventListener(CANCELLATION_CHANGED_EVENT, handleCancellationEvent);
+        window.removeEventListener('storage', handleCancellationEvent);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (draft.checkin && draft.checkout) {
@@ -302,7 +320,7 @@ export function HotelPage() {
           setAvailabilityLoading(false);
         });
     }
-  }, [draft.checkin, draft.checkout]);
+  }, [draft.checkin, draft.checkout, availabilityRev]);
 
   const displayRooms = useMemo(() => {
     const raw = availabilityRooms.length > 0 ? availabilityRooms : roomTypes;
@@ -354,6 +372,45 @@ export function HotelPage() {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [bookingConflict, setBookingConflict] = useState(null);
+  const [cancellingExisting, setCancellingExisting] = useState(false);
+
+  async function handleCancelExistingBooking() {
+    if (cancellingExisting) return;
+    setCancellingExisting(true);
+    try {
+      let ref = bookingConflict?.bookingRef;
+      if (!ref) {
+        const myBookings = await getMyStayBookings(user?.id);
+        const match = myBookings.find(
+          (b) =>
+            (b.room_type_id === draft.selectedRoomId || b.roomId === draft.selectedRoomId) &&
+            b.check_in < draft.checkout &&
+            b.check_out > draft.checkin &&
+            b.status !== 'cancelled' &&
+            !isBookingCancelledLocally(b.id || b.booking_ref)
+        );
+        ref = match?.booking_ref || match?.bookingRef || match?.id;
+      }
+      if (!ref) {
+        throw new Error('Existing booking reference not found.');
+      }
+      await cancelBooking({
+        bookingType: 'stay',
+        bookingId: ref,
+        bookingRef: ref,
+      });
+      setBookingConflict(null);
+      setSubmitError('');
+      pushToast('Booking cancelled successfully! The room is now available.');
+      setAvailabilityRev((prev) => prev + 1);
+    } catch (err) {
+      console.error('Failed to cancel existing booking:', err);
+      pushToast(err?.message || 'Failed to cancel booking. Please try from My Bookings.');
+    } finally {
+      setCancellingExisting(false);
+    }
+  }
 
   // Active membership verification from database
   const [hasDbMembership, setHasDbMembership] = useState(false);
@@ -577,13 +634,47 @@ export function HotelPage() {
         created = await createStayReservation(bookingPayload);
       } catch (err) {
         submittedRef.current = false;
-        const errMsg = (err?.message || '').toLowerCase();
-        if (errMsg.includes('availability') || errMsg.includes('insufficient') || errMsg.includes('unavailable') || errMsg.includes('sold out')) {
-          setSubmitError('The selected room is no longer available for your chosen dates. Please choose another room.');
-          setStep(2);
-          pushToast('Room became unavailable. Please choose another room.');
+        setPaying(false);
+        const rawMsg = err?.message || '';
+        const lowerMsg = rawMsg.toLowerCase();
+        const isConflict =
+          err?.code === 'ROOM_ALREADY_BOOKED_BY_YOU' ||
+          err?.code === 'ROOM_ALREADY_BOOKED' ||
+          err?.isOwnBooking !== undefined ||
+          lowerMsg.includes('already booked') ||
+          lowerMsg.includes('availability') ||
+          lowerMsg.includes('insufficient') ||
+          lowerMsg.includes('unavailable') ||
+          lowerMsg.includes('sold out');
+
+        if (isConflict) {
+          const isOwn = Boolean(
+            err.isOwnBooking ||
+            err.code === 'ROOM_ALREADY_BOOKED_BY_YOU' ||
+            rawMsg.includes('ROOM_ALREADY_BOOKED_BY_YOU') ||
+            rawMsg.includes('If this is your existing booking')
+          );
+
+          let conflictRef = err.existingBookingRef || null;
+          if (!conflictRef) {
+            const match = rawMsg.match(/FRCC-S-[0-9-]+/);
+            if (match) conflictRef = match[0];
+          }
+
+          const conflictObj = {
+            isOwnBooking: isOwn,
+            bookingRef: conflictRef,
+            message: isOwn
+              ? 'This room is already booked for these dates. If this is your existing booking, you can cancel it below to free up the room.'
+              : 'This room is already booked for these dates. Please choose another room or different dates.',
+          };
+
+          setBookingConflict(conflictObj);
+          setSubmitError(conflictObj.message);
+          pushToast(conflictObj.message);
           return;
         }
+
         setSubmitError(err?.message || 'Failed to complete booking. Please try again.');
         pushToast(err?.message || 'Booking submission failed.');
         return;
@@ -1142,7 +1233,25 @@ export function HotelPage() {
             {/* Availability / Submission Error Banner */}
             {submitError && (
               <div role="alert" className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-800">
-                ⚠️ {submitError}
+                <p className="font-semibold text-rose-900">⚠️ {submitError}</p>
+                {bookingConflict?.isOwnBooking && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={cancellingExisting}
+                      onClick={handleCancelExistingBooking}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {cancellingExisting ? 'Cancelling…' : `Cancel Booking ${bookingConflict.bookingRef ? `(${bookingConflict.bookingRef})` : ''} to Free Up Room`}
+                    </button>
+                    <Link
+                      to="/profile?tab=bookings"
+                      className="text-[11px] font-semibold text-rose-800 underline hover:text-rose-950 inline-flex items-center gap-1"
+                    >
+                      View in My Bookings →
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1550,11 +1659,35 @@ export function HotelPage() {
                 </span>
               </label>
 
-              {/* Error banner if submission fails */}
+              {/* Error banner if submission fails or room conflict */}
               {submitError && (
                 <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-4 text-sm text-rose-800">
-                  <p className="font-semibold">Booking Error</p>
-                  <p className="text-xs text-rose-700 mt-0.5">{submitError}</p>
+                  <div className="flex items-start gap-3">
+                    <span className="text-rose-600 text-lg leading-none mt-0.5">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-rose-900">Room Unavailable</p>
+                      <p className="text-xs text-rose-700 mt-1 leading-relaxed">{submitError}</p>
+
+                      {bookingConflict?.isOwnBooking && (
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={cancellingExisting}
+                            onClick={handleCancelExistingBooking}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm transition disabled:opacity-50 cursor-pointer"
+                          >
+                            {cancellingExisting ? 'Cancelling…' : `Cancel Booking ${bookingConflict.bookingRef ? `(${bookingConflict.bookingRef})` : ''} to Free Up Room`}
+                          </button>
+                          <Link
+                            to="/profile?tab=bookings"
+                            className="text-xs font-semibold text-rose-800 underline hover:text-rose-950 inline-flex items-center gap-1"
+                          >
+                            View in My Bookings →
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
