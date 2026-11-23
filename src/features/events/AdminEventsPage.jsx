@@ -282,6 +282,7 @@ export function AdminEventsPage() {
                 </label>
                 <input
                   id="evt-title"
+                  name="title"
                   type="text"
                   required
                   placeholder="e.g. Short Film Screening Night"
@@ -298,6 +299,7 @@ export function AdminEventsPage() {
                 </label>
                 <select
                   id="evt-category"
+                  name="category"
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm bg-white focus:border-navy-900 focus:outline-none"
@@ -316,6 +318,7 @@ export function AdminEventsPage() {
                 </label>
                 <input
                   id="evt-date"
+                  name="dateDMY"
                   type="text"
                   required
                   placeholder="DD/MM/YYYY (e.g. 15/11/2026)"
@@ -332,6 +335,7 @@ export function AdminEventsPage() {
                 </label>
                 <input
                   id="evt-start"
+                  name="start_time"
                   type="time"
                   value={formData.start_time}
                   onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
@@ -346,6 +350,7 @@ export function AdminEventsPage() {
                 </label>
                 <input
                   id="evt-end"
+                  name="end_time"
                   type="time"
                   value={formData.end_time}
                   onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
@@ -360,6 +365,7 @@ export function AdminEventsPage() {
                 </label>
                 <input
                   id="evt-venue"
+                  name="venue"
                   type="text"
                   placeholder="e.g. FRCC Main Auditorium"
                   value={formData.venue}
@@ -376,6 +382,7 @@ export function AdminEventsPage() {
                 <div className="space-y-2">
                   <input
                     id="evt-img-url"
+                    name="image_url"
                     type="url"
                     placeholder="https://..."
                     value={formData.image_url}
@@ -386,6 +393,8 @@ export function AdminEventsPage() {
                     <label className="cursor-pointer rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
                       <span>{uploadingImage ? 'Uploading…' : 'Upload image file'}</span>
                       <input
+                        id="evt-img-file"
+                        name="image_file"
                         type="file"
                         accept="image/*"
                         disabled={uploadingImage}
@@ -409,6 +418,7 @@ export function AdminEventsPage() {
                 </label>
                 <textarea
                   id="evt-desc"
+                  name="description"
                   rows={3}
                   placeholder="Detailed synopsis or schedule of the event…"
                   value={formData.description}
@@ -421,6 +431,8 @@ export function AdminEventsPage() {
               <div className="sm:col-span-2 flex flex-wrap items-center gap-6 pt-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                   <input
+                    id="evt-featured"
+                    name="featured"
                     type="checkbox"
                     checked={formData.featured}
                     onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
@@ -431,6 +443,8 @@ export function AdminEventsPage() {
 
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
                   <input
+                    id="evt-active"
+                    name="active"
                     type="checkbox"
                     checked={formData.active}
                     onChange={(e) => setFormData({ ...formData, active: e.target.checked })}

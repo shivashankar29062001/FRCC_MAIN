@@ -126,13 +126,15 @@ export default function ConventionDetails() {
         <Stepper current={2} />
         <h1 className="text-3xl mb-6">Step 3: Event Details</h1>
         <div className="space-y-4">
-          <label className="block">Event Type
-            <select className={inputClass} value={booking.eventType} onChange={e => updateBooking({ eventType: e.target.value })}>
+          <label htmlFor="hall-event-type" className="block">Event Type
+            <select id="hall-event-type" name="eventType" className={inputClass} value={booking.eventType} onChange={e => updateBooking({ eventType: e.target.value })}>
               <option value="">Select event type</option>
               {EVENT_TYPES.map(t => <option key={t}>{t}</option>)}
             </select></label>
-          <label className="block">Guest Count {hall && <span className="text-gray-500 text-sm">(min 30, up to this hall's max of {hall.capacity.toLocaleString('en-IN')})</span>}
+          <label htmlFor="hall-guests" className="block">Guest Count {hall && <span className="text-gray-500 text-sm">(min 30, up to this hall's max of {hall.capacity.toLocaleString('en-IN')})</span>}
             <input
+              id="hall-guests"
+              name="guests"
               type="number"
               min={HALL_MIN_GUESTS}
               max={HALL_MAX_GUESTS}
@@ -153,11 +155,13 @@ export default function ConventionDetails() {
               }}
             /></label>
           <p className="text-sm text-gray-600">Food: ₹1,500 – ₹3,000 per plate</p>
-          <label className="block">Organizer Name
-            <input className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: sanitizeNameInput(e.target.value) })} onBlur={e => updateBooking({ organizerName: normalizeName(e.target.value) })} /></label>
+          <label htmlFor="hall-organizer-name" className="block">Organizer Name
+            <input id="hall-organizer-name" name="organizerName" autoComplete="name" className={inputClass} value={booking.organizerName} onChange={e => updateBooking({ organizerName: sanitizeNameInput(e.target.value) })} onBlur={e => updateBooking({ organizerName: normalizeName(e.target.value) })} /></label>
           <div className="grid sm:grid-cols-2 gap-4">
-            <label className="block">Phone
+            <label htmlFor="hall-phone" className="block">Phone
               <input
+                id="hall-phone"
+                name="phone"
                 className={inputClass}
                 value={booking.phone || ''}
                 onChange={e => {
@@ -177,15 +181,15 @@ export default function ConventionDetails() {
                 autoComplete="tel-national"
               />
             </label>
-            <label className="block">Email
-              <input className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
+            <label htmlFor="hall-email" className="block">Email
+              <input id="hall-email" name="email" type="email" autoComplete="email" className={inputClass} value={booking.email} onChange={e => updateBooking({ email: e.target.value })} /></label>
           </div>
-          <label className="block">Event Details
-            <input className={inputClass} value={booking.eventDetails} onChange={e => updateBooking({ eventDetails: e.target.value })} placeholder="e.g. Annual general meet" /></label>
-          <label className="block">Special Requests
-            <textarea className={inputClass} rows={3} value={booking.specialRequests} onChange={e => updateBooking({ specialRequests: e.target.value })} /></label>
+          <label htmlFor="hall-event-details" className="block">Event Details
+            <input id="hall-event-details" name="eventDetails" className={inputClass} value={booking.eventDetails} onChange={e => updateBooking({ eventDetails: e.target.value })} placeholder="e.g. Annual general meet" /></label>
+          <label htmlFor="hall-special-requests" className="block">Special Requests
+            <textarea id="hall-special-requests" name="specialRequests" className={inputClass} rows={3} value={booking.specialRequests} onChange={e => updateBooking({ specialRequests: e.target.value })} /></label>
           <label className="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" className="mt-1" checked={booking.notifyUpdates !== false}
+            <input id="hall-notify-updates" name="notifyUpdates" type="checkbox" className="mt-1" checked={booking.notifyUpdates !== false}
               onChange={e => updateBooking({ notifyUpdates: e.target.checked })} />
             <span>Send my booking updates by SMS, WhatsApp and email.</span>
           </label>

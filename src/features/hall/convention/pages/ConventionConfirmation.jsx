@@ -164,6 +164,10 @@ export default function ConventionConfirmation() {
     const labelColor = '#0F1F3D';
     const valueColor = '#0F1F3D';
 
+    // jsPDF's built-in Times font has no ₹ glyph, so it was rendered as a stray
+    // leading "1" before every amount. Format the digits only for the PDF.
+    const inrPdf = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
     const rows = [
       ['Booking Reference', booking.id],
       ['Hall & Type', booking.hallName || 'Convention Hall'],
@@ -180,12 +184,12 @@ export default function ConventionConfirmation() {
       ['Payment ID', paymentId],
       ['Payment Status', booking.paymentStatus || '—'],
       ['Payment Date & Time', paidAtText],
-      ['Hall Charge', inr(booking.hallCharge)],
-      ['GST (18%)', inr(booking.gst)],
-      ...(Number(booking.convenienceFee) > 0 ? [['Convenience Fee', inr(booking.convenienceFee)]] : []),
-      ['Amount Paid', inr(booking.amountPaid ?? booking.amount)],
-      ...(Number(booking.balanceDue) > 0 ? [['Balance Due', inr(booking.balanceDue)]] : []),
-      ['Booking Status', booking.status],
+      ['Hall Charge', inrPdf(booking.hallCharge)],
+      ['GST (18%)', inrPdf(booking.gst)],
+      ...(Number(booking.convenienceFee) > 0 ? [['Convenience Fee', inrPdf(booking.convenienceFee)]] : []),
+      ['Amount Paid', inrPdf(booking.amountPaid ?? booking.amount)],
+      ...(Number(booking.balanceDue) > 0 ? [['Balance Due', inrPdf(booking.balanceDue)]] : []),
+      ['Booking Status', String(booking.status || '').toUpperCase() === 'CONFIRMED' ? 'CONFIRMED' : booking.status],
     ];
 
     let y = 96;
@@ -250,44 +254,153 @@ export default function ConventionConfirmation() {
         {cancelMsg && <p className="text-green-700 text-sm mb-3">{cancelMsg}</p>}
         {cancelNotice && <p className="text-green-700 text-sm mb-3">Cancellation notice sent.</p>}
         {cancelErr && <p className="text-red-600 text-sm mb-3">{cancelErr}</p>}
-        <dl className="grid sm:grid-cols-2 gap-y-2 gap-x-6 text-sm">
-          <dt className="font-semibold">Booking ID</dt><dd>{booking.id}</dd>
-          <dt className="font-semibold">Venue</dt><dd>{booking.venueName || '—'}</dd>
-          <dt className="font-semibold">City</dt><dd>{booking.cityName || booking.cityId || '—'}</dd>
-          <dt className="font-semibold">Area</dt><dd>{booking.areaName || booking.areaId || '—'}</dd>
-          <dt className="font-semibold">Hall</dt><dd className="font-bold text-navy">{booking.hallName}</dd>
-          <dt className="font-semibold">Date</dt><dd>{booking.date}</dd>
-          <dt className="font-semibold">Time</dt><dd>{booking.startTime} – {booking.endTime}</dd>
-          <dt className="font-semibold">Event</dt><dd>{booking.eventType} ({booking.guests} guests)</dd>
-          {booking.eventDetails && <><dt className="font-semibold">Event Details</dt><dd>{booking.eventDetails}</dd></>}
-          {booking.specialRequests && <><dt className="font-semibold">Special Requests</dt><dd>{booking.specialRequests}</dd></>}
-          <dt className="font-semibold">Organizer</dt><dd>{booking.organizerName}</dd>
-          <dt className="font-semibold">Phone</dt><dd>{booking.phone || '—'}</dd>
-          <dt className="font-semibold">Email</dt><dd>{booking.email || '—'}</dd>
-          <dt className="font-semibold">Payment Method</dt><dd>{(booking.paymentMethod || 'UPI_ID').replaceAll('_', ' ')}</dd>
-          <dt className="font-semibold">Instrument</dt><dd>{booking.maskedInstrument || booking.upiIdMasked || '—'}</dd>
-          {booking.emiTenure && <><dt className="font-semibold">EMI</dt><dd>{booking.emiTenure} × ₹{booking.emiMonthlyAmount}</dd></>}
-          {booking.gstin && <><dt className="font-semibold">GSTIN</dt><dd>{booking.gstin}</dd></>}
-          {booking.utrNumber && <><dt className="font-semibold">UTR</dt><dd>{booking.utrNumber}</dd></>}
-          {Number(booking.hallCharge) > 0 && <><dt className="font-semibold">Hall Charge</dt><dd>{inr(booking.hallCharge)}</dd></>}
-          {Number(booking.gst) > 0 && <><dt className="font-semibold">GST (18%)</dt><dd>{inr(booking.gst)}</dd></>}
-          {Number(booking.convenienceFee) > 0 && <><dt className="font-semibold">Convenience Fee</dt><dd>{inr(booking.convenienceFee)}</dd></>}
-          <dt className="font-semibold">Amount</dt><dd>{inr(booking.amount)}</dd>
-          <dt className="font-semibold">Amount Paid</dt><dd>{inr(booking.amountPaid ?? booking.amount)}</dd>
-          {(booking.balanceDue ?? 0) > 0 && <><dt className="font-semibold">Due at venue</dt><dd className="text-amber-700 font-semibold">{inr(booking.balanceDue)}</dd></>}
-          <dt className="font-semibold">Payment Status</dt><dd>{booking.paymentStatus || '—'}</dd>
-          <dt className="font-semibold">Payment Date &amp; Time</dt><dd>{paidAtText}</dd>
-          <dt className="font-semibold">Transaction Ref</dt><dd>{booking.transactionRef || '—'}</dd>
-          {paymentId !== '—' && paymentId !== booking.transactionRef && <><dt className="font-semibold">Payment ID</dt><dd>{paymentId}</dd></>}
-          <dt className="font-semibold">Status</dt><dd className={booking.status === 'CANCELLED' ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{booking.status}</dd>
+        <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-1 text-sm">
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Booking ID</dt>
+            <dd className="font-mono text-stone-900">{booking.id}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Hall</dt>
+            <dd className="font-bold text-navy">{booking.hallName}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Venue</dt>
+            <dd className="text-stone-900">{booking.venueName || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">City</dt>
+            <dd className="text-stone-900">{booking.cityName || booking.cityId || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Area</dt>
+            <dd className="text-stone-900">{booking.areaName || booking.areaId || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Date</dt>
+            <dd className="text-stone-900">{booking.date}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Time</dt>
+            <dd className="text-stone-900">{booking.startTime} – {booking.endTime}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Event</dt>
+            <dd className="text-stone-900">{booking.eventType} ({booking.guests} guests)</dd>
+          </div>
+          {booking.eventDetails && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Event Details</dt>
+              <dd className="text-stone-900">{booking.eventDetails}</dd>
+            </div>
+          )}
+          {booking.specialRequests && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Special Requests</dt>
+              <dd className="text-stone-900">{booking.specialRequests}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Organizer</dt>
+            <dd className="text-stone-900">{booking.organizerName}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Phone</dt>
+            <dd className="text-stone-900">{booking.phone || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Email</dt>
+            <dd className="text-stone-900">{booking.email || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Payment Method</dt>
+            <dd className="text-stone-900">{(booking.paymentMethod || 'UPI_ID').replaceAll('_', ' ')}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Instrument</dt>
+            <dd className="text-stone-900">{booking.maskedInstrument || booking.upiIdMasked || '—'}</dd>
+          </div>
+          {booking.emiTenure && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">EMI</dt>
+              <dd className="text-stone-900">{booking.emiTenure} × ₹{booking.emiMonthlyAmount}</dd>
+            </div>
+          )}
+          {booking.gstin && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">GSTIN</dt>
+              <dd className="font-mono text-stone-900">{booking.gstin}</dd>
+            </div>
+          )}
+          {booking.utrNumber && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">UTR</dt>
+              <dd className="font-mono text-stone-900">{booking.utrNumber}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Payment Status</dt>
+            <dd className="text-stone-900">{booking.paymentStatus || '—'}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Payment Date &amp; Time</dt>
+            <dd className="text-stone-900">{paidAtText}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Transaction Ref</dt>
+            <dd className="font-mono text-stone-900">{booking.transactionRef || '—'}</dd>
+          </div>
+          {paymentId !== '—' && paymentId !== booking.transactionRef && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Payment ID</dt>
+              <dd className="font-mono text-stone-900">{paymentId}</dd>
+            </div>
+          )}
+          {Number(booking.hallCharge) > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Hall Charge</dt>
+              <dd className="text-stone-900">{inr(booking.hallCharge)}</dd>
+            </div>
+          )}
+          {Number(booking.gst) > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">GST (18%)</dt>
+              <dd className="text-stone-900">{inr(booking.gst)}</dd>
+            </div>
+          )}
+          {Number(booking.convenienceFee) > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Convenience Fee</dt>
+              <dd className="text-stone-900">{inr(booking.convenienceFee)}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Total Amount</dt>
+            <dd className="font-semibold text-stone-900">{inr(booking.amount)}</dd>
+          </div>
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Amount Paid</dt>
+            <dd className="font-semibold text-stone-900">{inr(booking.amountPaid ?? booking.amount)}</dd>
+          </div>
+          {(booking.balanceDue ?? 0) > 0 && (
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Due at venue</dt>
+              <dd className="text-amber-700 font-semibold">{inr(booking.balanceDue)}</dd>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+            <dt className="font-semibold text-stone-700">Booking Status</dt>
+            <dd className={booking.status === 'CANCELLED' ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>
+              {statusUpper === 'CONFIRMED' ? 'CONFIRMED' : booking.status}
+            </dd>
+          </div>
           {booking.status === 'CANCELLED' && (
-            <>
-              <dt className="font-semibold">Refund Status</dt>
+            <div className="flex items-center justify-between py-1.5 border-b border-stone-100 gap-3">
+              <dt className="font-semibold text-stone-700">Refund Status</dt>
               <dd className="text-amber-700 font-semibold">
                 {booking.refundStatus === 'PROCESSED' ? 'Refund processed' : booking.refundAmount > 0 ? 'Refund pending' : 'No refund due'}
                 {booking.refundAmount > 0 && ` (${inr(booking.refundAmount)})`}
               </dd>
-            </>
+            </div>
           )}
         </dl>
         {(statusUpper === 'PENDING_VERIFICATION' || booking.paymentStatus === 'PENDING_VERIFICATION') && statusUpper !== 'CANCELLED' && (

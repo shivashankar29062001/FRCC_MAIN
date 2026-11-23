@@ -129,6 +129,7 @@ export default function BookingForm({
                 <input
                   type="text"
                   id="city-select"
+                  name="city"
                   className="form-input read-only-input read-only-city-input"
                   value={effectiveCity}
                   readOnly
@@ -159,6 +160,7 @@ export default function BookingForm({
                 <div className="select-wrapper">
                   <select
                     id="vehicle-type-select"
+                    name="vehicleType"
                     className={`form-select ${errors.vehicleType ? 'input-error' : ''}`}
                     value={formData.vehicleType || ''}
                     onChange={(e) => handleInputChange('vehicleType', e.target.value)}
@@ -179,6 +181,7 @@ export default function BookingForm({
                 <input
                   type="text"
                   id="vehicle-number"
+                  name="vehicleNumber"
                   className={`form-input ${errors.vehicleNumber ? 'input-error' : ''}`}
                   placeholder="Enter vehicle number (e.g. AP39AB1234)"
                   value={formData.vehicleNumber || ''}
@@ -280,6 +283,7 @@ export default function BookingForm({
                   <input
                     type="date"
                     id="booking-date-input"
+                    name="date"
                     className={`form-input date-picker-field ${errors.date ? 'input-error' : ''}`}
                     value={formData.date || ''}
                     min={todayStr}
@@ -306,6 +310,7 @@ export default function BookingForm({
                   <input
                     type="date"
                     id="booking-end-date-input"
+                    name="endDate"
                     className={`form-input date-picker-field ${errors.endDate ? 'input-error' : ''}`}
                     value={formData.endDate || ''}
                     min={formData.date || todayStr}
@@ -333,6 +338,7 @@ export default function BookingForm({
                   <input
                     type="time"
                     id="booking-time-input"
+                    name="time"
                     className={`form-input ${errors.time ? 'input-error' : ''}`}
                     value={formData.time || ''}
                     min={formData.date === todayStr ? minTime : undefined}
@@ -359,6 +365,7 @@ export default function BookingForm({
                   <input
                     type="time"
                     id="booking-end-time-input"
+                    name="endTime"
                     className={`form-input ${errors.endTime ? 'input-error' : ''}`}
                     value={formData.endTime || ''}
                     min={formData.time || (formData.date === todayStr ? minTime : undefined)}
@@ -384,6 +391,7 @@ export default function BookingForm({
                 <div className="select-wrapper">
                   <select
                     id="days-select"
+                    name="days"
                     className={`form-select ${errors.days ? 'input-error' : ''}`}
                     value={formData.days || ''}
                     onChange={(e) => handleInputChange('days', e.target.value ? Number(e.target.value) : '')}

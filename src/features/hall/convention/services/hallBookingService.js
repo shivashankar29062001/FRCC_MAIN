@@ -301,8 +301,11 @@ export async function sendHallBookingConfirmation({ type = 'hall_confirmed', boo
   try {
     const { data, error } = await supabase.functions.invoke('send-booking-confirmation', {
       body: {
-        type,
+        booking_id: booking.id,
         bookingId: booking.id,
+        service_type: 'hall',
+        type,
+        event_type: type.includes('cancel') ? 'booking_cancelled' : 'booking_confirmed',
         booking,
         refund,
       },

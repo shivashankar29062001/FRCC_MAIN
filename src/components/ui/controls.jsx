@@ -35,12 +35,14 @@ export function LoadingButton({ loading = false, loadingLabel = 'Please wait…'
 
 export function Input({ label, id, error, hint, className, ...props }) {
   const inputId = id || props.name;
+  const inputName = props.name || id;
   const isDate = props.type === 'date';
   return (
     <div className={isDate ? "relative date-input-wrapper" : undefined}>
       {label && <label htmlFor={inputId} className="label">{label}</label>}
       <input
         id={inputId}
+        name={inputName}
         className={cx('field', isDate && 'date-picker-field cursor-pointer', className)}
         aria-invalid={!!error}
         aria-describedby={error ? `${inputId}-err` : undefined}
@@ -54,12 +56,14 @@ export function Input({ label, id, error, hint, className, ...props }) {
 
 export function Select({ label, id, error, options = [], placeholder = 'Select…', ...props }) {
   const selectId = id || props.name;
+  const selectName = props.name || id;
   return (
     <div>
       {label && <label htmlFor={selectId} className="label">{label}</label>}
       <div className="relative">
         <select
           id={selectId}
+          name={selectName}
           className="field appearance-none pr-10"
           aria-invalid={!!error}
           aria-describedby={error ? `${selectId}-err` : undefined}
@@ -76,12 +80,13 @@ export function Select({ label, id, error, options = [], placeholder = 'Select�
 }
 
 export function DatePicker({ label, id, error, ...props }) {
-  return <Input label={label} id={id} error={error} type="date" {...props} />;
+  return <Input label={label} id={id} name={props.name || id} error={error} type="date" {...props} />;
 }
 
 /** Password input with an accessible show/hide toggle. */
 export function PasswordInput({ label, id, error, hint, name, ...props }) {
   const inputId = id || name;
+  const inputName = name || id;
   const [visible, setVisible] = useState(false);
   return (
     <div>
@@ -89,7 +94,7 @@ export function PasswordInput({ label, id, error, hint, name, ...props }) {
       <div className="relative">
         <input
           id={inputId}
-          name={name}
+          name={inputName}
           type={visible ? 'text' : 'password'}
           className="field pr-12"
           aria-invalid={!!error}
@@ -115,12 +120,13 @@ export function PasswordInput({ label, id, error, hint, name, ...props }) {
 /** Search box with a leading icon (payments table, booking lists…). */
 export function SearchInput({ id, label, className, ...props }) {
   const inputId = id || props.name;
+  const inputName = props.name || id;
   return (
     <div className={className}>
       {label && <label htmlFor={inputId} className="label">{label}</label>}
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input id={inputId} type="search" className="field pl-9" {...props} />
+        <input id={inputId} name={inputName} type="search" className="field pl-9" {...props} />
       </div>
     </div>
   );
@@ -128,10 +134,11 @@ export function SearchInput({ id, label, className, ...props }) {
 
 export function TextArea({ label, id, error, ...props }) {
   const tid = id || props.name;
+  const tname = props.name || id;
   return (
     <div>
       {label && <label htmlFor={tid} className="label">{label}</label>}
-      <textarea id={tid} className="field min-h-[110px]" aria-invalid={!!error} {...props} />
+      <textarea id={tid} name={tname} className="field min-h-[110px]" aria-invalid={!!error} {...props} />
       {error && <p role="alert" className="field-error">{error}</p>}
     </div>
   );

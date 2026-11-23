@@ -386,8 +386,10 @@ export default function ConventionPayment() {
                           } ${disabledMin ? 'opacity-40 cursor-not-allowed' : ''}`}
                         >
                           <input 
+                            id={`hall-pay-method-${m.id}`}
                             type="radio" 
-                            name="method" 
+                            name="method"
+                            value={m.id}
                             className="mr-2 h-4 w-4 text-gold border-gray-300 focus:ring-gold"
                             checked={isSelected} 
                             disabled={disabledMin}
@@ -427,7 +429,7 @@ export default function ConventionPayment() {
             )}
             <div className="mt-5 flex items-center justify-between flex-wrap gap-3">
               <label className="flex items-center gap-2 text-xs text-gray-500">
-                <input type="checkbox" checked={forceFail} onChange={e => { setForceFail(e.target.checked); pay.setForceFailure(e.target.checked); }} />
+                <input id="hall-pay-force-fail" name="forceFail" type="checkbox" checked={forceFail} onChange={e => { setForceFail(e.target.checked); pay.setForceFailure(e.target.checked); }} />
                 Force next payment to fail (testing)
               </label>
               <div className="flex gap-3">
@@ -500,7 +502,7 @@ export default function ConventionPayment() {
             <h3 className="text-xl mb-2">3D Secure / OTP Verification</h3>
             <p className="text-sm text-gray-600 mb-1">Enter the 6-digit OTP sent to your registered mobile.</p>
             <p className="text-xs text-amber-600 mb-3">Test mode OTP: <strong>{TEST_OTP}</strong> (attempt {otp.attempts + 1}/3)</p>
-            <input name="otp" inputMode="numeric" maxLength={6} className="border rounded p-2 w-full mb-3" placeholder="••••••" />
+            <input id="hall-pay-otp" name="otp" inputMode="numeric" maxLength={6} className="border rounded p-2 w-full mb-3" placeholder="••••••" />
             {otp.attempts > 0 && <p className="text-red-600 text-sm mb-3">Incorrect OTP. Try again.</p>}
             <div className="flex justify-between items-center">
               <button type="button" disabled={otp.resendIn > 0}

@@ -541,6 +541,7 @@ export function LocationPanel() {
               <div className="relative">
                 <input
                   id="origin-input"
+                  name="origin"
                   ref={inputRef}
                   type="text"
                   value={startPoint}

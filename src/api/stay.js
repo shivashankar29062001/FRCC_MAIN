@@ -163,6 +163,7 @@ export async function getAvailability(checkIn, checkOut) {
   if (isMock) {
     const allBookings = getMockBookings();
     return LOCAL_ROOMS.map((r) => {
+<<<<<<< HEAD
       const bookedRooms = allBookings
         .filter((b) => {
           if (b.room_type_id !== r.id) return false;
@@ -174,6 +175,14 @@ export async function getAvailability(checkIn, checkOut) {
           }
           return true;
         })
+=======
+      const bookedRooms = mockStayBookings
+        .filter((b) => (
+          b.room_type_id === r.id ||
+          b.room_type_id === r.id.replace('vja-', '') ||
+          `vja-${b.room_type_id}` === r.id
+        ) && b.check_in < checkOut && b.check_out > checkIn && b.status !== 'cancelled')
+>>>>>>> eb2e74ea3d58db10f578c98699eece993639cb2f
         .reduce((sum, b) => sum + (b.rooms || 1), 0);
 
       const available = Math.max(0, (r.roomsTotal || 1) - bookedRooms);
@@ -207,6 +216,39 @@ export async function getAvailability(checkIn, checkOut) {
     }
   } catch (err) {
     console.warn('Error invoking get_available_rooms RPC, using fallback:', err);
+  }
+
+  // Fallback: query stay_bookings directly if possible, else return room types
+  try {
+    const types = await getRoomTypes();
+    const { data: bookings } = await supabase
+      .from('stay_bookings')
+      .select('room_type_id, rooms, status, hold_expires_at, check_in, check_out')
+      .lt('check_in', checkOut)
+      .gt('check_out', checkIn);
+
+    if (bookings) {
+      const now = new Date();
+      const activeBookings = bookings.filter((b) =>
+        b.status === 'confirmed' || (b.status === 'pending' && (!b.hold_expires_at || new Date(b.hold_expires_at) > now))
+      );
+
+      return deduplicateRoomTypes(types).map((r) => {
+        const booked = activeBookings
+          .filter((b) =>
+            b.room_type_id === r.id ||
+            b.room_type_id === r.id.replace('vja-', '') ||
+            `vja-${b.room_type_id}` === r.id
+          )
+          .reduce((sum, b) => sum + (Number(b.rooms) || 1), 0);
+        return {
+          ...r,
+          available: Math.max(0, (r.rooms_total || r.roomsTotal || 0) - booked),
+        };
+      });
+    }
+  } catch (fallbackErr) {
+    console.warn('Fallback availability query failed:', fallbackErr);
   }
 
   // Fallback if RPC or database is unavailable

@@ -434,10 +434,12 @@ export function ActivitiesProcessPage() {
       const partyTotal = hasAdultsChildrenFields
         ? Number(draft.extras.adults || 0) + Number(draft.extras.children || 0)
         : null;
+      const rawPlayers = String(draft.players ?? '').trim();
+      const isPlayersNumeric = /^\d+$/.test(rawPlayers);
       const playersOk = game?.id === 'luxury-gym'
         || (hasAdultsChildrenFields
           ? partyTotal >= 1 && partyTotal <= maxAllowed
-          : Boolean(draft.players) && Number.isFinite(n) && n >= 1 && n <= maxAllowed);
+          : isPlayersNumeric && Number.isInteger(n) && n >= 1 && n <= maxAllowed);
       if (!nameOk || !mobileOk || !playersOk) return false;
       if (g?.extraFields) {
         for (const f of g.extraFields) {
@@ -498,12 +500,17 @@ export function ActivitiesProcessPage() {
       const selectedSlot = slots.find((s) => s.time === draft.slot);
       const maxAllowed = getMaxPlayersForSlot(g, selectedSlot);
 
-      if (g?.id !== 'luxury-gym' && (!draft.players || !Number.isFinite(n) || n < 1)) {
-        next.players = 'Enter how many are playing.';
-      } else if (g?.id !== 'luxury-gym' && n > maxAllowed) {
-        next.players = isGroupActivity(g?.id) && selectedSlot && selectedSlot.remaining !== undefined
-          ? `Only ${selectedSlot.remaining} spot${selectedSlot.remaining > 1 ? 's' : ''} available for this slot.`
-          : `Max ${g?.maxPlayers} for ${g?.name}.`;
+      if (g?.id !== 'luxury-gym') {
+        const rawPlayers = String(draft.players ?? '').trim();
+        if (!rawPlayers || !/^\d+$/.test(rawPlayers)) {
+          next.players = 'Please enter a valid numeric player count.';
+        } else if (!Number.isInteger(n) || n < 1) {
+          next.players = 'Player count must be at least 1.';
+        } else if (n > maxAllowed) {
+          next.players = isGroupActivity(g?.id) && selectedSlot && selectedSlot.remaining !== undefined
+            ? `Only ${selectedSlot.remaining} spot${selectedSlot.remaining > 1 ? 's' : ''} available for this slot.`
+            : `Max ${maxAllowed} for ${g?.name || 'this game'}.`;
+        }
       }
       if (g) {
         for (const f of g.extraFields) {
@@ -685,6 +692,15 @@ export function ActivitiesProcessPage() {
       } catch (_) {}
 
       setConfirmed(confirmedRecord);
+      try {
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            booking_id: confirmedRecord.bookingId,
+            service_type: 'activity',
+            event_type: 'booking_confirmed',
+          },
+        }).catch(() => {});
+      } catch (_) {}
       slotsQuery.retry();
       setStep(5);
       pushToast(isFreeGame ? 'Complimentary booking confirmed.' : draft.paymentMethod === 'pay_at_venue' ? 'Slot reserved — pay at the venue.' : 'Booking confirmed.');
@@ -737,7 +753,7 @@ export function ActivitiesProcessPage() {
             `Total: ${formatINR(pricing.total)}`,
             `Payment: ${confirmed.paymentMethod || draft.paymentMethod} · ${formatINR(pricing.total)}`,
           ]),
-      `Status: ${confirmed.status}`,
+      `Status: ${String(confirmed.status || '').toUpperCase() === 'CONFIRMED' ? 'CONFIRMED' : confirmed.status}`,
       `Booked: ${formatDMYTime(confirmed.createdAt)}`,
       ...(!confirmedIsFree && !isMember ? [`Note: ${MEMBER_PROMO_NOTE}`] : []),
     ].join('\n');
@@ -769,10 +785,11 @@ export function ActivitiesProcessPage() {
   function renderExtraField(f) {
     const err = errors[`x_${f.id}`];
     const value = draft.extras[f.id] ?? '';
+    const fieldId = `act-extra-${f.id}`;
     if (f.type === 'select') {
       const opts = f.options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o));
       return (
-        <Select key={f.id} label={f.label} name={f.id} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} options={opts} error={err} />
+        <Select key={f.id} id={fieldId} label={f.label} name={f.id} value={value} onChange={(e) => patchExtra(f.id, e.target.value)} options={opts} error={err} />
       );
     }
     if (f.type === 'number') {
@@ -791,18 +808,25 @@ export function ActivitiesProcessPage() {
       return (
         <Input
           key={f.id}
+          id={fieldId}
           label={f.label}
           name={f.id}
           type="number"
           min={f.min}
           max={fieldMax}
+          step={1}
           value={value}
+          onKeyDown={(e) => {
+            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+              e.preventDefault();
+            }
+          }}
           onChange={(e) => {
+            const raw = e.target.value.replace(/\D/g, '');
             if (!isPartyField) {
-              patchExtra(f.id, e.target.value);
+              patchExtra(f.id, raw);
               return;
             }
-            const raw = e.target.value;
             if (raw === '') {
               patchExtra(f.id, '');
               return;
@@ -824,6 +848,7 @@ export function ActivitiesProcessPage() {
       return (
         <Input
           key={f.id}
+          id={fieldId}
           label={f.label}
           name={f.id}
           type="tel"
@@ -847,6 +872,7 @@ export function ActivitiesProcessPage() {
         return (
           <Input
             key={f.id}
+            id={fieldId}
             label={f.label}
             name={f.id}
             type="text"
@@ -863,13 +889,15 @@ export function ActivitiesProcessPage() {
         );
       }
       return (
-        <Input key={f.id} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
+        <Input key={f.id} id={fieldId} label={f.label} name={f.id} type="text" value={value} onChange={(e) => patchExtra(f.id, e.target.value)} placeholder={f.placeholder} hint={f.hint} error={err} />
       );
     }
     if (f.type === 'checkbox') {
       return (
         <label key={f.id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-3 transition hover:border-navy-900/40">
           <input
+            id={`act-extra-${f.id}`}
+            name={f.id}
             type="checkbox"
             className="mt-1 h-4 w-4 accent-[#0B1D3A]"
             checked={Boolean(value)}
@@ -1038,6 +1066,7 @@ export function ActivitiesProcessPage() {
                   {locationSelectorField}
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
                     <Input
+                      id="activity-booking-date"
                       label={draft.date ? `Date — ${formatDMY(draft.date)}` : 'Date (DD/MM/YYYY)'}
                       name="date"
                       type="date"
@@ -1113,8 +1142,9 @@ export function ActivitiesProcessPage() {
                   <p className="eyebrow">{isGymFlow ? 'Step 3' : 'Step 4'} · Player / Guest Details</p>
                   <h2 className="h-sub mt-1">Who’s playing?</h2>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <Input label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
+                    <Input id="activity-player-name" label="Full name" name="name" value={draft.name} onChange={(e) => patch({ name: e.target.value })} autoComplete="name" error={errors.name} />
                     <Input
+                      id="activity-player-mobile"
                       label="Mobile"
                       name="mobile"
                       type="tel"
@@ -1132,19 +1162,34 @@ export function ActivitiesProcessPage() {
                       const maxAllowed = getMaxPlayersForSlot(game, selectedSlot);
                       return (
                         <Input
+                          id="activity-player-count"
                           label={`${game.playerLabel} (max ${maxAllowed})`}
                           name="players"
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           min={1}
                           max={maxAllowed}
+                          step={1}
                           value={draft.players}
-                          onChange={(e) => patch({ players: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            // Digits only — reject e/E notation, decimals, signs.
+                            if (!/^\d*$/.test(val)) return;
+                            patch({ players: val });
+                          }}
                           error={errors.players}
                         />
                       );
                     })()}
                     {!isFreeGame && game.id !== 'luxury-gym' && game.id !== 'swimming-pool' && (
                       <Select
+                        id="activity-sessions-count"
                         label="Number of Sessions (₹1,500 per session) *"
                         name="sessions"
                         value={draft.extras.sessions || '1'}
@@ -1159,7 +1204,7 @@ export function ActivitiesProcessPage() {
                     )}
                     {game.rentalPrice > 0 && (
                       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-3 transition hover:border-navy-900/40 sm:mt-7">
-                        <input type="checkbox" className="mt-1 h-4 w-4 accent-[#0B1D3A]" checked={draft.equipment} onChange={(e) => patch({ equipment: e.target.checked })} />
+                        <input id="act-equipment-rental" name="equipment" type="checkbox" className="mt-1 h-4 w-4 accent-[#0B1D3A]" checked={draft.equipment} onChange={(e) => patch({ equipment: e.target.checked })} />
                         <span>
                           <span className="block text-sm font-medium text-slate-700">Equipment rental (+{formatINR(game.rentalPrice)})</span>
                           <span className="mt-0.5 block text-xs text-slate-500">Optional extra, collected at the venue.</span>
@@ -1208,7 +1253,7 @@ export function ActivitiesProcessPage() {
                                 selected ? 'border-navy-900 bg-navy-900 text-white shadow-card' : 'border-slate-300 bg-white hover:border-navy-900/50'
                               }`}
                             >
-                              <input type="radio" name="paymentMethod" className="sr-only" checked={selected} onChange={() => patch({ paymentMethod: m.id })} />
+                              <input id={`act-pay-${m.id}`} type="radio" name="paymentMethod" value={m.id} className="sr-only" checked={selected} onChange={() => patch({ paymentMethod: m.id })} />
                               <span className={`block text-sm font-semibold ${selected ? 'text-white' : 'text-navy-900'}`}>{m.label}</span>
                               <span className={`block text-xs ${selected ? 'text-slate-300' : 'text-slate-500'}`}>{m.hint}</span>
                             </label>
@@ -1381,7 +1426,7 @@ export function ActivitiesProcessPage() {
                       </div>
                       <div className="flex justify-between text-xs text-slate-500">
                         <span>Status</span>
-                        <span className="font-medium text-emerald-700">{confirmed.status}</span>
+                        <span className="font-medium text-emerald-700">{String(confirmed.status || '').toUpperCase() === 'CONFIRMED' ? 'CONFIRMED' : confirmed.status}</span>
                       </div>
                     </div>
 

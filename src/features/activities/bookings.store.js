@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase.js';
 import { getUserBookings, getUserPayments } from '../../services/bookingsService.js';
 import { readSession } from '../../app/session.js';
-import { gameById, quotePrice, isGroupActivity, resolveActivityLocation, matchesActivityBooking } from './games.config.js';
+import { gameById, quotePrice, isGroupActivity, resolveActivityLocation, matchesActivityBooking, getActivityMaxPlayers } from './games.config.js';
 
 export const CHANGED_EVENT = 'frcc:activity-bookings-changed';
 export const LOCAL_ACTIVITY_BOOKINGS_KEY = 'frcc_active_activity_bookings';
@@ -365,6 +365,30 @@ export async function createActivityBookingRemote({
     err.status = 400;
     err.statusCode = 400;
     throw err;
+  }
+
+  if (gameId !== 'luxury-gym') {
+    if (players === undefined || players === null || players === '' || !/^\d+$/.test(String(players))) {
+      const err = new Error('Player count must be a valid whole number.');
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+    const numPlayers = Number(players);
+    if (numPlayers < 1) {
+      const err = new Error('Player count must be at least 1.');
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+    const g = gameById(gameId);
+    const maxPlayersAllowed = getActivityMaxPlayers(g);
+    if (g && numPlayers > maxPlayersAllowed) {
+      const err = new Error(`Player count cannot exceed ${maxPlayersAllowed} for ${g.name}.`);
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
   }
 
   const loc = resolveActivityLocation({

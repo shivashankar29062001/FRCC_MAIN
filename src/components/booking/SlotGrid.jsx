@@ -104,6 +104,7 @@ export function SlotGrid({
               )}
             >
               <input
+                id={`slot-radio-${gameId || 'game'}-${String(s.time).replace(/[^a-zA-Z0-9]/g, '-')}`}
                 type="radio"
                 name="slot"
                 className="sr-only"

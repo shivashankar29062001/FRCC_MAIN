@@ -282,7 +282,7 @@ export default function BookingConfirmation({
               className={`confirmation-status-badge ${isCancelled ? 'is-cancelled' : 'is-confirmed'}`}
               id="confirmed-booking-status"
             >
-              {isCancelled ? 'Cancelled' : 'Confirmed'}
+              {isCancelled ? 'Cancelled' : 'CONFIRMED'}
             </span>
           </div>
 

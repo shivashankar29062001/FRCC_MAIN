@@ -3,11 +3,13 @@
 // WhatsApp provider abstraction for sending booking notifications
 // ---------------------------------------------------------------------------
 
+declare const Deno: any;
+
 export interface WhatsAppNotificationDetails {
   recipientMobile: string;
   recipientName?: string;
   eventType: 'booking_confirmed' | 'booking_cancelled';
-  serviceType: 'hall' | 'parking';
+  serviceType: 'hall' | 'parking' | 'stay' | 'activity';
   bookingReference: string;
   title: string;
   date: string;

@@ -185,9 +185,11 @@ export default function ConventionDate() {
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <label className="block">
+        <label htmlFor="hall-select" className="block">
           <span className="text-sm font-medium text-navy block mb-1">Hall</span>
           <select
+            id="hall-select"
+            name="hallId"
             aria-label="Hall"
             className={inputClass}
             value={booking.hallId || ''}
@@ -202,9 +204,11 @@ export default function ConventionDate() {
           </select>
         </label>
 
-        <label className="block">
+        <label htmlFor="hall-date-select" className="block">
           <span className="text-sm font-medium text-navy block mb-1">Date</span>
           <input
+            id="hall-date-select"
+            name="date"
             type="date"
             min={today}
             className={`${inputClass} date-picker-field`}
@@ -217,9 +221,11 @@ export default function ConventionDate() {
           />
         </label>
 
-        <label className="block">
+        <label htmlFor="hall-start-time" className="block">
           <span className="text-sm font-medium text-navy block mb-1">Start Time</span>
           <select
+            id="hall-start-time"
+            name="startTime"
             aria-label="Start Time"
             className={inputClass}
             value={booking.startTime}
@@ -241,9 +247,11 @@ export default function ConventionDate() {
           </select>
         </label>
 
-        <label className="block">
+        <label htmlFor="hall-end-time" className="block">
           <span className="text-sm font-medium text-navy block mb-1">End Time</span>
           <select
+            id="hall-end-time"
+            name="endTime"
             aria-label="End Time"
             className={inputClass}
             value={booking.endTime}

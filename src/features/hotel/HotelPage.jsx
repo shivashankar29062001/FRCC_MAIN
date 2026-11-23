@@ -22,6 +22,7 @@ import { getRoomTypes, createBooking as createStayReservation, getAvailability, 
 import { cancelBooking, CANCELLATION_CHANGED_EVENT, isBookingCancelledLocally } from '../../services/cancellationService.js';
 import { validateCoupon } from '../../services/couponService.js';
 import { getUserMembership } from '../../services/membershipService.js';
+import { supabase } from '../../services/supabase.js';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   CheckCircleIcon,
@@ -745,6 +746,16 @@ export function HotelPage() {
       }
 
       try {
+        supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            booking_id: bookingRef || bookingId,
+            service_type: 'stay',
+            event_type: 'booking_confirmed',
+          },
+        }).catch(() => {});
+      } catch (_) {}
+
+      try {
         if (typeof window !== 'undefined' && window.localStorage) {
           const storedStays = JSON.parse(window.localStorage.getItem('frcc_stay_bookings') || '[]');
           const updatedStays = [confirmationRecord, ...storedStays.filter((s) => s.bookingRef !== bookingRef && s.id !== bookingId)];
@@ -1032,6 +1043,8 @@ export function HotelPage() {
                 <div>
                   <Input
                     label="Check-in Date (DD/MM/YYYY) *"
+                    id="stay-checkin"
+                    name="checkin"
                     type="date"
                     min={getTodayISO()}
                     value={draft.checkin}
@@ -1047,6 +1060,8 @@ export function HotelPage() {
                 <div>
                   <Input
                     label="Check-out Date (DD/MM/YYYY) *"
+                    id="stay-checkout"
+                    name="checkout"
                     type="date"
                     min={draft.checkin ? new Date(new Date(draft.checkin).getTime() + 86400000).toISOString().split('T')[0] : getTomorrowISO()}
                     value={draft.checkout}
@@ -1091,6 +1106,8 @@ export function HotelPage() {
                 <div>
                   <Select
                     label="Adults (1 to 10) *"
+                    id="stay-adults"
+                    name="adults"
                     value={draft.adults}
                     onChange={(e) => updateDraft({ adults: e.target.value })}
                     options={Array.from({ length: 10 }, (_, i) => ({
@@ -1105,6 +1122,8 @@ export function HotelPage() {
                 <div>
                   <Select
                     label="Children (0 to 6)"
+                    id="stay-children"
+                    name="children"
                     value={draft.children}
                     onChange={(e) => updateDraft({ children: e.target.value })}
                     options={Array.from({ length: 7 }, (_, i) => ({
@@ -1119,6 +1138,8 @@ export function HotelPage() {
                 <div>
                   <Select
                     label="Rooms (1 to 5) *"
+                    id="stay-rooms"
+                    name="roomsCount"
                     value={draft.roomsCount}
                     onChange={(e) => updateDraft({ roomsCount: e.target.value })}
                     options={Array.from({ length: 5 }, (_, i) => ({
@@ -1373,6 +1394,9 @@ export function HotelPage() {
             <div className="mt-6 max-w-xl space-y-5">
               <Input
                 label="Full Name (as per government photo ID) *"
+                id="stay-guest-name"
+                name="name"
+                autoComplete="name"
                 value={draft.name}
                 onChange={(e) => updateDraft({ name: sanitizeNameInput(e.target.value) })}
                 onBlur={(e) => updateDraft({ name: normalizeName(e.target.value) })}
@@ -1382,12 +1406,14 @@ export function HotelPage() {
 
               {/* Mobile with +91 indicator */}
               <div>
-                <label className="label">Mobile Number *</label>
+                <label htmlFor="stay-mobile" className="label">Mobile Number *</label>
                 <div className="mt-1.5 flex rounded-xl border border-slate-300 bg-white shadow-xs focus-within:border-gold-500 focus-within:ring-2 focus-within:ring-gold-500/20">
                   <span className="inline-flex items-center px-3.5 border-r border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 select-none rounded-l-xl">
                     +91
                   </span>
                   <input
+                    id="stay-mobile"
+                    name="mobile"
                     type="tel"
                     inputMode="numeric"
                     pattern="[6-9][0-9]{9}"
@@ -1414,6 +1440,9 @@ export function HotelPage() {
 
               <Input
                 label="Email Address *"
+                id="stay-email"
+                name="email"
+                autoComplete="email"
                 type="email"
                 value={draft.email}
                 onChange={(e) => updateDraft({ email: e.target.value })}
@@ -1423,12 +1452,14 @@ export function HotelPage() {
               {/* Special Request */}
               <div>
                 <div className="flex justify-between items-center">
-                  <label className="label">Special Request (Optional)</label>
+                  <label htmlFor="stay-special-request" className="label">Special Request (Optional)</label>
                   <span className={`text-[11px] font-medium ${(draft.specialRequest || '').length > 300 ? 'text-rose-600' : 'text-slate-500'}`}>
                     {(draft.specialRequest || '').length}/300 characters
                   </span>
                 </div>
                 <textarea
+                  id="stay-special-request"
+                  name="specialRequest"
                   value={draft.specialRequest || ''}
                   onChange={(e) => updateDraft({ specialRequest: e.target.value.slice(0, 300) })}
                   maxLength={300}
@@ -1582,6 +1613,8 @@ export function HotelPage() {
                     <div className="space-y-2">
                       <div className="flex gap-2">
                         <input
+                          id="stay-coupon-code"
+                          name="couponCode"
                           type="text"
                           value={couponInput}
                           onChange={(e) => {
@@ -1644,6 +1677,7 @@ export function HotelPage() {
                 <input
                   type="checkbox"
                   id="accept-terms"
+                  name="acceptTerms"
                   checked={termsAccepted}
                   onChange={(e) => {
                     const checked = e.target.checked;

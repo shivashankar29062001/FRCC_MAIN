@@ -389,6 +389,7 @@ function PersonalDetails({ user, membership, pushToast }) {
                 <div className="flex flex-wrap gap-2">
                   <Input
                     id="profile-new-email"
+                    name="newEmail"
                     type="email"
                     placeholder="you@example.com"
                     value={newEmail}

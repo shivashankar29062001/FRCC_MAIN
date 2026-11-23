@@ -12,11 +12,11 @@ export default function CorporateForm({ onValid }) {
   const input = "border rounded p-2 w-full mt-1";
   return (
     <div className="space-y-3 max-w-md">
-      <label className="block text-sm">Company Name<input className={input} value={f.company} onChange={e => set('company', e.target.value)} /></label>
-      <label className="block text-sm">GSTIN<input className={input} value={f.gstin} placeholder="22ABCDE1234F1Z5" onChange={e => set('gstin', e.target.value.toUpperCase())} />
+      <label className="block text-sm">Company Name<input id="corporate-company" name="company" className={input} value={f.company} onChange={e => set('company', e.target.value)} /></label>
+      <label className="block text-sm">GSTIN<input id="corporate-gstin" name="gstin" className={input} value={f.gstin} placeholder="22ABCDE1234F1Z5" onChange={e => set('gstin', e.target.value.toUpperCase())} />
         {f.gstin && !GSTIN_RE.test(f.gstin) && <span className="text-red-600 text-xs">Invalid GSTIN format</span>}</label>
-      <label className="block text-sm">Billing Address<textarea className={input} rows={2} value={f.addr} onChange={e => set('addr', e.target.value)} /></label>
-      <label className="block text-sm">PO Number<input className={input} value={f.po} onChange={e => set('po', e.target.value)} /></label>
+      <label className="block text-sm">Billing Address<textarea id="corporate-address" name="address" className={input} rows={2} value={f.addr} onChange={e => set('addr', e.target.value)} /></label>
+      <label className="block text-sm">PO Number<input id="corporate-po" name="poNumber" className={input} value={f.po} onChange={e => set('po', e.target.value)} /></label>
       <p className="text-xs text-gray-500">A GST invoice will be generated. Booking stays <strong>PENDING_VERIFICATION</strong> until payment is received.</p>
     </div>
   );

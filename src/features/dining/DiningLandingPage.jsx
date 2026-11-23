@@ -123,6 +123,7 @@ export function DiningLandingPage() {
               <label htmlFor="bar-venue" className="label">Venue</label>
               <select
                 id="bar-venue"
+                name="venue"
                 value={barVenue}
                 onChange={(e) => { setBarVenue(e.target.value); setBarError(''); }}
                 className="field h-11 w-full text-sm"
@@ -142,6 +143,7 @@ export function DiningLandingPage() {
                 </span>
                 <input
                   id="bar-date"
+                  name="date"
                   type="text"
                   placeholder="DD/MM/YYYY"
                   value={barDate}
@@ -151,6 +153,8 @@ export function DiningLandingPage() {
                 />
                 <input
                   ref={barPickerRef}
+                  id="bar-native-date-picker"
+                  name="dateNative"
                   type="date"
                   value={barIsoValue}
                   min={todayISO()}
@@ -170,6 +174,7 @@ export function DiningLandingPage() {
                 </span>
                 <select
                   id="bar-guests"
+                  name="guests"
                   value={barGuests}
                   onChange={(e) => { setBarGuests(e.target.value); setBarError(''); }}
                   className="field h-11 w-full !pl-10 text-sm"

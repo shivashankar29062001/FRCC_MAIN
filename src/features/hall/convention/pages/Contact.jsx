@@ -26,10 +26,10 @@ export default function Contact() {
     <div className="max-w-3xl mx-auto px-4 py-10">
       <h1 className="text-3xl mb-6">Contact / Support</h1>
       <form onSubmit={submit} className="bg-white rounded shadow p-6 space-y-4 mb-8">
-        <label className="block">Subject
-          <input className="w-full border rounded p-2 mt-1" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
-        <label className="block">Message
-          <textarea rows={4} className="w-full border rounded p-2 mt-1" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} /></label>
+        <label htmlFor="hall-contact-subject" className="block">Subject
+          <input id="hall-contact-subject" name="subject" className="w-full border rounded p-2 mt-1" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} /></label>
+        <label htmlFor="hall-contact-message" className="block">Message
+          <textarea id="hall-contact-message" name="message" rows={4} className="w-full border rounded p-2 mt-1" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} /></label>
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {msg && <p className="text-green-700 text-sm">{msg}</p>}
         <button className="bg-navy text-gold px-6 py-2 rounded font-semibold">Submit Ticket</button>

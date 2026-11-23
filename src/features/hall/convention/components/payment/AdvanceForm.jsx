@@ -37,7 +37,7 @@ export default function AdvanceForm({ total, onValid }) {
     <div className="space-y-4">
       <div className="bg-stone-50 border rounded p-3 text-sm">
         Advance: <strong>₹{advance}</strong> ({pct}%) • Due at venue: <strong>₹{balance}</strong>
-        <input type="range" min="10" max="90" value={pct} onChange={e => setPct(Number(e.target.value))} className="w-full mt-2" />
+        <input id="advance-percentage" name="advancePercentage" type="range" min="10" max="90" value={pct} onChange={e => setPct(Number(e.target.value))} className="w-full mt-2" />
       </div>
       <div className="flex flex-wrap gap-2">
         {ONLINE.map(o => (

@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../../app/store/AppContext.jsx';
+import { supabase } from '../../../services/supabase.js';
 import { cancelBooking } from '../../../services/cancellationService.js';
 import './ParkingBookingPage.css';
 import BookingForm from './components/BookingForm.jsx';
@@ -763,6 +764,15 @@ export default function ParkingBookingPage() {
           arrivalTime: dbData.arrival_time || booking.arrivalTime,
           arrival_time: dbData.arrival_time || booking.arrivalTime,
         });
+        try {
+          supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              booking_id: authoritativeRef,
+              service_type: 'parking',
+              event_type: 'booking_confirmed',
+            },
+          }).catch(() => {});
+        } catch (_) {}
       })
       .catch((err) => {
         setIsSubmitting(false);

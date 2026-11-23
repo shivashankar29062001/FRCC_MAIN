@@ -21,7 +21,7 @@ export default function NetBankingPicker({ onValid }) {
   }
   return (
     <div className="space-y-3">
-      <input className="border rounded p-2 w-full max-w-sm" placeholder="Search bank…" value={q} onChange={e => setQ(e.target.value)} />
+      <input id="netbanking-search" name="netbankingSearch" type="search" className="border rounded p-2 w-full max-w-sm" placeholder="Search bank…" value={q} onChange={e => setQ(e.target.value)} />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-xl">
         {list.map(b => (
           <button type="button" key={b} onClick={() => { setBank(b); setRedirect(true); onValid(false, {}); }}
