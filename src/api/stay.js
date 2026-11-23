@@ -163,10 +163,13 @@ export async function getAvailability(checkIn, checkOut) {
   if (isMock) {
     const allBookings = getMockBookings();
     return LOCAL_ROOMS.map((r) => {
-<<<<<<< HEAD
       const bookedRooms = allBookings
         .filter((b) => {
-          if (b.room_type_id !== r.id) return false;
+          const idMatch =
+            b.room_type_id === r.id ||
+            b.room_type_id === r.id.replace('vja-', '') ||
+            `vja-${b.room_type_id}` === r.id;
+          if (!idMatch) return false;
           if (b.check_in >= checkOut || b.check_out <= checkIn) return false;
           if (b.status === 'cancelled') return false;
           if (isBookingCancelledLocally(b.id) || isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.bookingId)) {
@@ -175,14 +178,6 @@ export async function getAvailability(checkIn, checkOut) {
           }
           return true;
         })
-=======
-      const bookedRooms = mockStayBookings
-        .filter((b) => (
-          b.room_type_id === r.id ||
-          b.room_type_id === r.id.replace('vja-', '') ||
-          `vja-${b.room_type_id}` === r.id
-        ) && b.check_in < checkOut && b.check_out > checkIn && b.status !== 'cancelled')
->>>>>>> eb2e74ea3d58db10f578c98699eece993639cb2f
         .reduce((sum, b) => sum + (b.rooms || 1), 0);
 
       const available = Math.max(0, (r.roomsTotal || 1) - bookedRooms);
