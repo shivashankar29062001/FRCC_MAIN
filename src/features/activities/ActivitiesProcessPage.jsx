@@ -28,6 +28,7 @@ import { LocationTrigger } from '../../components/location/LocationTrigger.jsx';
 import { ACTIVITY_LOCATIONS } from '../../data/bookingLocations.js';
 import { calculateTotal } from '../../utils/pricing.js';
 import { formatDMY, formatDMYTime } from '../../utils/dates.js';
+import { generateBookingReceiptPdf } from '../../utils/receiptGenerator.js';
 import {
   INDIAN_MOBILE_MESSAGE,
   INDIAN_MOBILE_PLACEHOLDER,
@@ -737,6 +738,31 @@ export function ActivitiesProcessPage() {
     const g = gameById(confirmed.game);
     const confirmedIsFree = Boolean(confirmed.isFree || g?.isFree || (g?.price ?? g?.pricePerSlot) === 0 || Number(confirmed.amount ?? 0) === 0);
     const pricing = calculateTotal(confirmed.subtotal ?? confirmed.amount, Boolean(confirmed.isMember ?? isMember));
+
+    try {
+      generateBookingReceiptPdf({
+        ...confirmed,
+        category: 'activity',
+        bookingRef: confirmed.bookingId || confirmed.id,
+        title: confirmed.gameName || g?.name || confirmed.game,
+        gameName: confirmed.gameName || g?.name || confirmed.game,
+        location: confirmed.location || confirmed.areaName || draft?.location || 'Vijayawada Campus',
+        date: confirmed.date,
+        slot: confirmed.slot,
+        players: confirmed.players,
+        subtotal: pricing.subtotal,
+        discount: pricing.discount,
+        total: confirmedIsFree ? 0 : pricing.total,
+        amount: confirmedIsFree ? 0 : pricing.total,
+        payment_method: confirmedIsFree ? 'Complimentary Pass (Free)' : (confirmed.paymentMethod || draft?.paymentMethod || 'Online (UPI/Card)'),
+        status: confirmed.status || 'CONFIRMED'
+      });
+      pushToast('Receipt downloaded successfully.', 'success');
+      return;
+    } catch (pdfErr) {
+      console.warn('PDF receipt generation failed, falling back to text:', pdfErr);
+    }
+
     const text = [
       'FRCC — Activities Booking Receipt',
       `Booking ID: ${confirmed.bookingId}`,

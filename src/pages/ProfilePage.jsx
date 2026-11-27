@@ -60,27 +60,40 @@ import {
 
 
 function extractStayLocation(r, localRecord = null) {
-  if (localRecord) {
-    const locName = localRecord.areaName || localRecord.cityName;
-    if (locName && (locName.toLowerCase().includes('hyd') || localRecord.cityId === 'hyd')) {
-      return {
-        areaName: localRecord.areaName || 'Hyderabad Campus',
-        venueName: localRecord.venueName || 'Hyderabad Club Residency',
-        cityName: localRecord.cityName || 'Hyderabad',
-        cityId: 'hyd',
-      };
-    }
-    if (localRecord.areaName && localRecord.venueName) {
-      return {
-        areaName: localRecord.areaName,
-        venueName: localRecord.venueName,
-        cityName: localRecord.cityName || 'Vijayawada',
-        cityId: localRecord.cityId || 'vja',
-      };
-    }
+  const rec = localRecord || r || {};
+  const isHydLocal = Boolean(
+    (rec.cityId && String(rec.cityId).toLowerCase().includes('hyd')) ||
+    (rec.city_id && String(rec.city_id).toLowerCase().includes('hyd')) ||
+    (rec.venueId && String(rec.venueId).toLowerCase().includes('hyd')) ||
+    (rec.cityName && rec.cityName.toLowerCase().includes('hyd')) ||
+    (rec.areaName && rec.areaName.toLowerCase().includes('hyd')) ||
+    (rec.venueName && rec.venueName.toLowerCase().includes('hyd')) ||
+    (rec.location && rec.location.toLowerCase().includes('hyd')) ||
+    (rec.details?.cityName && rec.details.cityName.toLowerCase().includes('hyd')) ||
+    (rec.details?.cityId && String(rec.details.cityId).toLowerCase().includes('hyd'))
+  );
+
+  if (isHydLocal) {
+    return {
+      areaName: rec.areaName || 'Hyderabad Campus',
+      venueName: rec.venueName || 'Hyderabad Club Residency',
+      cityName: rec.cityName || 'Hyderabad',
+      cityId: 'hyd',
+      venueId: 'hyd-residency',
+    };
   }
 
-  const sr = String(r.special_request || r.specialRequest || r.notes || '');
+  if (localRecord && localRecord.areaName && localRecord.venueName) {
+    return {
+      areaName: localRecord.areaName,
+      venueName: localRecord.venueName,
+      cityName: localRecord.cityName || 'Vijayawada',
+      cityId: localRecord.cityId || 'vja',
+      venueId: localRecord.venueId || 'vja-residency',
+    };
+  }
+
+  const sr = String(r?.special_request || r?.specialRequest || r?.notes || '');
   const locMatch = sr.match(/\[Location:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^\]]+)\]/i);
   if (locMatch) {
     return {
@@ -91,21 +104,23 @@ function extractStayLocation(r, localRecord = null) {
     };
   }
 
-  const allText = `${sr} ${r.area_name || ''} ${r.areaName || ''} ${r.venue_name || ''} ${r.venueName || ''} ${r.city_name || ''} ${r.cityName || ''} ${r.location || ''}`.toLowerCase();
+  const allText = `${sr} ${r?.area_name || ''} ${r?.areaName || ''} ${r?.venue_name || ''} ${r?.venueName || ''} ${r?.city_name || ''} ${r?.cityName || ''} ${r?.cityId || ''} ${r?.city_id || ''} ${r?.venueId || ''} ${r?.location || ''} ${r?.details?.cityName || ''} ${r?.details?.areaName || ''} ${r?.details?.cityId || ''} ${r?.room_types?.area_id || ''}`.toLowerCase();
   if (allText.includes('hyd') || allText.includes('hyderabad')) {
     return {
-      areaName: 'Hyderabad Campus',
-      venueName: 'Hyderabad Club Residency',
-      cityName: 'Hyderabad',
+      areaName: r?.areaName || r?.area_name || 'Hyderabad Campus',
+      venueName: r?.venueName || r?.venue_name || 'Hyderabad Club Residency',
+      cityName: r?.cityName || r?.city_name || 'Hyderabad',
       cityId: 'hyd',
+      venueId: 'hyd-residency',
     };
   }
 
   return {
-    areaName: r.area_name || r.areaName || 'Vijayawada Campus',
-    venueName: r.venue_name || r.venueName || 'FRCC Riverfront',
-    cityName: r.city_name || r.cityName || 'Vijayawada',
-    cityId: r.city_id || r.cityId || 'vja',
+    areaName: r?.area_name || r?.areaName || 'Vijayawada Campus',
+    venueName: r?.venue_name || r?.venueName || 'FRCC Riverfront',
+    cityName: r?.city_name || r?.cityName || 'Vijayawada',
+    cityId: r?.city_id || r?.cityId || 'vja',
+    venueId: 'vja-residency',
   };
 }
 
@@ -1179,28 +1194,57 @@ export function ProfilePage({ initialTab = 'details' }) {
 
       const isStay = appB.category === 'hotel' || appB.category === 'stay' || Boolean(appB.checkin) || appB.bookingId?.includes('STAY');
       if (!matchedRef && isStay) {
-        for (const [ref, existing] of bookingsByRef.entries()) {
-          if (existing.category === 'hotel' || existing.category === 'stay') {
-            const normDate = (d) => {
-              if (!d) return '';
-              const str = String(d).trim();
-              const m = str.match(/\d{4}-\d{2}-\d{2}/);
-              if (m) return m[0];
-              const dt = new Date(str);
-              return !isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : str;
-            };
-            const dateA = normDate(existing.checkin || existing.date);
-            const dateB = normDate(appB.checkin || appB.date);
-            const sameDate = Boolean(dateA && dateB && dateA === dateB);
-            const nameA = (existing.roomName || existing.title || '').trim().toLowerCase();
-            const nameB = (appB.roomName || appB.title || '').trim().toLowerCase();
-            const sameName = Boolean(nameA && nameB && (nameA.includes(nameB) || nameB.includes(nameA)));
-            const sameSubtotal =
-              (existing.subtotal !== undefined && existing.subtotal === appB.subtotal) ||
-              (existing.amount !== undefined && existing.amount === appB.amount);
-            if ((sameDate && sameName) || (sameName && sameSubtotal)) {
-              matchedRef = ref;
-              break;
+        const appBRefStr = String(appB.bookingRef || appB.booking_ref || appB.bookingId || appB.id || '');
+        const appBHasOfficialRef = appBRefStr.startsWith('FRCC-S-');
+
+        // Only attempt fuzzy merge if appB does NOT already have an official FRCC-S- reference
+        if (!appBHasOfficialRef) {
+          const normDate = (d) => {
+            if (!d) return '';
+            const str = String(d).trim();
+            const m = str.match(/\d{4}-\d{2}-\d{2}/);
+            if (m) return m[0];
+            const dt = new Date(str);
+            return !isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : str;
+          };
+          const dateB = normDate(appB.checkin || appB.date);
+          const nameB = (appB.roomName || appB.title || '').trim().toLowerCase();
+          const isHydB = Boolean(
+            (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
+            (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
+            (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
+            (appB.venueName && appB.venueName.toLowerCase().includes('hyd')) ||
+            (appB.details?.cityName && appB.details.cityName.toLowerCase().includes('hyd')) ||
+            (appB.details?.cityId && String(appB.details.cityId).toLowerCase().includes('hyd'))
+          );
+
+          for (const [ref, existing] of bookingsByRef.entries()) {
+            if (existing.category === 'hotel' || existing.category === 'stay') {
+              const isHydExisting = Boolean(
+                (existing.cityId && String(existing.cityId).toLowerCase().includes('hyd')) ||
+                (existing.cityName && existing.cityName.toLowerCase().includes('hyd')) ||
+                (existing.areaName && existing.areaName.toLowerCase().includes('hyd')) ||
+                (existing.venueName && existing.venueName.toLowerCase().includes('hyd')) ||
+                (existing.details?.cityName && existing.details.cityName.toLowerCase().includes('hyd')) ||
+                (existing.details?.cityId && String(existing.details.cityId).toLowerCase().includes('hyd'))
+              );
+
+              // Critical: Bookings in different locations (e.g. Hyderabad vs Vijayawada) MUST NEVER match!
+              if (isHydB !== isHydExisting) continue;
+
+              const dateA = normDate(existing.checkin || existing.date);
+              const sameDate = Boolean(dateA && dateB && dateA === dateB);
+              const nameA = (existing.roomName || existing.title || '').trim().toLowerCase();
+              const sameName = Boolean(nameA && nameB && (nameA.includes(nameB) || nameB.includes(nameA)));
+              const sameSubtotal =
+                (existing.subtotal !== undefined && existing.subtotal === appB.subtotal) ||
+                (existing.amount !== undefined && existing.amount === appB.amount);
+
+              // Only match if SAME date AND SAME room name AND SAME location!
+              if (sameDate && sameName && (sameSubtotal || !appB.subtotal)) {
+                matchedRef = ref;
+                break;
+              }
             }
           }
         }
@@ -1213,45 +1257,41 @@ export function ProfilePage({ initialTab = 'details' }) {
           ? (getRoomTypeName(appB) !== 'Standard Room' ? getRoomTypeName(appB) : getRoomTypeName(existing))
           : null;
 
-        const isHydLocation =
-          (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
-          (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
-          (appB.venueName && appB.venueName.toLowerCase().includes('hyd')) ||
-          (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
-          (appB.details?.cityName && appB.details.cityName.toLowerCase().includes('hyd')) ||
-          (appB.details?.areaName && appB.details.areaName.toLowerCase().includes('hyd')) ||
+        // Correctly preserve this booking's specific location
+        const isHydBooking = Boolean(
+          (existing.cityId && String(existing.cityId).toLowerCase().includes('hyd')) ||
           (existing.cityName && existing.cityName.toLowerCase().includes('hyd')) ||
           (existing.areaName && existing.areaName.toLowerCase().includes('hyd')) ||
           (existing.venueName && existing.venueName.toLowerCase().includes('hyd')) ||
-          (existing.cityId && String(existing.cityId).toLowerCase().includes('hyd'));
+          (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
+          (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
+          (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
+          (appB.venueName && appB.venueName.toLowerCase().includes('hyd'))
+        );
 
         const resolvedLocation = isStay
-          ? (isHydLocation
+          ? (isHydBooking
               ? {
                   areaName: 'Hyderabad Campus',
                   venueName: 'Hyderabad Club Residency',
                   cityName: 'Hyderabad',
                   cityId: 'hyd',
+                  venueId: 'hyd-residency',
+                  location: 'Hyderabad Campus · Hyderabad Club Residency',
                 }
               : {
                   areaName:
-                    (appB.areaName && !appB.areaName.includes('Vijayawada') ? appB.areaName : null) ||
-                    (existing.areaName && !existing.areaName.includes('Vijayawada') ? existing.areaName : null) ||
-                    appB.areaName ||
-                    existing.areaName ||
+                    (existing.areaName && !existing.areaName.includes('Hyderabad') ? existing.areaName : null) ||
+                    (appB.areaName && !appB.areaName.includes('Hyderabad') ? appB.areaName : null) ||
                     'Vijayawada Campus',
                   venueName:
-                    (appB.venueName && !appB.venueName.includes('Riverfront') ? appB.venueName : null) ||
-                    (existing.venueName && !existing.venueName.includes('Riverfront') ? existing.venueName : null) ||
-                    appB.venueName ||
-                    existing.venueName ||
+                    (existing.venueName && !existing.venueName.includes('Hyderabad') ? existing.venueName : null) ||
+                    (appB.venueName && !appB.venueName.includes('Hyderabad') ? appB.venueName : null) ||
                     'FRCC Riverfront',
-                  cityName:
-                    (appB.cityName && !appB.cityName.includes('Vijayawada') ? appB.cityName : null) ||
-                    (existing.cityName && !existing.cityName.includes('Vijayawada') ? existing.cityName : null) ||
-                    appB.cityName ||
-                    existing.cityName ||
-                    'Vijayawada',
+                  cityName: 'Vijayawada',
+                  cityId: 'vja',
+                  venueId: 'vja-residency',
+                  location: 'Vijayawada Campus · FRCC Riverfront',
                 })
           : {};
 
@@ -1271,8 +1311,37 @@ export function ProfilePage({ initialTab = 'details' }) {
       } else {
         const ref = appB.bookingRef || appB.booking_ref || appB.bookingId || appB.id;
         const uuid = appB.uuid || appB.rawId || appB.raw_id || appB.dbId || appB.db_id || appB.id;
+        const isHydApp = Boolean(
+          (appB.cityId && String(appB.cityId).toLowerCase().includes('hyd')) ||
+          (appB.cityName && appB.cityName.toLowerCase().includes('hyd')) ||
+          (appB.areaName && appB.areaName.toLowerCase().includes('hyd')) ||
+          (appB.venueName && appB.venueName.toLowerCase().includes('hyd')) ||
+          (appB.location && appB.location.toLowerCase().includes('hyd')) ||
+          (appB.details?.cityName && appB.details.cityName.toLowerCase().includes('hyd'))
+        );
+        const resolvedLocation = isStay
+          ? (isHydApp
+              ? {
+                  areaName: 'Hyderabad Campus',
+                  venueName: 'Hyderabad Club Residency',
+                  cityName: 'Hyderabad',
+                  cityId: 'hyd',
+                  venueId: 'hyd-residency',
+                  location: 'Hyderabad Campus · Hyderabad Club Residency',
+                }
+              : {
+                  areaName: appB.areaName || 'Vijayawada Campus',
+                  venueName: appB.venueName || 'FRCC Riverfront',
+                  cityName: appB.cityName || 'Vijayawada',
+                  cityId: appB.cityId || 'vja',
+                  venueId: appB.venueId || 'vja-residency',
+                  location: appB.location || 'Vijayawada Campus · FRCC Riverfront',
+                })
+          : {};
+
         const normalized = {
           ...appB,
+          ...resolvedLocation,
           bookingRef: ref,
           bookingId: ref,
           id: ref,
@@ -1294,23 +1363,44 @@ export function ProfilePage({ initialTab = 'details' }) {
         b.category === 'stay' ||
         Boolean(b.checkin) ||
         String(b.bookingId || '').includes('STAY') ||
-        String(b.bookingRef || '').includes('STAY');
+        String(b.bookingRef || '').includes('STAY') ||
+        String(b.bookingId || '').startsWith('FRCC-S-') ||
+        String(b.bookingRef || '').startsWith('FRCC-S-');
 
       if (isStay) {
-        const room = (b.roomName || b.title || '').trim().toLowerCase();
-        const dateKey = new Date(b.checkin || b.date || 0).toDateString();
-        const stayDedupKey = `${room}::${dateKey}::${b.subtotal ?? b.amount ?? 0}`;
+        const bRef = String(b.bookingRef || b.bookingId || b.id || '');
+        const bHasOfficialRef = bRef.startsWith('FRCC-S-');
+        const room = (b.roomName || b.title || b.room_type_id || '').trim().toLowerCase().replace('vja-', '').replace('hyd-', '');
+        const normDate = (d) => {
+          if (!d) return '';
+          const str = String(d).trim();
+          const m = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+          if (m) return m[1] + '-' + m[2] + '-' + m[3];
+          const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if (dmy) return dmy[3] + '-' + String(dmy[2]).padStart(2, '0') + '-' + String(dmy[1]).padStart(2, '0');
+          const dt = new Date(str);
+          return !isNaN(dt.getTime()) ? dt.toISOString().slice(0, 10) : str;
+        };
+        const dateKey = normDate(b.checkin || b.check_in || b.date);
+        const locInfo = extractStayLocation(b);
+        const locKey = locInfo.cityId || 'vja';
+        // A single physical room cannot be double-booked on the same date at the same campus
+        const stayDedupKey = `${locKey}::${room}::${dateKey}`;
+
         if (seenStayKeys.has(stayDedupKey)) {
           const existingIdx = dedupedList.findIndex((item) => {
-            const itemRoom = (item.roomName || item.title || '').trim().toLowerCase();
-            const itemDate = new Date(item.checkin || item.date || 0).toDateString();
-            return `${itemRoom}::${itemDate}::${item.subtotal ?? item.amount ?? 0}` === stayDedupKey;
+            const itemLoc = (extractStayLocation(item).cityId || 'vja');
+            const itemRoom = (item.roomName || item.title || item.room_type_id || '').trim().toLowerCase().replace('vja-', '').replace('hyd-', '');
+            const itemDate = normDate(item.checkin || item.check_in || item.date);
+            return `${itemLoc}::${itemRoom}::${itemDate}` === stayDedupKey;
           });
+
           if (existingIdx !== -1) {
             const existing = dedupedList[existingIdx];
-            const bHasRef = String(b.bookingRef || b.bookingId || '').startsWith('FRCC-S-');
-            const existHasRef = String(existing.bookingRef || existing.bookingId || '').startsWith('FRCC-S-');
-            if (bHasRef && !existHasRef) {
+            const existRef = String(existing.bookingRef || existing.bookingId || existing.id || '');
+            const existHasRef = existRef.startsWith('FRCC-S-');
+
+            if (bHasOfficialRef && !existHasRef) {
               dedupedList[existingIdx] = {
                 ...existing,
                 ...b,

@@ -23,9 +23,21 @@ function getMockBookings() {
         for (const s of stored) {
           const matchRef = s.bookingRef || s.booking_ref || s.id;
           if (!list.some((b) => (b.booking_ref && b.booking_ref === matchRef) || (b.id && b.id === matchRef))) {
+            const isHyd = Boolean(
+              s.cityId === 'hyd' ||
+              s.city_id === 'hyd' ||
+              s.venueId === 'hyd-residency' ||
+              (s.cityName && s.cityName.toLowerCase().includes('hyd')) ||
+              (s.areaName && s.areaName.toLowerCase().includes('hyd')) ||
+              (s.location && s.location.toLowerCase().includes('hyd')) ||
+              (s.details?.cityName && s.details.cityName.toLowerCase().includes('hyd')) ||
+              (s.details?.cityId && String(s.details.cityId).toLowerCase().includes('hyd'))
+            );
             list.push({
               id: s.id || matchRef,
               booking_ref: matchRef,
+              bookingRef: matchRef,
+              bookingId: matchRef,
               user_id: s.userId || s.user_id,
               userId: s.userId || s.user_id,
               room_type_id: s.roomId || s.roomTypeId || s.room_type_id,
@@ -35,6 +47,28 @@ function getMockBookings() {
               guest_name: s.guestName || s.userName,
               guest_mobile: s.mobile || s.guestMobile || '',
               status: s.status || 'confirmed',
+              areaName: s.areaName || s.area_name || s.details?.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+              area_name: s.areaName || s.area_name || s.details?.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+              venueName: s.venueName || s.venue_name || s.details?.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+              venue_name: s.venueName || s.venue_name || s.details?.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+              cityName: s.cityName || s.city_name || s.details?.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+              city_name: s.cityName || s.city_name || s.details?.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+              cityId: isHyd ? 'hyd' : (s.cityId || s.city_id || 'vja'),
+              city_id: isHyd ? 'hyd' : (s.cityId || s.city_id || 'vja'),
+              venueId: s.venueId || s.venue_id || s.details?.venueId || (isHyd ? 'hyd-residency' : 'vja-residency'),
+              venue_id: s.venueId || s.venue_id || s.details?.venueId || (isHyd ? 'hyd-residency' : 'vja-residency'),
+              location: s.location || s.details?.location || (isHyd ? 'Hyderabad Campus · Hyderabad Club Residency' : 'Vijayawada Campus · FRCC Riverfront'),
+              special_request: s.specialRequest || s.special_request || s.notes || null,
+              specialRequest: s.specialRequest || s.special_request || s.notes || null,
+              details: s.details,
+              nights: s.nights || s.details?.nights,
+              total: s.total ?? s.amount,
+              subtotal: s.subtotal ?? s.basePrice,
+              amount: s.amount ?? s.total,
+              roomName: s.roomName || s.title,
+              title: s.title || s.roomName,
+              is_test: Boolean(s.is_test),
+              created_at: s.createdAt || s.created_at || new Date().toISOString(),
             });
           }
         }
@@ -159,113 +193,84 @@ export async function getRoomTypes() {
  * Fetch real-time available rooms for a given check-in and check-out window.
  * Excludes cancelled bookings and bookings marked cancelled locally.
  */
-export async function getAvailability(checkIn, checkOut) {
-  if (isMock) {
-    const allBookings = getMockBookings();
-    return LOCAL_ROOMS.map((r) => {
-      const bookedRooms = allBookings
-        .filter((b) => {
-          const idMatch =
-            b.room_type_id === r.id ||
-            b.room_type_id === r.id.replace('vja-', '') ||
-            `vja-${b.room_type_id}` === r.id;
-          if (!idMatch) return false;
-          if (b.check_in >= checkOut || b.check_out <= checkIn) return false;
-          if (b.status === 'cancelled') return false;
-          if (isBookingCancelledLocally(b.id) || isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.bookingId)) {
-            b.status = 'cancelled';
-            return false;
-          }
-          return true;
-        })
-        .reduce((sum, b) => sum + (b.rooms || 1), 0);
+export async function getAvailability(checkIn, checkOut, cityId = null) {
+  const targetCity = cityId ? (String(cityId).toLowerCase().includes('hyd') ? 'hyd' : 'vja') : 'vja';
 
-      const available = Math.max(0, (r.roomsTotal || 1) - bookedRooms);
-      return {
-        id: r.id,
-        area_id: r.areaId || 'vijayawada',
-        category: r.category,
-        name: r.name,
-        description: r.description,
-        bed_type: r.bedType,
-        view: r.view,
-        size_sqft: r.sizeSqft,
-        max_guests: r.maxGuests,
-        rooms_total: r.roomsTotal,
-        price_per_night: r.pricePerNight,
-        amenities: r.amenities,
-        active: true,
-        available,
-      };
-    });
+  // 1. Gather all local mock/offline bookings
+  const localBookings = getMockBookings();
+
+  // 2. Gather DB bookings if online
+  let dbBookings = [];
+  if (!isMock && supabase) {
+    try {
+      const { data } = await supabase
+        .from('stay_bookings')
+        .select('id, booking_ref, room_type_id, rooms, status, hold_expires_at, check_in, check_out, special_request')
+        .lt('check_in', checkOut)
+        .gt('check_out', checkIn)
+        .neq('status', 'cancelled');
+      if (data && Array.isArray(data)) {
+        dbBookings = data;
+      }
+    } catch (_) {}
   }
 
-  try {
-    const { data, error } = await supabase.rpc('get_available_rooms', {
-      p_check_in: checkIn,
-      p_check_out: checkOut,
-    });
-
-    if (!error && data && data.length > 0) {
-      return deduplicateRoomTypes(data);
+  // Combine and deduplicate active bookings
+  const allActiveBookings = [...localBookings];
+  for (const dbB of dbBookings) {
+    const ref = dbB.booking_ref || dbB.id;
+    if (!allActiveBookings.some((b) => (b.booking_ref && b.booking_ref === ref) || (b.id && b.id === ref))) {
+      allActiveBookings.push(dbB);
     }
-  } catch (err) {
-    console.warn('Error invoking get_available_rooms RPC, using fallback:', err);
   }
 
-  // Fallback: query stay_bookings directly if possible, else return room types
-  try {
-    const types = await getRoomTypes();
-    const { data: bookings } = await supabase
-      .from('stay_bookings')
-      .select('room_type_id, rooms, status, hold_expires_at, check_in, check_out')
-      .lt('check_in', checkOut)
-      .gt('check_out', checkIn);
+  return LOCAL_ROOMS.map((r) => {
+    // 1 room of each room type in FRCC (client specification: 6 rooms total, 1 of each type)
+    const maxRooms = 1;
 
-    if (bookings) {
-      const now = new Date();
-      const activeBookings = bookings.filter((b) =>
-        b.status === 'confirmed' || (b.status === 'pending' && (!b.hold_expires_at || new Date(b.hold_expires_at) > now))
-      );
-
-      return deduplicateRoomTypes(types).map((r) => {
-        const booked = activeBookings
-          .filter((b) =>
-            b.room_type_id === r.id ||
-            b.room_type_id === r.id.replace('vja-', '') ||
-            `vja-${b.room_type_id}` === r.id
-          )
-          .reduce((sum, b) => sum + (Number(b.rooms) || 1), 0);
-        return {
-          ...r,
-          available: Math.max(0, (r.rooms_total || r.roomsTotal || 0) - booked),
-        };
-      });
-    }
-  } catch (fallbackErr) {
-    console.warn('Fallback availability query failed:', fallbackErr);
-  }
-
-  // Fallback if RPC or database is unavailable
-  const allBookings = getMockBookings();
-  const types = await getRoomTypes();
-  return types.map((r) => {
-    const bookedRooms = allBookings
+    const bookedRooms = allActiveBookings
       .filter((b) => {
-        if (b.room_type_id !== r.id) return false;
-        if (b.check_in >= checkOut || b.check_out <= checkIn) return false;
         if (b.status === 'cancelled') return false;
         if (isBookingCancelledLocally(b.id) || isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.bookingId)) {
-          b.status = 'cancelled';
           return false;
         }
-        return true;
-      })
-      .reduce((sum, b) => sum + (b.rooms || 1), 0);
 
-    const available = Math.max(0, (r.rooms_total || r.roomsTotal || 1) - bookedRooms);
+        const bIn = b.check_in || b.checkin;
+        const bOut = b.check_out || b.checkout;
+        if (!bIn || !bOut) return false;
+        if (bIn >= checkOut || bOut <= checkIn) return false;
+
+        const bCity = (b.cityId || b.city_id || b.cityName || b.areaName || '').toLowerCase().includes('hyd') ||
+          (b.special_request && String(b.special_request).toLowerCase().includes('hyd')) ? 'hyd' : 'vja';
+        if (bCity !== targetCity) return false;
+
+        const rId = String(r.id || '').toLowerCase().replace('vja-', '');
+        const bRoomId = String(b.room_type_id || b.roomId || b.roomTypeId || '').toLowerCase().replace('vja-', '');
+        const rName = String(r.name || '').toLowerCase();
+        const bRoomName = String(b.roomName || b.title || '').toLowerCase();
+
+        const matchId = bRoomId === rId || bRoomId === String(r.id).toLowerCase();
+        const matchName = bRoomName && (bRoomName === rName || bRoomName.includes(rName) || rName.includes(bRoomName));
+
+        return matchId || matchName;
+      })
+      .reduce((sum, b) => sum + (Number(b.rooms || b.roomsCount || 1)), 0);
+
+    const available = Math.max(0, maxRooms - bookedRooms);
     return {
-      ...r,
+      id: r.id,
+      area_id: targetCity === 'hyd' ? 'hyd' : (r.areaId || 'vijayawada'),
+      category: r.category,
+      name: r.name,
+      description: r.description,
+      bed_type: r.bedType,
+      view: r.view,
+      size_sqft: r.sizeSqft,
+      max_guests: r.maxGuests,
+      rooms_total: maxRooms,
+      price_per_night: r.pricePerNight,
+      amenities: r.amenities,
+      active: true,
       available,
     };
   });
@@ -297,44 +302,96 @@ export async function createBooking(payload) {
   const roomTypeId = payload.roomTypeId || payload.room_type_id;
   const requestedRooms = Number(payload.rooms || 1);
 
-  if (isMock) {
-    const roomType = LOCAL_ROOMS.find((r) => r.id === roomTypeId) || LOCAL_ROOMS[0];
-    const totalRooms = roomType.roomsTotal || 1;
+  const isHyd = Boolean(
+    payload.cityId === 'hyd' ||
+    payload.city_id === 'hyd' ||
+    payload.venueId === 'hyd-residency' ||
+    (payload.cityName && payload.cityName.toLowerCase().includes('hyd')) ||
+    (payload.areaName && payload.areaName.toLowerCase().includes('hyd')) ||
+    (payload.venueName && payload.venueName.toLowerCase().includes('hyd')) ||
+    (payload.location && payload.location.toLowerCase().includes('hyd')) ||
+    (payload.specialRequest && payload.specialRequest.toLowerCase().includes('hyd')) ||
+    (payload.special_request && payload.special_request.toLowerCase().includes('hyd'))
+  );
+  const payloadCity = isHyd ? 'hyd' : 'vja';
 
-    // Check availability against active overlapping bookings
-    const allBookings = getMockBookings();
-    const overlappingBookings = allBookings.filter((b) => {
-      if (b.room_type_id !== roomType.id) return false;
-      if (b.check_in >= checkOut || b.check_out <= checkIn) return false;
-      if (b.status === 'cancelled') return false;
-      if (isBookingCancelledLocally(b.id) || isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.bookingId)) {
-        b.status = 'cancelled';
-        return false;
+  const pRoomId = String(roomTypeId || '').toLowerCase().replace('vja-', '').replace('hyd-', '');
+  const pRoomName = String(payload.roomName || payload.title || '').toLowerCase();
+  const roomType = LOCAL_ROOMS.find((r) => {
+    const rId = String(r.id || '').toLowerCase().replace('vja-', '').replace('hyd-', '');
+    const rName = String(r.name || '').toLowerCase();
+    return rId === pRoomId || (pRoomName && (pRoomName === rName || pRoomName.includes(rName) || rName.includes(pRoomName)));
+  }) || LOCAL_ROOMS[0];
+  const totalRooms = 1; // Strict 1-room-per-type client rule (6 rooms total across property)
+
+  // Enforce conflict check across both local bookings and Supabase
+  const allBookings = [...getMockBookings()];
+  if (supabase) {
+    try {
+      const { data: dbData } = await supabase
+        .from('stay_bookings')
+        .select('*')
+        .lt('check_in', checkOut)
+        .gt('check_out', checkIn)
+        .neq('status', 'cancelled');
+      if (dbData && Array.isArray(dbData)) {
+        for (const dbB of dbData) {
+          const ref = dbB.booking_ref || dbB.id;
+          if (!allBookings.some((b) => (b.booking_ref && b.booking_ref === ref) || (b.id && b.id === ref))) {
+            allBookings.push(dbB);
+          }
+        }
       }
-      return true;
-    });
+    } catch (_) {}
+  }
 
-    const bookedRooms = overlappingBookings.reduce((sum, b) => sum + (b.rooms || 1), 0);
-    if (bookedRooms + requestedRooms > totalRooms) {
-      // Overlapping booking exists
-      const userExisting = overlappingBookings.find(
-        (b) =>
-          (currentUserId && (b.user_id === currentUserId || b.userId === currentUserId)) ||
-          (guestMobile && (b.guest_mobile === guestMobile || b.mobile === guestMobile))
-      );
-
-      const isOwn = Boolean(userExisting);
-      const conflictRef = userExisting ? (userExisting.booking_ref || userExisting.id) : null;
-      const err = new Error(
-        isOwn
-          ? 'This room is already booked for these dates. If this is your existing booking, you can cancel it below to free up the room.'
-          : 'This room is already booked for these dates. Please choose another room or different dates.'
-      );
-      err.code = isOwn ? 'ROOM_ALREADY_BOOKED_BY_YOU' : 'ROOM_ALREADY_BOOKED';
-      err.existingBookingRef = conflictRef;
-      err.isOwnBooking = isOwn;
-      throw err;
+  const overlappingBookings = allBookings.filter((b) => {
+    if (b.status === 'cancelled') return false;
+    if (isBookingCancelledLocally(b.id) || isBookingCancelledLocally(b.booking_ref) || isBookingCancelledLocally(b.bookingId)) {
+      return false;
     }
+    const bIn = b.check_in || b.checkin;
+    const bOut = b.check_out || b.checkout;
+    if (!bIn || !bOut) return false;
+    if (bIn >= checkOut || bOut <= checkIn) return false;
+
+    const bCity = (b.cityId || b.city_id || b.cityName || b.areaName || '').toLowerCase().includes('hyd') ||
+      (b.special_request && String(b.special_request).toLowerCase().includes('hyd')) ? 'hyd' : 'vja';
+    if (bCity !== payloadCity) return false;
+
+    const bRoomId = String(b.room_type_id || b.roomId || b.roomTypeId || '').toLowerCase().replace('vja-', '').replace('hyd-', '');
+    const tRoomId = String(roomType.id || '').toLowerCase().replace('vja-', '').replace('hyd-', '');
+    const bRoomName = String(b.roomName || b.title || '').toLowerCase();
+    const tRoomName = String(roomType.name || '').toLowerCase();
+
+    const matchId = bRoomId === tRoomId || bRoomId === String(roomType.id).toLowerCase();
+    const matchName = bRoomName && (bRoomName === tRoomName || bRoomName.includes(tRoomName) || tRoomName.includes(bRoomName));
+
+    return matchId || matchName;
+  });
+
+  const bookedRooms = overlappingBookings.reduce((sum, b) => sum + Number(b.rooms || b.roomsCount || 1), 0);
+  if (bookedRooms + requestedRooms > totalRooms) {
+    const userExisting = overlappingBookings.find(
+      (b) =>
+        (currentUserId && (b.user_id === currentUserId || b.userId === currentUserId)) ||
+        (guestMobile && (b.guest_mobile === guestMobile || b.mobile === guestMobile))
+    );
+
+    const isOwn = Boolean(userExisting);
+    const conflictRef = userExisting ? (userExisting.booking_ref || userExisting.id) : null;
+    const err = new Error(
+      isOwn
+        ? 'This room is already booked for these dates. If this is your existing booking, you can cancel it below to free up the room.'
+        : 'This room is already booked for these dates. Please choose another room or different dates.'
+    );
+    err.code = isOwn ? 'ROOM_ALREADY_BOOKED_BY_YOU' : 'ROOM_ALREADY_BOOKED';
+    err.existingBookingRef = conflictRef;
+    err.isOwnBooking = isOwn;
+    throw err;
+  }
+
+  if (isMock) {
 
     const year = new Date().getFullYear();
     const random6 = String(Math.floor(100000 + Math.random() * 900000));
@@ -351,9 +408,13 @@ export async function createBooking(payload) {
       id: `mock-stay-${Date.now()}`,
       client_request_id: clientRequestId,
       booking_ref: bookingRef,
+      bookingRef: bookingRef,
+      bookingId: bookingRef,
       user_id: currentUserId,
       userId: currentUserId,
       room_type_id: roomType.id,
+      roomName: payload.roomName || roomType.name,
+      title: payload.roomName || roomType.name,
       check_in: checkIn,
       check_out: checkOut,
       nights,
@@ -364,6 +425,25 @@ export async function createBooking(payload) {
       guest_mobile: guestMobile || '',
       guest_email: payload.guestEmail || payload.guest_email || '',
       special_request: payload.specialRequest || payload.special_request || null,
+      specialRequest: payload.specialRequest || payload.special_request || null,
+      areaName: payload.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+      area_name: payload.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+      venueName: payload.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+      venue_name: payload.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+      cityName: payload.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+      city_name: payload.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+      cityId: payloadCity,
+      city_id: payloadCity,
+      venueId: payload.venueId || (isHyd ? 'hyd-residency' : 'vja-residency'),
+      venue_id: payload.venueId || (isHyd ? 'hyd-residency' : 'vja-residency'),
+      location: payload.location || (isHyd ? 'Hyderabad Campus · Hyderabad Club Residency' : 'Vijayawada Campus · FRCC Riverfront'),
+      details: payload.details || {
+        areaName: payload.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+        venueName: payload.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
+        cityName: payload.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada'),
+        cityId: payloadCity,
+        venueId: payload.venueId || (isHyd ? 'hyd-residency' : 'vja-residency'),
+      },
       price_per_night: pricePerNight,
       subtotal,
       member_discount: memberDiscount,
@@ -373,7 +453,7 @@ export async function createBooking(payload) {
       payment_method: payload.paymentMethod || payload.payment_method || 'upi',
       status: total === 0 || payload.isMockPaid ? 'confirmed' : 'pending',
       hold_expires_at: total === 0 ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      is_test: false,
+      is_test: Boolean(payload.isTest || payload.is_test),
       created_at: new Date().toISOString(),
     };
 
@@ -437,6 +517,23 @@ export async function createBooking(payload) {
       throw customErr;
     }
     throw error;
+  }
+
+  if (data) {
+    mockStayBookings.push({
+      ...data,
+      room_type_id: roomType.id,
+      roomName: payload.roomName || roomType.name,
+      title: payload.roomName || roomType.name,
+      cityId: payloadCity,
+      city_id: payloadCity,
+      cityName: payloadCity === 'hyd' ? 'Hyderabad' : 'Vijayawada',
+      areaName: isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus',
+      venueName: isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront',
+      check_in: checkIn,
+      check_out: checkOut,
+      rooms: requestedRooms,
+    });
   }
 
   return data;

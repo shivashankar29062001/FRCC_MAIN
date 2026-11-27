@@ -16,6 +16,7 @@ import { areas as HOTEL_AREAS, rooms as ALL_ROOMS, checkInTime, checkOutTime, ca
 import { memberDiscountPercent, whatsappNumber } from '../../config/site.js';
 import { formatInr } from '../../utils/pricing.js';
 import { formatDMY } from '../../utils/dates.js';
+import { generateBookingReceiptPdf } from '../../utils/receiptGenerator.js';
 import { isValidIndianMobile, INDIAN_MOBILE_MESSAGE, INDIAN_MOBILE_PLACEHOLDER, sanitizeMobileInput } from '../../utils/mobile.js';
 import { isValidName, sanitizeNameInput, normalizeName, nameError } from '../../utils/fullName.js';
 import { getRoomTypes, createBooking as createStayReservation, getAvailability, deduplicateRoomTypes, getMyStayBookings } from '../../api/stay.js';
@@ -308,7 +309,7 @@ export function HotelPage() {
   useEffect(() => {
     if (draft.checkin && draft.checkout) {
       setAvailabilityLoading(true);
-      getAvailability(draft.checkin, draft.checkout)
+      getAvailability(draft.checkin, draft.checkout, draft.cityId)
         .then((rooms) => {
           if (rooms && rooms.length > 0) {
             setAvailabilityRooms(rooms);
@@ -321,7 +322,7 @@ export function HotelPage() {
           setAvailabilityLoading(false);
         });
     }
-  }, [draft.checkin, draft.checkout, availabilityRev]);
+  }, [draft.checkin, draft.checkout, draft.cityId, availabilityRev]);
 
   const displayRooms = useMemo(() => {
     const raw = availabilityRooms.length > 0 ? availabilityRooms : roomTypes;
@@ -572,6 +573,10 @@ export function HotelPage() {
   // Payment Handler
   async function handlePay() {
     if (paying || submittedRef.current) return;
+    if (isSelectedSoldOut) {
+      setSubmitError('This room is already booked for these dates. Please choose another room or different dates.');
+      return;
+    }
     submittedRef.current = true;
     setPaying(true);
     setSubmitError('');
@@ -594,7 +599,7 @@ export function HotelPage() {
 
       const isTestBooking = Boolean(appliedCoupon?.is_test || appliedCoupon);
 
-      const isHyd = draft.cityId === 'hyd' || (draft.cityName || '').toLowerCase().includes('hyd') || (draft.areaName || '').toLowerCase().includes('hyd');
+      const isHyd = draft.cityId === 'hyd' || (draft.cityName || '').toLowerCase().includes('hyd') || (draft.areaName || '').toLowerCase().includes('hyd') || (draft.areaId || '').toLowerCase().includes('hyd');
       const resolvedAreaName = draft.areaName || (isHyd ? 'Hyderabad Campus' : 'Vijayawada Campus');
       const resolvedVenueName = draft.venueName || (isHyd ? 'Hyderabad Club Residency' : 'FRCC Riverfront');
       const resolvedCityName = draft.cityName || (isHyd ? 'Hyderabad' : 'Vijayawada');
@@ -610,6 +615,7 @@ export function HotelPage() {
         clientRequestId,
         userId: user?.id || null,
         roomTypeId: selectedRoom.id,
+        roomName: selectedRoom.name,
         checkIn: draft.checkin,
         checkOut: draft.checkout,
         checkInTime: '12:00',
@@ -621,6 +627,17 @@ export function HotelPage() {
         guestMobile: draft.mobile,
         guestEmail: draft.email,
         specialRequest: combinedSpecialRequest,
+        areaName: resolvedAreaName,
+        area_name: resolvedAreaName,
+        venueName: resolvedVenueName,
+        venue_name: resolvedVenueName,
+        cityName: resolvedCityName,
+        city_name: resolvedCityName,
+        cityId: resolvedCityId,
+        city_id: resolvedCityId,
+        venueId: resolvedVenueId,
+        venue_id: resolvedVenueId,
+        location: `${resolvedAreaName} · ${resolvedVenueName}`,
         paymentMethod: total === 0 ? 'coupon' : draft.paymentMethod,
         couponCode: appliedCoupon?.code || null,
         couponDiscount,
@@ -1025,6 +1042,7 @@ export function HotelPage() {
                       venueId: firstVenue?.id || (isHydCity ? 'hyd-residency' : 'vja-residency'),
                       venueName: firstVenue?.name || firstVenue?.displayName || (isHydCity ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
                       areaName: firstVenue?.areaName || (isHydCity ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+                      areaId: isHydCity ? 'hyd' : 'vja',
                     });
                   }}
                   onVenueChange={(vid, venueObj) => {
@@ -1033,6 +1051,7 @@ export function HotelPage() {
                       venueId: vid,
                       venueName: venueObj?.name || venueObj?.displayName || (isHydVenue ? 'Hyderabad Club Residency' : 'FRCC Riverfront'),
                       areaName: venueObj?.areaName || (isHydVenue ? 'Hyderabad Campus' : 'Vijayawada Campus'),
+                      areaId: isHydVenue ? 'hyd' : 'vja',
                     });
                   }}
                 />
@@ -1241,6 +1260,26 @@ export function HotelPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Sold Out Warning Banner */}
+            {isSelectedSoldOut && selectedRoom && (
+              <div role="alert" className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    ⚠️ &ldquo;{selectedRoom.name}&rdquo; is already booked and sold out for your selected dates ({formatDMY(draft.checkin)} to {formatDMY(draft.checkout)}) at {draft.cityName || (draft.cityId === 'hyd' ? 'Hyderabad Campus' : 'Vijayawada Campus')}.
+                  </span>
+                  {hasPreselectedRoom && !showAllRooms && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllRooms(true)}
+                      className="underline font-bold text-rose-900 hover:text-rose-950"
+                    >
+                      Browse available rooms
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1769,6 +1808,12 @@ export function HotelPage() {
               )}
             </div>
 
+            {isSelectedSoldOut && (
+              <div role="alert" className="mt-6 rounded-xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-800">
+                ⚠️ &ldquo;{selectedRoom.name}&rdquo; is sold out for these dates at {resolvedCityName} ({formatDMY(draft.checkin)} to {formatDMY(draft.checkout)}). Please go back and select another room or change your dates.
+              </div>
+            )}
+
             <div className="mt-8 flex justify-between border-t border-slate-100 pt-5">
               <button
                 type="button"
@@ -1781,7 +1826,7 @@ export function HotelPage() {
                 variant={total === 0 ? 'primary' : 'gold'}
                 loading={paying}
                 loadingLabel={total === 0 ? 'Confirming booking…' : 'Processing payment…'}
-                disabled={!termsAccepted || paying}
+                disabled={!termsAccepted || paying || isSelectedSoldOut}
                 onClick={handlePay}
                 className="px-8 py-2.5 font-semibold cursor-pointer"
               >
@@ -1906,10 +1951,39 @@ export function HotelPage() {
             <div className="no-print mt-6 flex flex-col sm:flex-row justify-center gap-3">
               <button
                 type="button"
+                onClick={() => {
+                  try {
+                    generateBookingReceiptPdf({
+                      ...confirmedBooking,
+                      category: 'stay',
+                      bookingRef: confirmedBooking.bookingRef || confirmedBooking.id,
+                      roomName: confirmedBooking.roomName,
+                      title: confirmedBooking.roomName,
+                      checkin: confirmedBooking.checkin,
+                      checkout: confirmedBooking.checkout,
+                      nights: confirmedBooking.nights,
+                      guests: confirmedBooking.guests,
+                      venueName: confirmedBooking.venueName || confirmedBooking.areaName || 'Vijayawada Campus',
+                      areaName: confirmedBooking.areaName || 'Vijayawada Campus',
+                      total: confirmedBooking.total,
+                      amount: confirmedBooking.total,
+                      status: confirmedBooking.status || 'CONFIRMED',
+                      payment_method: confirmedBooking.payment_method || 'Online (UPI/Card)',
+                    });
+                  } catch (e) {
+                    console.error('Failed to generate receipt:', e);
+                  }
+                }}
+                className="btn-base bg-navy-900 text-gold-400 hover:bg-navy-800 font-semibold px-6 py-2.5 inline-flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                Download Receipt (PDF)
+              </button>
+              <button
+                type="button"
                 onClick={() => window.print()}
                 className="btn-base border border-slate-300 bg-white text-navy-900 hover:bg-slate-50 font-semibold px-6 py-2.5 inline-flex items-center justify-center gap-2 cursor-pointer"
               >
-                <PrinterIcon className="h-4 w-4" /> Print / Save as PDF
+                <PrinterIcon className="h-4 w-4" /> Print
               </button>
               <a
                 href={waUrl}

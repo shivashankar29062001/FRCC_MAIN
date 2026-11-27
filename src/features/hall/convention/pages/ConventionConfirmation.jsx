@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
+import { FRCC_LOGO_BASE64 } from '../../../../assets/logoBase64.js';
 import { useBooking } from '../context/BookingContext';
 import Stepper from '../components/Stepper';
 import { inr, getBookingRefundPolicy, maskPhone, maskEmail, CANCELLATION_POLICY_TEXT } from '../utils/format';
@@ -141,8 +142,9 @@ export default function ConventionConfirmation() {
     const emblemY = (headerHeight - emblemSize) / 2;
 
     try {
-      const emblemImg = '/images/brand/frcc-emblem-receipt.png';
-      doc.addImage(emblemImg, 'PNG', emblemX, emblemY, emblemSize, emblemSize, '', 'FAST');
+      doc.setFillColor('#FFFFFF');
+      doc.roundedRect(emblemX - 2, emblemY - 2, emblemSize + 4, emblemSize + 4, 4, 4, 'F');
+      doc.addImage(FRCC_LOGO_BASE64, 'PNG', emblemX, emblemY, emblemSize, emblemSize, '', 'FAST');
     } catch (e) {
       doc.setFont('times', 'bold');
       doc.setFontSize(18);

@@ -3,6 +3,7 @@ import { SITE_INFO } from '../config/siteInfo.js';
 import { registrationNo } from '../config/organization.js';
 import { formatDMY } from './dates.js';
 import { formatINR } from './pricing.js';
+import { FRCC_LOGO_BASE64 } from '../assets/logoBase64.js';
 
 /**
  * Generates and downloads a clean, professional PDF booking receipt for any
@@ -48,34 +49,50 @@ export function generateBookingReceiptPdf(booking) {
     (isParking ? `Parking Slot ${booking.slot_id || booking.parkingSlot}` : 'Booking');
 
   // 1 · Header Banner (Navy #0F1F3D + Gold #C9A227 accent stripe)
-  const headerHeight = 44;
+  const headerHeight = 46;
   doc.setFillColor('#0F1F3D');
   doc.rect(0, 0, 210, headerHeight, 'F');
   doc.setFillColor('#C9A227');
   doc.rect(0, headerHeight - 3, 210, 2.5, 'F');
 
+  // Embed Official FRCC Logo
+  const logoSize = 28;
+  const logoX = 14;
+  const logoY = 7;
+  try {
+    doc.setFillColor('#FFFFFF');
+    doc.roundedRect(logoX - 1, logoY - 1, logoSize + 2, logoSize + 2, 3, 3, 'F');
+    doc.addImage(FRCC_LOGO_BASE64, 'PNG', logoX, logoY, logoSize, logoSize, '', 'FAST');
+  } catch (err) {
+    console.warn('[receiptGenerator] Logo embed warning:', err);
+  }
+
   // Header Typography
+  const textX = 48;
   doc.setFont('times', 'bold');
-  doc.setFontSize(16);
+  doc.setFontSize(13.5);
   doc.setTextColor('#C9A227');
-  doc.text('FRCC — FILM RECREATION & CULTURAL CENTRE', 14, 18);
+  doc.text('FRCC — FILM RECREATION & CULTURAL CENTRE', textX, 16);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor('#E2E8F0');
-  doc.text(`Regd. No. ${registrationNo} • Official Booking Confirmation Receipt`, 14, 26);
-  doc.text(`${SITE_INFO.locations[0]?.fullAddress || 'Vijayawada, NTR District, Andhra Pradesh – 520003'}`, 14, 32);
+  doc.text(`Regd. No. ${registrationNo} • Official Booking Confirmation Receipt`, textX, 23);
+  doc.text(`${SITE_INFO.locations[0]?.fullAddress || 'Vijayawada, NTR District, Andhra Pradesh – 520003'}`, textX, 29);
+  doc.setFontSize(7.5);
+  doc.setTextColor('#94A3B8');
+  doc.text(`Tel: ${SITE_INFO.phone || '+91 78936 16262'} • Email: ${SITE_INFO.email || 'support@frcc.org.in'} • Web: ${SITE_INFO.website || 'www.frccind.com'}`, textX, 35);
 
   // 2 · Receipt Title & Timestamp
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor('#0F1F3D');
-  doc.text('BOOKING RECEIPT', 14, 55);
+  doc.text('BOOKING RECEIPT', 14, 57);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor('#64748B');
-  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 61);
+  doc.text(`Generated on: ${new Date().toLocaleString('en-IN')}`, 14, 63);
 
   // 3 · Key Details Table Rows
   const rows = [
@@ -166,7 +183,7 @@ export function generateBookingReceiptPdf(booking) {
   rows.push(['Booking Status', displayStatus]);
 
   // 4 · Render Card-like Table
-  let y = 70;
+  let y = 72;
   const boxHeight = rows.length * 8 + 4;
   doc.setFillColor('#F8FAFC');
   doc.rect(14, y, 182, boxHeight, 'F');

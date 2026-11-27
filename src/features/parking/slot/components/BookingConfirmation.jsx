@@ -20,8 +20,10 @@ import {
   Ticket,
   XCircle,
   Loader2,
-  Send
+  Send,
+  Download
 } from 'lucide-react';
+import { generateBookingReceiptPdf } from '../../../../utils/receiptGenerator.js';
 import { resendBookingConfirmation } from '../services/bookingService.js';
 import './BookingConfirmation.css';
 
@@ -356,6 +358,37 @@ export default function BookingConfirmation({
 
         {/* Final actions */}
         <div className="confirmation-actions-container">
+          <button
+            type="button"
+            id="download-parking-receipt-btn"
+            className="btn-confirmation-done"
+            style={{ backgroundColor: '#0F1F3D', color: '#F1C40F', border: '1px solid #C9A227' }}
+            onClick={() => {
+              try {
+                generateBookingReceiptPdf({
+                  ...booking,
+                  category: 'parking',
+                  bookingRef: booking.bookingReference || booking.bookingId || booking.id,
+                  parkingSlot: booking.parkingSlot || booking.slot,
+                  slot_id: booking.parkingSlot || booking.slot,
+                  vehicleNumber: booking.vehicleNumber,
+                  vehicleType: booking.vehicleType,
+                  date: booking.date || booking.bookingDate,
+                  arrival_time: booking.arrival_time || booking.arrivalTime,
+                  total: Number(booking.amount || 0),
+                  amount: Number(booking.amount || 0),
+                  payment_method: booking.paymentMethod || 'Complimentary (Free)',
+                  status: booking.bookingStatus || 'CONFIRMED'
+                });
+              } catch (e) {
+                console.error('Failed to download parking receipt:', e);
+              }
+            }}
+          >
+            <Download size={18} />
+            <span>Download Receipt</span>
+          </button>
+
           <button
             type="button"
             id="done-btn"
